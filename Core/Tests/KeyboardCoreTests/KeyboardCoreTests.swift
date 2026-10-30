@@ -220,7 +220,7 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertEqual(sentence(["ㄋㄧˇ", "ㄏ*"]), "你好")
         XCTAssertEqual(sentence(["ㄋ*", "ㄏ*", "ㄕ*", "ㄐ*"]), "你好世界")
         XCTAssertEqual(sentence(["ㄨㄛ*", "ㄏ*", "ㄓㄜ*", "ㄧ*"]), "我會這樣")
-        XCTAssertEqual(e.candidates(for: ["ㄋㄧ*"]).map { $0.text }, ["你", "妳"])
+        XCTAssertEqual(e.candidates(for: ["ㄋㄧ*"]).map { $0.text }, ["你", "你好", "你們", "妳"])
         XCTAssertEqual(e.candidates(for: ["ㄅ*"]).first?.text, "ㄅ")
     }
 
@@ -279,11 +279,78 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertEqual(c.map { $0.text }, ["你", "你好", "你們", "妳"])
         XCTAssertEqual(c[1].reading, "ㄋㄧˇ-ㄏㄠˇ")
         XCTAssertEqual(c[1].span, 1)
-        // 還沒打完（沒聲調）不預測
-        XCTAssertFalse(e.candidates(for: ["ㄋㄧ*"]).contains { $0.reading != nil })
+        // 不必先打聲調，也會出現相關詞；選取仍使用完整讀音。
+        let partial = e.candidates(for: ["ㄋㄧ*"])
+        XCTAssertEqual(partial.map { $0.text }, ["你", "你好", "你們", "妳"])
+        XCTAssertEqual(partial[1].reading, "ㄋㄧˇ-ㄏㄠˇ")
         // 學過的詞排在預測的最前面
         e.learn(readings: ["ㄋㄧˇ", "ㄇㄣ˙"], text: "你們")
         XCTAssertEqual(e.candidates(for: ["ㄋㄧˇ"])[1].text, "你們")
+    }
+
+    func testPartialPredictionsRespectTonesAndConsumption() {
+        let e = makeEngine(extra: [("ㄋㄧˋ-ㄌㄧㄡˊ", "逆流", -2.0)])
+        let partial = e.candidates(for: ["ㄋㄧ*"])
+        XCTAssertEqual(partial.first?.text, "你")
+        XCTAssertEqual(partial[1].text, "你好")
+        let phrase = partial.first { $0.text == "你好" }!
+        XCTAssertEqual(phrase.span, 1)
+        XCTAssertEqual(phrase.reading, "ㄋㄧˇ-ㄏㄠˇ")
+        e.learn(readings: phrase.reading!.components(separatedBy: "-"), text: phrase.text)
+        XCTAssertTrue(e.userModel.phrases(for: "ㄋㄧˇ-ㄏㄠˇ").contains("你好"))
+        XCTAssertFalse(e.predictions(for: ["ㄋㄧˇ"]).contains { $0.text == "逆流" })
+        XCTAssertTrue(e.predictions(for: ["ㄋㄧ*"]).contains { $0.text == "逆流" })
+        XCTAssertTrue(e.predictions(for: ["ㄋㄧ*"], limit: 0).isEmpty)
+        var composer = ZhuyinComposer()
+        for ch in "ㄋㄧ" { composer.input(ch) }
+        composer.removeFirst(phrase.span)
+        XCTAssertFalse(composer.isComposing)
+    }
+
+    func testContextRanksHomophonesWithoutOverridingStrongLearning() {
+        let e = makeEngine(extra: [("ㄐㄧ", "雞", -3.0), ("ㄐㄧ", "機", -3.8),
+                                   ("ㄕㄡˇ-ㄐㄧ", "手機", -3.0)])
+        XCTAssertEqual(e.candidates(for: ["ㄐㄧ*"]).first?.text, "雞")
+        XCTAssertEqual(e.candidates(for: ["ㄐㄧ*"], before: "手").first?.text, "機")
+        XCTAssertEqual(e.candidates(for: ["ㄐㄧ*"], before: "手。").first?.text, "雞")
+        XCTAssertEqual(e.candidates(for: ["ㄐㄧ*"], before: "手 ").first?.text, "雞")
+        for _ in 0..<5 { e.learn(readings: ["ㄐㄧ"], text: "雞") }
+        XCTAssertEqual(e.candidates(for: ["ㄐㄧ*"], before: "手").first?.text, "雞")
+    }
+
+    func testContextCompletionUsesOnlyUncommittedSuffix() {
+        let e = makeEngine(extra: [("ㄒㄧㄣ-ㄎㄨˇ", "辛苦", -4.0),
+                                   ("ㄒㄧㄣ-ㄎㄨˇ-ㄌㄜ˙", "辛苦了", -3.5),
+                                   ("ㄎㄨˇ-ㄍㄨㄚ", "苦瓜", -3.0)])
+        XCTAssertEqual(e.associations(after: "今天辛苦").first, "了")
+        XCTAssertFalse(e.associations(after: "辛苦").contains("苦了"))
+        XCTAssertTrue(e.associations(after: "辛苦！").isEmpty)
+        let c = e.candidates(for: ["ㄎㄨ*"], before: "辛")
+        let completion = c.first { $0.text == "苦了" }!
+        XCTAssertEqual(completion.span, 1)
+        XCTAssertEqual(completion.reading, "ㄎㄨˇ-ㄌㄜ˙")
+        XCTAssertFalse(c.contains { $0.text == "辛苦了" && $0.reading != nil })
+    }
+
+    func testLearnedCompletionsRefreshCacheAndReset() {
+        let e = makeEngine()
+        _ = e.associations(after: "你好")
+        _ = e.predictions(for: ["ㄋㄧ*"])
+        e.learn(readings: ["ㄋㄧˇ", "ㄏㄠˇ", "ㄅㄠˇ", "ㄅㄠˇ"], text: "你好寶寶")
+        XCTAssertTrue(e.associations(after: "你好").contains("寶寶"))
+        XCTAssertTrue(e.predictions(for: ["ㄋㄧ*"]).contains { $0.text == "你好寶寶" })
+        e.resetLearning()
+        XCTAssertFalse(e.associations(after: "你好").contains("寶寶"))
+        XCTAssertFalse(e.predictions(for: ["ㄋㄧ*"]).contains { $0.text == "你好寶寶" })
+    }
+
+    func testPredictionCountLeavesSingleCharacterAlternativesReachable() {
+        let e = makeEngine(extra: [("ㄋㄧˇ-ㄇㄚ˙", "你嗎", -4.2), ("ㄋㄧˇ-ㄋㄜ˙", "你呢", -4.3),
+                                   ("ㄋㄧˇ-ㄏㄠˇ-ㄇㄚ˙", "你好嗎", -4.4)])
+        let c = e.candidates(for: ["ㄋㄧ*"])
+        XCTAssertLessThanOrEqual(c.filter { $0.reading != nil }.count, 3)
+        XCTAssertLessThanOrEqual(c.firstIndex { $0.text == "妳" }!, 4)
+        XCTAssertEqual(Set(c.map { $0.text }).count, c.count)
     }
 
     func testSyllablePrefixes() {

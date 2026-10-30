@@ -31,6 +31,14 @@ final class ZhuyinEngine {
     private let column: String
     private var cache: [String: [Scored]] = [:]
     private var fuzzyCache: [String: [Scored]] = [:]
+    private struct Completion {
+        let text: String
+        let reading: String
+        let score: Double
+    }
+    // 只快取本機查詢；同一句話打不同注音時不重查前文，避免每按一鍵掃字典。
+    private var predictionRows: [String: [Completion]] = [:]
+    private var contextCache: [String: [Completion]] = [:]
     private var alternativeCache: [String: [(reading: String, penalty: Double)]] = [:]
 
     /// 容錯：打錯鍵、聲調錯、ㄣㄥ這類模糊音也猜得到
@@ -321,7 +329,7 @@ final class ZhuyinEngine {
     }
 
     /// 候選字：第一個是整句，接著是預測的詞，再來是從開頭算起最長到最短的詞
-    func candidates(for readings: [String]) -> [Candidate] {
+    func candidates(for readings: [String], before context: String = "") -> [Candidate] {
         guard !readings.isEmpty else { return [] }
         let readings = Self.settleSplits(readings)
         var out: [Candidate] = []
@@ -351,28 +359,131 @@ final class ZhuyinEngine {
                 out.insert(Candidate(text: best.text, span: 1, kind: .phrase), at: best.score > top ? 0 : min(1, out.count))
             }
         }
-        // 第一個（按空白送出的）還是照打的字，預測的詞接在它後面
-        let predicted = predictions(for: readings).filter { !seen.contains($0.text) }
-        out.insert(contentsOf: predicted.map { Candidate(text: $0.text, span: readings.count, kind: .phrase, reading: $0.reading) },
-                   at: min(1, out.count))
+        let related = completions(after: context)
+        // 同音單字結合字頻、使用者選字與前文詞彙；加分有限，不蓋過反覆選過的偏好。
+        if readings.count == 1, !related.isEmpty {
+            let scores = Dictionary(fuzzyPhrases(readings[...]).map { ($0.text, $0.score) },
+                                    uniquingKeysWith: max)
+            let ranked = out.enumerated().filter { $0.element.text.count == 1 && $0.element.kind != .literal }
+                .map { index, candidate -> (Int, Double) in
+                    let support = related.filter {
+                        $0.text.hasPrefix(candidate.text) &&
+                        Self.matchPenalty([Substring(Self.displayQuery(readings[0]))],
+                                          Array($0.reading.split(separator: "-").prefix(1))) != nil
+                    }.map { max(0, min(1.8, 5 + $0.score)) }.max() ?? 0
+                    return (index, (scores[candidate.text] ?? Self.userPhraseBase) + support)
+                }.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0 < $1.0 }
+            // 簡拼拆出的兩字詞仍維持原本排序，不被單字搶走。
+            if out.first?.text.count == 1, let winner = ranked.first, winner.0 != 0 {
+                out.insert(out.remove(at: winner.0), at: 0)
+            }
+        }
+        // 預測詞最多三個；保留第一個直接候選，也讓其他常用單字仍容易選到。
+        let pattern = readings.map { Substring(Self.displayQuery($0)) }
+        let contextual = related.filter {
+            let full = $0.reading.split(separator: "-")
+            return full.count > readings.count &&
+                Self.matchPenalty(pattern, Array(full.prefix(readings.count))) != nil
+        }
+        var ordinary = predictions(for: readings)
+        if readings.contains(where: { $0.contains("*") }), let leading = out.first, leading.kind != .literal {
+            // 注音尚未打完時，先補目前最可能的字，避免別的同音字詞佔滿前排。
+            ordinary = ordinary.filter { $0.text.hasPrefix(leading.text) } +
+                ordinary.filter { !$0.text.hasPrefix(leading.text) }
+        }
+        let predicted = contextual.map { (text: $0.text, reading: $0.reading) } + ordinary
+        var extras: [Candidate] = []
+        for p in predicted where seen.insert(p.text).inserted {
+            extras.append(Candidate(text: p.text, span: readings.count, kind: .phrase, reading: p.reading))
+            if extras.count == 3 { break }
+        }
+        out.insert(contentsOf: extras, at: min(1, out.count))
         return out
     }
 
-    /// 預測：打完整的字（有聲調）就先列出以它們開頭的詞，例如 ㄏㄠˇ → 好像、好的；學過的詞排最前面
+    private static func displayQuery(_ reading: String) -> String {
+        reading.hasSuffix("~") ? String(reading.dropLast()) : reading
+    }
+
+    /// 沒打聲調也先預測詞；保留完整讀音，選取後才能正確學習。
     func predictions(for readings: [String], limit: Int = 8) -> [(text: String, reading: String)] {
-        guard column == "reading", !readings.isEmpty, readings.allSatisfy({ !$0.contains("*") }) else { return [] }
-        let head = readings.joined(separator: "-") + "-"
-        var out: [(text: String, reading: String)] = []
-        var seen = Set<String>()
-        for learned in userModel.learned(startingWith: head) where seen.insert(learned.phrase).inserted {
-            out.append((learned.phrase, learned.reading))
+        guard column == "reading", !readings.isEmpty, readings.count < Self.maxPhraseLength, limit > 0 else { return [] }
+        let input = readings.map { Self.displayQuery($0) }
+        let pattern = input.map { Substring($0) }
+        let key = input.joined(separator: "-")
+        let rows: [Completion]
+        if let cached = predictionRows[key] {
+            rows = cached
+        } else {
+            var found: [Completion] = []
+            let abbreviation = String(input.compactMap { $0.first })
+            // abbr 範圍用索引縮小查詢；逐音節比對避免 * 跨過分隔符而誤配。
+            db.run("SELECT phrase, reading, score FROM phrases WHERE abbr > ?1 AND abbr < ?2 AND reading GLOB ?3 ORDER BY score DESC, phrase ASC LIMIT 160",
+                   [.text(abbreviation), .text(abbreviation + "\u{10FFFF}"), .text(key + "-*")]) { stmt in
+                found.append(Completion(text: SQLiteDB.text(stmt, 0), reading: SQLiteDB.text(stmt, 1),
+                                        score: SQLiteDB.double(stmt, 2)))
+            }
+            if predictionRows.count >= 64 { predictionRows.removeAll() }
+            predictionRows[key] = found
+            rows = found
         }
-        db.run("SELECT phrase, reading, MAX(score) AS s FROM phrases WHERE reading > ?1 AND reading < ?2 GROUP BY phrase ORDER BY s DESC LIMIT ?3",
-               [.text(head), .text(head + "\u{10FFFF}"), .int(limit)]) { stmt in
-            let phrase = SQLiteDB.text(stmt, 0)
-            if seen.insert(phrase).inserted { out.append((phrase, SQLiteDB.text(stmt, 1))) }
+        let learned = userModel.learnedPhrases().map {
+            Completion(text: $0.phrase, reading: $0.reading, score: Self.userPhraseBase)
         }
-        return Array(out.prefix(limit))
+        var best: [String: Completion] = [:]
+        for row in rows + learned {
+            let full = row.reading.split(separator: "-")
+            guard full.count > input.count, full.count <= Self.maxPhraseLength,
+                  let penalty = Self.matchPenalty(pattern, Array(full.prefix(input.count))) else { continue }
+            let score = row.score + penalty + userModel.boost(reading: row.reading, phrase: row.text)
+            if let old = best[row.text], old.score >= score { continue }
+            best[row.text] = Completion(text: row.text, reading: row.reading, score: score)
+        }
+        return best.values.sorted {
+            $0.score != $1.score ? $0.score > $1.score : $0.text < $1.text
+        }.prefix(limit).map { (text: $0.text, reading: $0.reading) }
+    }
+
+    /// 只取游標前連續中文的末三字；標點、空格、換行會中斷前文。
+    private static func contextTail(_ text: String) -> String {
+        String(text.suffix(3).reversed().prefix { ch in
+            ch.unicodeScalars.allSatisfy {
+                (0x3400...0x9FFF).contains($0.value) || (0x20000...0x323AF).contains($0.value)
+            }
+        }.reversed())
+    }
+
+    private func completions(after text: String) -> [Completion] {
+        let tail = Self.contextTail(text)
+        guard !tail.isEmpty else { return [] }
+        if let cached = contextCache[tail] { return cached }
+        var best: [String: Completion] = [:]
+        let learned = userModel.learnedPhrases()
+        for length in stride(from: tail.count, through: 1, by: -1) {
+            let head = String(tail.suffix(length))
+            var rows: [Completion] = []
+            db.run("SELECT phrase, reading, score FROM phrases WHERE phrase > ?1 AND phrase < ?2 ORDER BY score DESC, phrase ASC LIMIT 80",
+                   [.text(head), .text(head + "\u{10FFFF}")]) { stmt in
+                rows.append(Completion(text: SQLiteDB.text(stmt, 0), reading: SQLiteDB.text(stmt, 1),
+                                       score: SQLiteDB.double(stmt, 2)))
+            }
+            rows += learned.filter { $0.phrase.hasPrefix(head) && $0.phrase.count > length }.map {
+                Completion(text: $0.phrase, reading: $0.reading, score: Self.userPhraseBase)
+            }
+            for row in rows where row.text.hasPrefix(head) {
+                let sounds = row.reading.split(separator: "-")
+                guard sounds.count == row.text.count, sounds.count > length else { continue }
+                let rest = String(row.text.dropFirst(length))
+                let score = row.score + Double(length - 1) * 1.5 +
+                    userModel.boost(reading: row.reading, phrase: row.text)
+                if let old = best[rest], old.score >= score { continue }
+                best[rest] = Completion(text: rest, reading: sounds.dropFirst(length).joined(separator: "-"), score: score)
+            }
+        }
+        let result = best.values.sorted { $0.score != $1.score ? $0.score > $1.score : $0.text < $1.text }
+        if contextCache.count >= 64 { contextCache.removeAll() }
+        contextCache[tail] = result
+        return result
     }
 
     /// 所有音節（沒聲調）的開頭，例如 ㄋㄧㄠ → ㄋ、ㄋㄧ、ㄋㄧㄠ（給組字用，判斷注音能不能接在一起）
@@ -389,18 +500,10 @@ final class ZhuyinEngine {
         return out
     }
 
-    /// 聯想詞：打完一個字後，接在它後面常見的字詞
+    /// 聯想整段前文的後續詞，較長的吻合與常用詞優先，也包含已學會的片語。
     func associations(after text: String, limit: Int = 30) -> [String] {
-        guard let last = text.last else { return [] }
-        let head = String(last)
-        var out: [String] = []
-        db.run("SELECT phrase, MAX(score) AS s FROM phrases WHERE phrase > ?1 AND phrase < ?2 GROUP BY phrase ORDER BY s DESC LIMIT ?3",
-               [.text(head), .text(head + "\u{10FFFF}"), .int(limit)]) { stmt in
-            let phrase = SQLiteDB.text(stmt, 0)
-            guard phrase.count > 1, phrase.hasPrefix(head) else { return }
-            out.append(String(phrase.dropFirst()))
-        }
-        return out
+        guard limit > 0 else { return [] }
+        return completions(after: text).prefix(limit).map { $0.text }
     }
 
     /// 使用者選了某個詞：之後這個詞會排更前面
@@ -420,6 +523,7 @@ final class ZhuyinEngine {
         }
         guard !used.isEmpty, used.count == text.count, used.count <= Self.maxPhraseLength else { return }
         userModel.record(reading: used.joined(separator: "-"), phrase: text)
+        contextCache.removeAll()
         cache.removeAll()
         fuzzyCache.removeAll()
         alternativeCache.removeAll()
@@ -427,6 +531,7 @@ final class ZhuyinEngine {
 
     func resetLearning() {
         userModel.reset()
+        contextCache.removeAll()
         cache.removeAll()
         fuzzyCache.removeAll()
         alternativeCache.removeAll()
@@ -460,6 +565,15 @@ final class UserPhraseModel {
     func phrases(for reading: String) -> [String] {
         guard !reading.isEmpty else { return [] }
         return matchingCounts(for: reading).keys.sorted()
+    }
+
+    /// 可用於詞語補全的完整讀音；不把只記了簡拼的資料當成確定的聲調。
+    func learnedPhrases() -> [(reading: String, phrase: String)] {
+        var out: [(reading: String, phrase: String)] = []
+        for (reading, phrases) in counts where !reading.isEmpty && !reading.contains("*") {
+            for phrase in phrases.keys { out.append((reading: reading, phrase: phrase)) }
+        }
+        return out
     }
 
     /// 學過、完整讀音以 prefix 開頭的詞（選越多次越前面），給預測用

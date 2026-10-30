@@ -673,7 +673,8 @@ final class KeyboardViewController: UIInputViewController {
         } else if composer.readings.isEmpty {
             candidates = []
         } else if let engine = engine {
-            candidates = engine.candidates(for: composer.readings)
+            let context = settings.associations ? (editorText ?? textDocumentProxy.documentContextBeforeInput ?? "") : ""
+            candidates = engine.candidates(for: composer.readings, before: context)
         } else {
             candidates = [Candidate(text: ZhuyinEngine.display(composer.readings.joined()), span: composer.readings.count, kind: .literal)]
         }
@@ -882,7 +883,12 @@ final class KeyboardViewController: UIInputViewController {
             kanaBuffer = ""
         } else {
             if !composer.readings.isEmpty {
-                text = engine?.bestSegments(composer.readings).map { $0.text }.joined() ?? ZhuyinEngine.display(composer.readings.joined())
+                // 送出畫面上已排序的第一個候選，保持 Return 與空白鍵結果一致。
+                if let first = candidates.first, first.span == composer.readings.count {
+                    text = first.text
+                } else {
+                    text = engine?.bestSegments(composer.readings).map { $0.text }.joined() ?? ZhuyinEngine.display(composer.readings.joined())
+                }
             }
             composer.clear()
         }
@@ -894,8 +900,10 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func showAssociations(after text: String) {
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let context = before.hasSuffix(text) ? before : before + text
         if settings.associations, editorText == nil, mode == .zhuyin || mode == .handwriting, let engine = engine {
-            suggestions = engine.associations(after: text)
+            suggestions = engine.associations(after: context)
         } else if settings.associations, editorText == nil, mode == .pinyin, let p = pinyinEngine {
             // 拼音：用繁體原文查，結果再轉簡體
             var seen = Set<String>()
@@ -905,8 +913,10 @@ final class KeyboardViewController: UIInputViewController {
         }
         // 中文模式：選字那排最前面放標點，看起來是問句就把「？」排第一個
         if editorText == nil, mode == .zhuyin || mode == .handwriting || mode == .pinyin {
-            let before = textDocumentProxy.documentContextBeforeInput ?? ""
-            suggestions = PunctuationSuggestions.after(before.hasSuffix(text) ? before : before + text) + suggestions
+            let punctuation = PunctuationSuggestions.after(context)
+            // 先露出兩個聯想詞，再放其餘標點，避免四個符號擋住所有詞。
+            suggestions = Array(punctuation.prefix(1)) + Array(suggestions.prefix(2)) +
+                Array(punctuation.dropFirst()) + Array(suggestions.dropFirst(2))
         }
         suggestionSource = .association
         refreshTopBar()
