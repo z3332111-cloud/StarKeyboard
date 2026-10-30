@@ -6,6 +6,7 @@ on:
     paths:
       - "android/**"
       - "tools/build_dict.py"
+      - "tools/chat_phrases.txt"
       - "tools/build_fonts.py"
       - "tools/build_words.py"
       - ".github/workflows/android.yml"

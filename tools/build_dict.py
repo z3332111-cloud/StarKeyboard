@@ -12,6 +12,8 @@ data.txt 每行是「讀音 字詞 分數」，讀音的音節用 - 連接，例
     abbr：每個音節的第一個注音（只打開頭的簡拼用），例如 ㄋㄏ
 - pinyin(py, bpmf)：漢語拼音音節 → 沒聲調的注音，例如 hao → ㄏㄠ、lv → ㄌㄩ
 - t2s(trad, simp)：繁體 → 簡體（OpenCC，Apache 2.0；有給 OpenCC 檔案才會有）
+
+另外會讀同一個資料夾的 chat_phrases.txt（聊天常用句），分數拉到至少 CHAT_SCORE。
 """
 import os
 import re
@@ -21,6 +23,9 @@ import sys
 SYLLABLE = "[ㄅ-ㄩˊˇˋ˙]+"
 READING = re.compile("^%s(-%s)*$" % (SYLLABLE, SYLLABLE))
 TONES = "ˊˇˋ˙"
+# 聊天常用句的分數下限（log10 機率）：比「女孩」「們」這類新聞常見詞高一點，簡拼才猜得到「你好」「可以嗎」
+CHAT_SCORE = -3.5
+CHAT_PHRASES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat_phrases.txt")
 
 INITIALS = {
     "ㄅ": "b", "ㄆ": "p", "ㄇ": "m", "ㄈ": "f", "ㄉ": "d", "ㄊ": "t", "ㄋ": "n", "ㄌ": "l",
@@ -110,6 +115,19 @@ def main(src, dst, opencc):
             if key not in best or best[key] < score:
                 best[key] = score
 
+    chat = 0
+    with open(CHAT_PHRASES, encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            reading, phrase = line.split()
+            if not READING.match(reading):
+                sys.exit("chat_phrases.txt 讀音格式不對：%s" % line.strip())
+            key = (reading, phrase)
+            if best.get(key, -99) < CHAT_SCORE:
+                best[key] = CHAT_SCORE
+                chat += 1
+
     pinyin = {}
     unknown = set()
     for (reading, _) in best:
@@ -142,8 +160,8 @@ def main(src, dst, opencc):
     db.close()
 
     singles = sum(1 for (r, _) in best if "-" not in r)
-    print("字詞 %d 筆（單字 %d）、拼音音節 %d 個、繁簡對照 %d 筆、檔案 %.1f MB"
-          % (len(best), singles, len(pinyin), len(t2s), os.path.getsize(dst) / 1e6))
+    print("字詞 %d 筆（單字 %d，聊天常用句調整 %d 筆）、拼音音節 %d 個、繁簡對照 %d 筆、檔案 %.1f MB"
+          % (len(best), singles, chat, len(pinyin), len(t2s), os.path.getsize(dst) / 1e6))
     if unknown:
         print("轉不出拼音的注音音節：", " ".join(sorted(unknown)[:30]))
 
@@ -156,6 +174,7 @@ def main(src, dst, opencc):
         ("SELECT phrase FROM phrases WHERE reading=? ORDER BY score DESC LIMIT 5", "ㄉㄜ˙", "的"),
         ("SELECT phrase FROM phrases WHERE plain=? ORDER BY score DESC LIMIT 5", "ㄋㄧ-ㄏㄠ", "你好"),
         ("SELECT phrase FROM phrases WHERE abbr=? ORDER BY score DESC LIMIT 20", "ㄋㄏ", "你好"),
+        ("SELECT phrase FROM phrases WHERE abbr=? ORDER BY score DESC LIMIT 5", "ㄎㄧㄇ", "可以嗎"),
         ("SELECT bpmf FROM pinyin WHERE py=?", "zhong", "ㄓㄨㄥ"),
         ("SELECT bpmf FROM pinyin WHERE py=?", "lv", "ㄌㄩ"),
         ("SELECT bpmf FROM pinyin WHERE py=?", "jue", "ㄐㄩㄝ"),

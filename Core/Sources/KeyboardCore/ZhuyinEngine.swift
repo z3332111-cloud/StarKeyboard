@@ -56,6 +56,8 @@ final class ZhuyinEngine {
     static let prefixPenalty: Double = -1.0
     /// 簡拼裡的 ㄎㄞ 拆成 ㄎ＋ㄞ 兩個字的讀法加分（前一個字只打了聲母，多半整串都是簡拼）
     static let splitBonus: Double = 2.5
+    /// 單獨一個音節（ㄨㄢ）拆開的詞，分數和最好的單字差多少以內才列出來（ㄋㄧ 的「難以」差太多就不列）
+    static let loneSplitRange: Double = 1.5
     let userModel: UserPhraseModel
 
     init(db: SQLiteDB, userModel: UserPhraseModel, column: String = "reading") {
@@ -91,21 +93,21 @@ final class ZhuyinEngine {
         reading.replacingOccurrences(of: "*", with: "").replacingOccurrences(of: "~", with: "")
     }
 
-    /// 可能是兩個字的音節（ㄎㄞ*~）拆成兩個只打開頭的字（ㄎ*、ㄞ*）；拆不了回傳 nil
+    /// 可能是兩個字的音節（ㄎㄞ*~、ㄨㄞ*~）拆成兩個只打開頭的字（ㄎ*、ㄞ*）；拆不了回傳 nil
     static func splitAbbreviation(_ reading: String) -> [String]? {
         guard reading.hasSuffix("*~") else { return nil }
         let body = Array(reading.dropLast(2))
-        guard body.count >= 2, Bopomofo.kind(of: body[0]) == .initial,
+        guard body.count == 2, let first = Bopomofo.kind(of: body[0]), first == .initial || first == .medial,
               let next = Bopomofo.kind(of: body[1]), next == .medial || next == .rhyme else { return nil }
-        return [String(body[0]) + "*", String(body[1...]) + "*"]
+        return [String(body[0]) + "*", String(body[1]) + "*"]
     }
 
     /// 後面接的是打完整的音節（不是只打聲母）：使用者回到完整打法，前面那個就不拆（ㄏ ㄎㄞ ㄒㄧㄣ 是好開心，不是好可愛心）
     static func settleSplits(_ readings: [String]) -> [String] {
         var out = readings
         for j in out.indices.dropLast() where out[j].hasSuffix("~") {
-            let next = out[j + 1]   // 只打聲母的寫法是「ㄏ*」
-            let nextIsBare = next.count == 2 && next.hasSuffix("*") && Bopomofo.kind(of: next.first!) == .initial
+            let next = out[j + 1]   // 只打一個注音的寫法是「ㄏ*」「ㄧ*」
+            let nextIsBare = next.count == 2 && next.hasSuffix("*")
             if !nextIsBare { out[j].removeLast() }
         }
         return out
@@ -340,6 +342,15 @@ final class ZhuyinEngine {
         if !hasSingle {
             out.append(Candidate(text: Self.display(readings[0]), span: 1, kind: .literal))
         }
+        // 單獨一個 ㄨㄢ 也可能是簡拼的兩個字（晚安）：拆開最好的詞放第二個，學過、分數比單字高就放第一個
+        if readings.count == 1, let parts = Self.splitAbbreviation(readings[0] + "~"),
+           let best = phrases(parts[...]).first, !seen.contains(best.text) {
+            let top = fuzzyPhrases(readings[...]).first?.score ?? -.infinity
+            if best.score > top - Self.loneSplitRange {
+                seen.insert(best.text)
+                out.insert(Candidate(text: best.text, span: 1, kind: .phrase), at: best.score > top ? 0 : min(1, out.count))
+            }
+        }
         // 第一個（按空白送出的）還是照打的字，預測的詞接在它後面
         let predicted = predictions(for: readings).filter { !seen.contains($0.text) }
         out.insert(contentsOf: predicted.map { Candidate(text: $0.text, span: readings.count, kind: .phrase, reading: $0.reading) },
@@ -394,11 +405,13 @@ final class ZhuyinEngine {
 
     /// 使用者選了某個詞：之後這個詞會排更前面
     func learn(readings: [String], text: String) {
-        // 簡拼拆開選到的詞（ㄎㄞ*~ 選了「可愛」）記成拆開的讀音（ㄎ*-ㄞ*）；字數對不上就是沒拆（選了「開」）
-        let splits = readings.compactMap { Self.splitAbbreviation($0) }
+        // 簡拼拆開選到的詞（ㄎㄞ*~ 選了「可愛」、單獨的 ㄨㄢ* 選了「晚安」）記成拆開的讀音（ㄎ*-ㄞ*）；
+        // 字數對不上就是沒拆（選了「開」）
+        func parts(_ r: String) -> [String]? { Self.splitAbbreviation(r.hasSuffix("*") ? r + "~" : r) }
+        let splits = readings.compactMap(parts)
         let split = !splits.isEmpty && text.count == readings.count + splits.count
         let used = readings.flatMap { r -> [String] in
-            if split, let parts = Self.splitAbbreviation(r) { return parts }
+            if split, let parts = parts(r) { return parts }
             return [r.hasSuffix("~") ? String(r.dropLast()) : r]
         }
         guard !used.isEmpty, used.count <= Self.maxPhraseLength else { return }

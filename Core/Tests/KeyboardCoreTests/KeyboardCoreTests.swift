@@ -53,11 +53,11 @@ final class ZhuyinComposerTests: XCTestCase {
         XCTAssertEqual(c.readings, ["ㄅ*", "ㄆㄚˋ"])
         var w = ZhuyinComposer()
         for ch in "ㄨㄛㄏㄓㄜㄧ" { w.input(ch) }
-        // ㄓㄜ 前面是只打聲母的 ㄏ：也可能是簡拼的 ㄓ＋ㄜ，加 ~ 記號
-        XCTAssertEqual(w.readings, ["ㄨㄛ*", "ㄏ*", "ㄓㄜ*~", "ㄧ*"])
+        // ㄨㄛ 後面接簡拼的 ㄏ、ㄓㄜ 前面是簡拼的 ㄏ：都可能是兩個字（ㄨ＋ㄛ、ㄓ＋ㄜ），加 ~ 記號
+        XCTAssertEqual(w.readings, ["ㄨㄛ*~", "ㄏ*", "ㄓㄜ*~", "ㄧ*"])
         w.backspace()
         w.backspace()
-        XCTAssertEqual(w.readings, ["ㄨㄛ*", "ㄏ*", "ㄓ*"])
+        XCTAssertEqual(w.readings, ["ㄨㄛ*~", "ㄏ*", "ㄓ*"])
         w.removeFirst(3)
         XCTAssertFalse(w.isComposing)
     }
@@ -67,7 +67,8 @@ final class ZhuyinComposerTests: XCTestCase {
         var c = ZhuyinComposer()
         c.validPrefixes = ["ㄘ", "ㄘㄜ", "ㄧ", "ㄧㄝ"]
         for ch in "ㄘㄧㄝ" { c.input(ch) }
-        XCTAssertEqual(c.readings, ["ㄘ*", "ㄧㄝ*"])
+        // ㄘ 自己算一個字（像簡拼），後面的 ㄧㄝ 也可能是 ㄧ＋ㄝ
+        XCTAssertEqual(c.readings, ["ㄘ*", "ㄧㄝ*~"])
     }
 
     func testAbbreviationMarksPossibleSplit() {
@@ -86,6 +87,15 @@ final class ZhuyinComposerTests: XCTestCase {
         var toned = ZhuyinComposer()
         for ch in "ㄏㄎㄞˋ" { toned.input(ch) }
         XCTAssertEqual(toned.readings, ["ㄏ*", "ㄎㄞˋ"])
+        // 後面接著簡拼也可能拆（ㄨㄞㄋ＝我愛你、ㄉㄧㄒ＝等一下）；單獨一個 ㄨㄞ 就是「外」，不拆
+        var vowel = ZhuyinComposer()
+        for ch in "ㄨㄞ" { vowel.input(ch) }
+        XCTAssertEqual(vowel.readings, ["ㄨㄞ*"])
+        vowel.input("ㄋ")
+        XCTAssertEqual(vowel.readings, ["ㄨㄞ*~", "ㄋ*"])
+        var three = ZhuyinComposer()
+        for ch in "ㄇㄧㄢㄊ" { three.input(ch) }
+        XCTAssertEqual(three.readings, ["ㄇㄧㄢ*", "ㄊ*"])
     }
 
     func testNeutralToneAtEnd() {
@@ -221,6 +231,8 @@ final class ZhuyinEngineTests: XCTestCase {
         func sentence(_ r: [String]) -> String { e.bestSegments(r).map { $0.text }.joined() }
         XCTAssertEqual(ZhuyinEngine.splitAbbreviation("ㄎㄞ*~"), ["ㄎ*", "ㄞ*"])
         XCTAssertNil(ZhuyinEngine.splitAbbreviation("ㄎㄞ*"))
+        XCTAssertEqual(ZhuyinEngine.splitAbbreviation("ㄨㄞ*~"), ["ㄨ*", "ㄞ*"])
+        XCTAssertNil(ZhuyinEngine.splitAbbreviation("ㄇㄧㄢ*~"))
         XCTAssertEqual(e.candidates(for: ["ㄎㄞ*~"]).first?.text, "可愛")
         XCTAssertEqual(e.candidates(for: ["ㄎㄞ*"]).first?.text, "開")
         XCTAssertEqual(sentence(["ㄏ*", "ㄎㄞ*~"]), "好可愛")
@@ -235,6 +247,19 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertTrue(e.userModel.phrases(for: "ㄏ*-ㄎ*-ㄞ*").contains("好可愛"))
         e.learn(readings: ["ㄎㄞ*~"], text: "開")
         XCTAssertTrue(e.userModel.phrases(for: "ㄎㄞ*").contains("開"))
+    }
+
+    func testLoneSyllableSplit() {
+        // 單獨的 ㄨㄢ：第一個還是單字，簡拼的「晚安」排第二；選過之後排第一
+        let e = makeEngine(extra: [("ㄨㄢ", "灣", -3.2), ("ㄨㄢˇ-ㄢ", "晚安", -3.5)])
+        XCTAssertEqual(e.candidates(for: ["ㄨㄢ*"]).prefix(2).map { $0.text }, ["灣", "晚安"])
+        e.learn(readings: ["ㄨㄢ*"], text: "晚安")
+        e.learn(readings: ["ㄨㄢ*"], text: "晚安")
+        XCTAssertTrue(e.userModel.phrases(for: "ㄨ*-ㄢ*").contains("晚安"))
+        XCTAssertEqual(e.candidates(for: ["ㄨㄢ*"]).first?.text, "晚安")
+        // 拆開的詞分數差太多就不列（ㄋㄧ 不會冒出「那一」）
+        let f = makeEngine(extra: [("ㄋㄚˋ-ㄧ", "那一", -6.0)])
+        XCTAssertFalse(f.candidates(for: ["ㄋㄧ*"]).contains { $0.text == "那一" })
     }
 
     func testPredictions() {

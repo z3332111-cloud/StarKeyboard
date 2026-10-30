@@ -61,17 +61,16 @@ struct Syllable: Equatable {
 
     var isEmpty: Bool { initial == nil && medial == nil && rhyme == nil && tone == nil }
     var hasSound: Bool { initial != nil || medial != nil || rhyme != nil }
-    /// 只有聲母（簡拼的打法，例如 ㄏ）
-    var isBareInitial: Bool { initial != nil && medial == nil && rhyme == nil && tone == nil }
+    /// 只打了一個注音、沒聲調（簡拼的打法，例如 ㄏ、ㄧ）
+    var isSingleSymbol: Bool { [initial, medial, rhyme].filter { $0 != nil }.count == 1 && tone == nil }
 
     /// 沒打聲調就換下一個字（或只打了開頭）：查字典時當成「以這些注音開頭、聲調不限」
     var open = false
 
-    /// 簡拼時可能是兩個字的開頭：前一個字只打了聲母，這個字的聲母後面又接了韻（ㄏㄎㄞ 的 ㄎㄞ 也可能是 ㄎ＋ㄞ）
+    /// 簡拼時可能是兩個字的開頭：只打了一個注音又接了一個（ㄎㄞ 也可能是 ㄎ＋ㄞ、ㄨㄞ 也可能是 ㄨ＋ㄞ）
     var maySplit = false
-
-    /// 查字典用的寫法：沒打完的音節後面加 *，例如「ㄋ*」「ㄋㄧ*」；可能是兩個字的再加 ~，例如「ㄎㄞ*~」
-    var key: String { open ? reading + "*" + (maySplit ? "~" : "") : reading }
+    /// 打這個字的時候，前一個字是簡拼（只打了一個注音）
+    var afterAbbreviation = false
 
     /// 再打這一類的符號時，算是開始打下一個字（例如已經有韻母又打韻母、已經有音又打聲母）
     func startsNew(with kind: BopomofoKind) -> Bool {
@@ -108,7 +107,7 @@ struct Syllable: Equatable {
         else if rhyme != nil { rhyme = nil }
         else if medial != nil { medial = nil }
         else { initial = nil }
-        if medial == nil && rhyme == nil { maySplit = false }
+        maySplit = false
     }
 }
 
@@ -120,10 +119,22 @@ struct ZhuyinComposer {
     var validPrefixes: Set<String>?
 
     /// 查字典用的讀音：打完的音節＋正在打的音節（沒打聲調也算，先拿來預覽）
+    /// 沒打完的音節後面加 *，例如「ㄋ*」「ㄋㄧ*」；可能是兩個字的再加 ~，例如「ㄎㄞ*~」
     var readings: [String] {
-        var pending = current
-        pending.open = true
-        return syllables.map { $0.key } + (current.hasSound ? [pending.key] : [])
+        var all = syllables
+        if current.hasSound {
+            var pending = current
+            pending.open = true
+            all.append(pending)
+        }
+        return all.indices.map { (i: Int) -> String in
+            let s = all[i]
+            guard s.open else { return s.reading }
+            // 前一個字是簡拼（ㄏㄎㄞ）或後面接著簡拼（ㄨㄞㄋ）才可能拆；後面接的是打完整的字就不拆
+            let next = i + 1 < all.count ? all[i + 1] : nil
+            let split = s.maySplit && (next.map { $0.open && $0.isSingleSymbol } ?? s.afterAbbreviation)
+            return s.reading + "*" + (split ? "~" : "")
+        }
     }
     /// 給使用者核對實際輸入的注音；保留聲調與音節分隔，不顯示查詢用的 *／~。
     var displayText: String {
@@ -146,8 +157,9 @@ struct ZhuyinComposer {
         }
         // 不打聲調直接打下一個字：前一個字自動結束（ㄋㄏ → 你好）
         if current.hasSound && (current.startsNew(with: kind) || !fits(c)) { finishSyllable(open: true) }
-        if kind != .initial, current.isBareInitial, let previous = syllables.last, previous.open, previous.isBareInitial {
-            current.maySplit = true
+        if kind != .initial {
+            current.maySplit = current.isSingleSymbol
+            current.afterAbbreviation = current.maySplit && syllables.last.map { $0.open && $0.isSingleSymbol } == true
         }
         current.put(c)
         return true

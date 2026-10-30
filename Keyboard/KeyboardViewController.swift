@@ -512,7 +512,11 @@ final class KeyboardViewController: UIInputViewController {
         if mode == .zhuyin && layer == .letters && composer.hasPendingSyllable {
             // 空白鍵＝一聲；這個音沒有一聲的字（例如只打了 ㄋ）就直接送出預覽的字
             let noFirstTone = engine?.phrases([composer.current.reading][...]).isEmpty ?? false
-            if noFirstTone && !candidates.isEmpty {
+            // 前面的字都沒打聲調（簡拼 ㄏㄎㄞ、ㄋㄧㄏㄠ）：空白鍵是送出，不是把最後一個字當一聲（不然 ㄎㄞ 變成「開」）
+            let skippedTones = composer.syllables.contains { $0.open }
+            // 第一個候選字數比打的音節多（學過的 ㄨㄢ＝晚安）：也是簡拼，直接送出
+            let abbreviated = (candidates.first?.text.count ?? 0) > composer.readings.count
+            if (noFirstTone || skippedTones || abbreviated) && !candidates.isEmpty {
                 selectCandidate(at: 0, learn: false)
             } else if composer.confirmSyllable() {
                 updateCandidates()
