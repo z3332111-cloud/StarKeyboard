@@ -1,9 +1,10 @@
 <!doctype html><html lang="zh-Hant"><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>糯糯鍵盤｜外觀預覽與下載</title>
+<title>糯糯鍵盤｜完整功能、外觀預覽與下載</title>
 <link rel="stylesheet" href="preview.css?v=1">
+<link rel="stylesheet" href="features.css?v=1">
 <link rel="icon" type="image/png" href="assets/app-icon.png?v=4">
 <link rel="apple-touch-icon" href="assets/app-icon.png?v=4">
-<meta name="description" content="先試看糯糯鍵盤的 11 款軟萌按鍵與 8 組配色，體驗注音選字、標點和快捷片語示範，再下載 iPhone 或 Android 版。">
+<meta name="description" content="糯糯鍵盤完整功能介紹：注音、拼音繁簡、英文滑行、韓文、日文、手寫、選字記憶、表符貼圖、翻譯、主題、剪貼簿搬家，以及 iPhone／Android 的功能差異與安裝教學。">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
   /* 版面：一欄的說明書。最上面切 iPhone／Android，各自從準備、下載、安裝、設定到更新；下面是兩邊共用的「怎麼用」和常見問題 */
@@ -128,7 +129,8 @@
     <div class="brand"><img src="assets/app-icon.png?v=4" alt="深色底紫色透視線條鍵盤" width="76" height="76"><div><h1>糯糯鍵盤</h1><small>軟軟的按鍵，記住你的每一句。</small></div></div>
     <p class="note">原「星星鍵盤」・下載與安裝說明</p>
     <p class="lead">把喜歡的造型、顏色和常說的話，放進每天用的手機鍵盤。支援 iPhone 與 Android，目前提供自行安裝版本。</p>
-    <nav class="preview-jump" aria-label="頁面導覽"><a href="#preview">看看外觀與功能 ↓</a><a href="#install">前往下載與安裝 ↓</a></nav>
+    <nav class="preview-jump" aria-label="頁面導覽"><a href="#features" class="catalog-nav">完整功能一覽 ↓</a>
+      <a href="#preview">看看外觀與功能 ↓</a><a href="#install">前往下載與安裝 ↓</a></nav>
   </header>
 
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"><defs><symbol id="preview-shape-rounded" viewBox="0 0 100 100"><rect width="100" height="100" rx="23" ry="17.5" fill="var(--key)"/></symbol><symbol id="preview-shape-jelly" viewBox="0 0 100 100"><rect width="100" height="100" rx="42" ry="31.5" fill="var(--key)"/></symbol><symbol id="preview-shape-catEar" viewBox="0 0 100 100"><rect y="11" width="100" height="89" rx="34" ry="25.5" fill="var(--key)"/><path d="M5 30 L11 0 L41 17 Z M59 17 L89 0 L95 30 Z" fill="var(--key)"/></symbol><symbol id="preview-shape-cloud" viewBox="0 0 100 100"><rect y="15" width="100" height="85" rx="38" ry="28.5" fill="var(--key)"/><ellipse cx="33" cy="22" rx="30" ry="22.5" fill="var(--key)"/><ellipse cx="67" cy="22" rx="30" ry="22.5" fill="var(--key)"/></symbol><symbol id="preview-shape-bunny" viewBox="0 0 100 100"><path fill="var(--key)" d="M20 32 C13 15 13 3 23 3 C33 3 34 19 37 28 Q50 24 63 28 C66 19 67 3 77 3 C87 3 87 15 80 32 C96 37 98 51 97 67 C97 91 83 97 50 97 C17 97 3 91 3 67 C2 51 4 37 20 32 Z"/><path fill="var(--detail)" opacity=".48" d="M22 11 C18 14 24 29 28 30 C32 30 27 10 22 11 Z M78 11 C73 10 68 30 72 30 C76 29 82 14 78 11 Z"/></symbol><symbol id="preview-shape-puppy" viewBox="0 0 100 100"><path fill="var(--key)" d="M24 21 C35 9 66 9 77 21 C90 16 96 25 98 39 C100 55 95 69 86 67 L83 66 C82 88 73 96 50 96 C27 96 18 88 17 66 L14 67 C5 69 0 55 2 39 C4 25 10 16 24 21 Z"/><path fill="var(--detail)" opacity=".48" d="M17 27 C10 28 6 49 12 57 C17 61 21 48 22 37 Q23 25 17 27 Z M83 27 Q77 25 78 37 C79 48 83 61 88 57 C94 49 90 28 83 27 Z"/></symbol><symbol id="preview-shape-pudding" viewBox="0 0 100 100"><path fill="var(--key)" d="M24 13 Q50 6 76 13 C86 16 86 28 89 45 L96 77 C100 94 79 97 50 97 C21 97 0 94 4 77 L11 45 C14 28 14 16 24 13 Z"/><path fill="var(--detail)" opacity=".48" d="M24 14 Q50 8 76 14 Q83 16 85 29 C77 35 69 24 60 29 C43 38 34 27 15 30 Q17 16 24 14 Z"/></symbol><symbol id="preview-shape-jellyfish" viewBox="0 0 100 100"><path fill="var(--key)" d="M7 67 C3 35 19 8 50 8 C81 8 97 35 93 67 Q94 77 82 77 C82 83 89 89 83 94 C74 100 69 88 69 79 L58 80 C57 88 60 98 50 98 C40 98 43 88 42 80 L31 79 C31 88 26 100 17 94 C11 89 18 83 18 77 Q6 77 7 67 Z"/><path fill="var(--detail)" opacity=".48" d="M22 26 C32 11 65 10 78 26 C56 20 43 20 22 26 Z"/></symbol><symbol id="preview-shape-flame" viewBox="0 0 100 100"><path fill="var(--key)" d="M60 5 C65 4 63 17 70 23 C77 31 81 34 82 43 Q90 32 92 41 C100 63 97 81 83 90 C68 100 31 100 16 90 C2 81 0 63 9 43 Q13 35 16 43 Q19 48 24 48 C37 47 35 21 47 16 Q54 13 60 5 Z"/><path fill="var(--detail)" opacity=".48" d="M18 59 C11 67 14 80 23 84 Q27 84 23 78 Q17 70 18 59 Z M84 61 Q85 73 78 81 Q75 86 80 84 C90 79 90 67 84 61 Z"/></symbol><symbol id="preview-shape-droplet" viewBox="0 0 100 100"><path fill="var(--key)" d="M58 6 C63 3 60 14 70 24 C79 33 95 42 95 63 C98 88 78 97 50 97 C22 97 2 88 5 63 C6 41 24 30 38 22 Q50 16 58 6 Z"/><path fill="var(--detail)" opacity=".48" d="M24 40 C13 47 13 66 21 72 Q25 74 23 67 C19 55 22 47 27 42 Q29 38 24 40 Z"/></symbol><symbol id="preview-shape-duck" viewBox="0 0 100 100"><path fill="var(--key)" d="M32 43 C26 32 30 14 44 10 C59 4 79 12 80 25 Q98 25 98 31 Q98 38 80 38 L78 47 C93 53 98 68 91 82 C84 97 64 98 45 97 C19 97 5 84 4 66 Q2 54 10 57 Q23 64 32 43 Z"/><path fill="var(--detail)" opacity=".48" d="M78 26 Q96 25 97 31 Q96 36 79 36 Q74 31 78 26 Z M64 22 C64 19 70 19 70 22 C70 25 64 25 64 22 Z"/></symbol></defs></svg>
@@ -168,18 +170,63 @@
     <div><span aria-hidden="true">♡</span><h3>隱私設定說清楚</h3><p>自動剪貼簿紀錄與外部翻譯預設關閉；App 裡有完整風險說明。</p></div>
   </section>
 
-  <section id="clipboard-move">
-    <h2>拼音直接打繁體，剪貼簿也能搬家</h2>
-    <p><b>拼音繁／簡切換：</b>切到拼音後，按候選列右側的「繁／簡」。顯示「繁」時就會送出繁體字；正在打的拼音會保留。</p>
-    <p><b>剪貼簿匯入／匯出：</b>鍵盤 → 剪貼簿 →「匯入／匯出・剪貼簿搬家」。Android 也可從 App 首頁開啟。JSON 保留多行內容和釘選，iPhone 與 Android 可互相搬移；TXT 每行視為一筆。</p>
-    <ol>
-      <li>在舊鍵盤找「匯出／備份」或「全選複製」，將內容存為 JSON／UTF-8 TXT，或複製文字清單。</li>
-      <li>在糯糯鍵盤選「匯入檔案」或「匯入目前複製的文字」。貼上時可選每行一筆，或整段保留換行。</li>
-      <li>查看預覽後按匯入。重複文字會合併，原有紀錄會保留，超過未釘選容量的新內容會跳過並顯示筆數。</li>
-    </ol>
-    <p class="note">支援 JSON 文字陣列、items 清單，以及 text／content 文字欄位。每次最多 2 MB、1,000 筆，單筆最多 20,000 字。其他鍵盤若沒有匯出功能，需要先手動複製內容；無法直接讀取它的私人資料。</p>
-    <p class="tip">匯出檔是明文；存到雲端可能同步或備份。先檢查有沒有密碼、驗證碼與私密內容，並妥善保存或刪除檔案。</p>
-  </section>
+  <section id="features" class="feature-catalog" aria-labelledby="features-heading">
+<p class="catalog-kicker">從第一版到現在，一次看完整</p>
+<h2 id="features-heading">糯糯鍵盤，到底能做什麼？</h2>
+<p>包含最初版本與後續更新，共整理成 <b>32 項功能、6 個分類</b>。每項都有用途、入口與限制；不只列最近新增的功能。</p>
+<p class="note">依已發布的 v0.2.0 整理・2026/10/30。標示「平台有差異」的項目請看內文；網頁預覽是示意，不等同手機實測。</p>
+<div class="catalog-controls" hidden><button type="button" id="features-expand">全部展開</button><button type="button" id="features-collapse">全部收起</button></div>
+<details class="feature-group" id="features-input" open>
+<summary><span class="catalog-number">01</span><span><strong>六種輸入方式</strong><small>注音、拼音、英文、滑行、韓文、日文與手寫 · 7 項</small></span></summary><div class="catalog-cards">
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>注音：完整讀音或簡拼</h3><p>大千注音排列，支援整句組字與分段選字；可以打完整注音和聲調，也能省略聲調、只打開頭注音，例如 ㄋㄏ 找「你好」。字典包含小麥注音字詞與日常聊天常用句。</p><p class="feature-location"><b>怎麼用：</b>選「注音」模式，點上排候選字；不確定讀音時可展開更多候選。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>拼音＋繁／簡快捷切換</h3><p>漢語拼音自動分音節，也支援 nh 這類聲母簡拼；需要分開音節時可用 xi&#x27;an 的半形單引號。預設輸出繁體，點候選列「繁／簡」切換，正在打的拼音會保留。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 輸入法開啟「拼音」，再按中／英切到「拼」。這個按鈕控制拼音輸出，不是把其他 App 已輸入的整段文字轉換。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>英文 QWERTY 與大小寫</h3><p>英文排列、依輸入欄位與句子調整大寫；Shift 連按兩下可鎖定大寫，英文快速連按兩次空白可輸入句號。</p><p class="feature-location"><b>怎麼用：</b>切到英文；符號和數字可從 123、#+= 切換。自動行為可能受使用中的 App 輸入欄位影響。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>英文滑行輸入</h3><p>手指不放開，滑過字母後放開即可選整個單字；辨識不對時可點候選列的其他結果。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 打錯字修正 → 英文滑行輸入，可隨時開關。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>韓文兩排式拼字</h3><p>輸入韓文子音、母音後自動組合成韓文字；可逐步刪除組字。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 輸入法開啟「韓文」，再用中／英輪流切換。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>日文羅馬拼音轉假名</h3><p>例如 sakura 可選 さくら 或 サクラ，也會提供原本的羅馬字。現在支援平假名、片假名，尚未提供日文漢字轉換。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 輸入法開啟「日文」，再用中／英切換。</p></article>
+<article class="catalog-card"><span class="platform-badge">平台有差異</span><h3>手寫輸入</h3><p>用手指寫字，停筆後顯示候選；可清空重寫，接著寫下一個字時會依畫面狀態送出上一個候選。iPhone 使用系統文字辨識，屬實驗功能；Android 使用繁中手寫模型，第一次須連網下載。</p><p class="feature-location"><b>怎麼用：</b>工具列 ✍ 或切到手寫模式。辨識效果因字跡、裝置而異，請看候選再選。</p></article>
+</div></details>
+<details class="feature-group" id="features-candidates">
+<summary><span class="catalog-number">02</span><span><strong>選字、記憶與打錯字修正</strong><small>常用字、前後文、標點、候選展開與容錯 · 5 項</small></span></summary><div class="catalog-cards">
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>記住常選的字詞</h3><p>手動選過的字詞會在本機學習，下次相同或相關讀音可往前排；也支援簡拼選字記憶。排序仍會參考字典，不保證每次第一個都是想要的字。</p><p class="feature-location"><b>怎麼用：</b>平常點候選字即可；⚙ → 清除選字學習紀錄可重設。沒有跨裝置同步選字記憶。</p></article>
+<article class="catalog-card"><span class="platform-badge">兩邊都有，iPhone 加強</span><h3>關聯詞與常用單字排序</h3><p>兩邊都有選字後的聯想詞。iPhone 另有未打完聲調就先顯示詞語預測、參考游標前文字調整同音字，以及較長前文的接續建議；常用字頻與個人選字習慣一起參與排序。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 輸入法 → 聯想詞。這些建議在本機計算，Android 尚未包含本次 iPhone 的完整前文排序改善。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone</span><h3>候選列快速加標點</h3><p>中文字選好後，可在候選列點逗號、句號、問號、驚嘆號；遇到「怎麼」「有沒有」或問句結尾等線索時，優先推薦問號。這是文字規則判斷，不一定每次都猜對。</p><p class="feature-location"><b>怎麼用：</b>選好中文字後看上排，不必每次切到符號頁。標點與聯想詞可一起出現。</p></article>
+<article class="catalog-card"><span class="platform-badge">兩邊都有，iPhone 加強</span><h3>看清注音、展開更多候選</h3><p>按下拉箭頭可展開候選面板；第一個候選有明顯底色。iPhone 會在候選列上方保留實際按過的注音與聲調，長內容可左右滑查看，並已改善換字閃動及候選面板與按鍵重疊。</p><p class="feature-location"><b>怎麼用：</b>按候選列右側的下拉箭頭，選字或返回鍵盤。Android 的組字文字主要顯示在正在輸入的欄位，與 iPhone 上排注音呈現不同。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>英文修正＋注音容錯</h3><p>英文提供拼字建議，按空白或標點時可自動修正；改錯了立刻按刪除可復原。注音可開啟相鄰鍵容錯、聲調容錯，以及 ㄣ／ㄥ、ㄓ／ㄗ、ㄔ／ㄘ、ㄕ／ㄙ 模糊音。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 打錯字修正，各項可分別開關。容錯是提供候選，不會保證猜中。</p></article>
+</div></details>
+<details class="feature-group" id="features-tools">
+<summary><span class="catalog-number">03</span><span><strong>聊天、符號與翻譯工具</strong><small>表情、顏文字、自製貼圖、花式文字與快捷片語 · 8 項</small></span></summary><div class="catalog-cards">
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>數字、符號與全形／半形</h3><p>123、#+= 有數字和常用標點；中文符號第二頁可切全形／半形並記住選擇。半形 #、*、_、~、反引號、|、/、反斜線、&gt;、@、- 可用於支援它們的聊天或 Markdown 語法。</p><p class="feature-location"><b>怎麼用：</b>123 → #+= → 全形／半形。這只是輸入符號，格式效果仍由接收的 App 決定。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>表情符號與特殊符號分類</h3><p>☺ 提供人物、動物、食物等表情分類與最近使用。※ 提供常用、括號、標點、箭頭、數學、單位、圈圈數字、希臘字母、框線、日文假名與注音。</p><p class="feature-location"><b>怎麼用：</b>工具列 ☺ 或 ※，滑動下方分類找需要的項目。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>顏文字與我的表符</h3><p>內建開心、愛心、難過、生氣、驚訝、害羞、動物、打招呼等顏文字。可自行打字、拼出顏文字或從剪貼簿新增到「我的」，並保留最近使用；長按自製項目可進入刪除。</p><p class="feature-location"><b>怎麼用：</b>工具列 (•ᴗ•) → 我的，或 ☺ → ⭐ → ＋。</p></article>
+<article class="catalog-card"><span class="platform-badge">平台有差異</span><h3>照片做成自己的貼圖</h3><p>可把圖片存成常用貼圖。iPhone 點貼圖後先複製，再到輸入框長按貼上；Android 會嘗試插入圖片，不支援的 App 則改用複製貼上。能否貼圖片取決於使用中的 App。</p><p class="feature-location"><b>怎麼用：</b>iPhone：App 挑照片或相簿拷貝 → ☺ → ⭐ → ＋ → 圖片做成貼圖。Android：App → 挑一張照片做成貼圖。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>21 種花式文字</h3><p>草寫、粗體、斜體、哥德、打字機、圈圈、黑圈、方塊、小型大寫、全形、倒過來、刪除線、底線、波浪、愛心、閃亮、星星、花花、括號、標題、一字一星。字母變體以英文為主，裝飾也可搭配中文。</p><p class="feature-location"><b>怎麼用：</b>工具列 𝒜 → 輸入文字 → 變花樣 → 點結果送出。這是特殊文字，不同 App／字型的顯示可能不同。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>自訂快捷片語</h3><p>把常用整段話配上縮寫，例如 addr 對應地址；打英文縮寫、中文縮寫或對應的簡拼時，可從候選列選整段送出。支援新增與刪除。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 快捷片語 → ＋ 新增，先填內容，再填縮寫。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>游標與日常操作</h3><p>按住空白鍵左右滑動可移動游標；按住刪除可連續刪字。中／英輪流切換已啟用模式，工具列可收起鍵盤；送出鍵會依輸入欄位顯示傳送、搜尋、完成等用途。</p><p class="feature-location"><b>怎麼用：</b>iPhone 用 🌐 切其他鍵盤；Android 長按中／英叫出系統鍵盤選擇。</p></article>
+<article class="catalog-card"><span class="platform-badge">平台有差異</span><h3>多語翻譯與原文語言選擇</h3><p>可選原文語言或自動判斷，再翻成英、日、韓、繁中、簡中、法、德、西班牙、義大利、泰、越南、印尼文。點翻譯結果即可送出，也可回去修改原文。</p><p class="feature-location"><b>怎麼用：</b>工具列「譯」→ 從：原文語言／→ 目標語言 → 翻譯。iPhone 的系統翻譯需符合版本與語言資料條件；Android 可下載離線模型，但目前翻成繁中會走外部服務。外部 MyMemory 翻譯須先在 ⚙ → 隱私與安全開啟，最多傳送 450 字；預設關閉。</p></article>
+</div></details>
+<details class="feature-group" id="features-look">
+<summary><span class="catalog-number">04</span><span><strong>把鍵盤變成喜歡的樣子</strong><small>8 組配色、11 款按鍵、字體、照片與聲音 · 6 項</small></span></summary><div class="catalog-cards">
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>8 組主題配色</h3><p>草莓牛奶、薄荷蘇打、奶茶布丁、薰衣草、檸檬小雞、星空夜、經典淺色、經典深色。工具列和面板會搭配底色，讓背景照片上的文字比較清楚。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 主題，點選切換。iPhone 換主題時會保留設定捲動位置。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>11 款按鍵外貌</h3><p>圓角、果凍、貓耳、雲朵，以及奶油軟萌風格的兔兔、狗狗、布丁、水母、火焰、水滴、鴨鴨。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 按鍵造型；可搭配不同配色與照片，上方網頁預覽能先試看。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>4 種鍵盤字體</h3><p>系統、粉圓、芫荽、文楷，可改變按鍵與候選字的外觀。字體只影響自己的鍵盤，不會強迫收訊息的人使用同一套字體。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 字體。想傳出特別文字，請用 𝒜 花式文字。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>多張背景照片與輪換</h3><p>可新增多張照片，固定一張、每次開啟換或每天換；拖拉移動、兩指縮放，每張各自記住位置和大小。也能調整圖片淡化、按鍵透明度或移除照片。Android 選照片時會嘗試以偵測到的人臉置中。</p><p class="feature-location"><b>怎麼用：</b>iPhone 從相簿或 App 複製照片，再到鍵盤 ⚙ → 背景圖片新增；Android 從 App 選照片。後續在 ⚙ 調整。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>高度、字級與間距</h3><p>鍵盤高度可調 80%～130%、字的大小 80%～140%、間距 30%～160%；滑桿可邊調邊看，也能恢復預設。間距越小，按鍵可用面積越大。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 大小。</p></article>
+<article class="catalog-card"><span class="platform-badge">平台有差異</span><h3>按鍵特效、聲音與震動</h3><p>特效可選星星、愛心、閃亮、花花、泡泡或關閉。iPhone 有原本按鍵聲與叮叮；Android 有系統、泡泡、木琴、叮鈴、啵啵。聲音可試聽，按鍵聲與震動可各自開關。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 按鍵特效／聲音與震動。iPhone 的部分回饋需要允許完整取用，並受系統音量與裝置能力影響。</p></article>
+</div></details>
+<details class="feature-group" id="clipboard-move">
+<summary><span class="catalog-number">05</span><span><strong>剪貼簿保存與搬家</strong><small>手動保存、釘選、JSON 備份與其他鍵盤匯入 · 3 項</small></span></summary><div class="catalog-cards">
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>保存、釘選與整理紀錄</h3><p>可手動加入目前複製的文字、點一下貼出、釘選、只看釘選、逐筆刪除，以及清除未釘選內容。未釘選上限可選 50／100／200／500 筆，預設 200；釘選另行保留。</p><p class="feature-location"><b>怎麼用：</b>工具列剪貼簿。自動記錄預設關閉，需在 ⚙ → 隱私與安全開啟；只在鍵盤使用期間捕捉複製內容，不是全天候監看。iPhone 支援左右滑動管理項目。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>JSON 匯出、檔案匯入</h3><p>匯出 JSON 保留多行文字、順序與釘選，iPhone 和 Android 共用格式；可匯入 JSON 或 UTF-8 TXT（每行一筆）。先預覽再匯入，重複文字合併，保留原有紀錄；容量不足會跳過新內容並顯示筆數。</p><p class="feature-location"><b>怎麼用：</b>剪貼簿 → 匯入／匯出・剪貼簿搬家；Android App 首頁也能開啟。每次最多 2 MB／1,000 筆，單筆最多 20,000 字。iPhone 選檔介面仍需實機確認。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>從其他鍵盤搬家</h3><p>先在原鍵盤匯出檔案，或複製文字清單，再到這裡匯入。支援 JSON 文字陣列、items 清單，以及 text／content 欄位；貼上清單時可選每行一筆或整段一筆，保留換行。</p><p class="feature-location"><b>怎麼用：</b>原鍵盤沒有匯出功能時，需先手動複製；不能直接讀取別的鍵盤私人資料。匯出檔是明文，存到雲端可能同步，請先移除敏感內容。</p></article>
+</div></details>
+<details class="feature-group" id="features-safety">
+<summary><span class="catalog-number">06</span><span><strong>隱私、App 與版本更新</strong><small>預設開關、資料保護、試打、安裝與續簽 · 3 項</small></span></summary><div class="catalog-cards">
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>隱私開關與本機資料保護</h3><p>自動剪貼簿紀錄、外部網路翻譯預設關閉。會跳過有敏感標記的剪貼簿，但無法辨識所有密碼。iPhone 的剪貼簿、學習與快捷片語檔案套用完整檔案保護及不備份設定；Android 關閉 App 備份並設定排除規則。</p><p class="feature-location"><b>怎麼用：</b>⚙ → 隱私與安全；App 有完整風險說明。選字記憶與片語留在本機，解除安裝仍可能失去資料，手動匯出的檔案不在這些保護範圍內。</p></article>
+<article class="catalog-card"><span class="platform-badge">iPhone・Android</span><h3>App 試打、說明與新版提醒</h3><p>App 提供鍵盤開啟步驟、試打欄位、照片／貼圖入口與隱私說明。App 和鍵盤會向 GitHub 檢查新版並顯示更新內容；公開版本使用 v0.2.0 這類小版本號。Android 遇到鍵盤錯誤時可在 App 複製診斷紀錄協助排查。</p><p class="feature-location"><b>怎麼用：</b>打開桌面上的「糯糯鍵盤」。版本查詢不包含打字或剪貼簿內容；下載更新仍需自行安裝。</p></article>
+<article class="catalog-card"><span class="platform-badge">平台有差異</span><h3>安裝網站、自動建置與 Wi-Fi 續簽</h3><p>網站可預覽造型配色、選字／標點／快捷片語示意及試聽。GitHub 在程式更新後自動測試打包，網站指向已發布安裝檔。iPhone 首次插線配對後，可設定 Sideloadly Daemon 透過 Wi-Fi 自動續簽；Android 不需要每週續簽。</p><p class="feature-location"><b>怎麼用：</b>免費 Apple ID 簽章有效 7 天，無線續簽需要電腦喚醒、Daemon 執行、手機在可互通的同一網路。Daemon 不會自動抓新版 IPA；完整步驟在下方安裝教學。</p></article>
+</div></details>
+<p class="tip">先從最常用的開始：切換輸入法看「01」，打字選字看「02」，聊天小工具看「03」，換外觀看「04」，搬剪貼簿看「05」。</p></section>
 
   <div class="switch" id="install">
     <div class="tabs big" role="tablist" aria-label="手機種類">
@@ -206,11 +253,11 @@
     <section>
       <h2>下載安裝檔（在電腦上）</h2>
       <div class="download">
-        <a id="download-iphone" class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/build-34/StarKeyboard.ipa">下載 iPhone 安裝檔</a>
-        <span id="version-iphone" class="note" aria-live="polite">iPhone 最新版本</span>
-        <a id="release-iphone" href="https://github.com/z3332111-cloud/StarKeyboard/releases/tag/build-34">更新內容</a>
+        <a id="download-iphone" class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/build-39/StarKeyboard.ipa">下載 iPhone 安裝檔</a>
+        <span id="version-iphone" class="note" aria-live="polite">v0.2.0（備用下載）</span>
+        <a id="release-iphone" href="https://github.com/z3332111-cloud/StarKeyboard/releases/tag/build-39">更新內容</a>
       </div>
-      <p class="note">安裝檔會直接下載到電腦。這裡只提供已完成打包的版本；新版完成後重新開啟此頁即可。舊版 App 名稱可能仍顯示「星星鍵盤」。</p>
+      <p class="note">安裝檔會直接下載到電腦。這裡只提供已完成打包的版本；新版完成後重新開啟此頁即可；若版本查詢暫時不可用，保留已驗證的備用下載。舊版 App 名稱可能仍顯示「星星鍵盤」。</p>
     </section>
 
     <section>
@@ -325,9 +372,9 @@
     <section>
       <h2>下載並安裝</h2>
       <div class="download">
-        <a id="download-android" class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/android-29/StarKeyboard.apk">下載 Android 安裝檔</a>
-        <span id="version-android" class="note" aria-live="polite">Android 最新版本</span>
-        <a id="release-android" href="https://github.com/z3332111-cloud/StarKeyboard/releases/tag/android-29">更新內容</a>
+        <a id="download-android" class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/android-31/StarKeyboard.apk">下載 Android 安裝檔</a>
+        <span id="version-android" class="note" aria-live="polite">v0.2.0（備用下載）</span>
+        <a id="release-android" href="https://github.com/z3332111-cloud/StarKeyboard/releases/tag/android-31">更新內容</a>
         <span class="note">本頁會自動取得最新已發布版本；新版打包完成後，重新開啟此頁即可。各版本的更新內容在 <a href="https://github.com/z3332111-cloud/StarKeyboard/releases">所有版本</a>（名稱有「Android」的）。</span>
       </div>
       <ol class="steps">
@@ -392,40 +439,10 @@
     </section>
   </div>
 
-  <!-- ===================== 兩邊共用 ===================== -->
-  <section>
-    <h2>怎麼用</h2>
-    <p class="note">iPhone 和 Android 都有以下常用功能；介面與部分新功能會依平台、版本不同。工具列在鍵盤最上面那一排；<span class="key">⚙</span> 是鍵盤設定。</p>
-    <div class="features">
-      <div class="feature">
-        <h3>注音：不打聲調也可以</h3>
-        <p>打到一半上面就會先出字。可以只打每個字開頭的注音，連打好幾個字再一起選：<span class="eg">ㄨㄛㄏㄓㄜㄧ → 我會這樣</span>、<span class="eg">ㄋㄏ → 你好</span>。打聲調也可以，會更準。</p>
-      </div>
-      <div class="feature">
-        <h3>拼音（給習慣拼音的朋友）</h3>
-        <p>到 <span class="path">⚙ › 輸入法</span> 打開「拼音」，按 <span class="key">中／英</span> 切過去。打 <span class="eg">nihao</span> 或只打聲母 <span class="eg">nh</span> 都會出「你好」。預設是繁體字，想要簡體在設定裡打開「拼音輸出簡體字」。</p>
-      </div>
-      <div class="feature">
-        <h3>𝒜 花式文字</h3>
-        <p>按工具列的 <span class="key">𝒜</span>，打字後按「變花樣」，點一個樣式送出。對方也看得到：<span class="eg">𝓼𝓽𝓪𝓻</span>、<span class="eg">ⓢⓣⓐⓡ</span>、<span class="eg">刪̶除̶線̶</span>、<span class="eg">♡ 愛心 ♡</span>。英文的樣式最多。</p>
-      </div>
-      <div class="feature">
-        <h3>快捷片語</h3>
-        <p><span class="path">⚙ › 快捷片語 › ＋ 新增</span>：先打整段話（例如地址），再打縮寫（例如「地址」或 addr）。之後打縮寫，候選字第二個就是整段話。</p>
-      </div>
-      <div class="feature">
-        <h3>英文滑行輸入</h3>
-        <p>英文鍵盤上手指<b>不要放開</b>，依序滑過字母再放開，就會打出整個字，例如滑過 h→e→l→o 出 <span class="eg">hello</span>。認錯了就點上面列出的別的字。不想用可以在 <span class="path">⚙ › 打錯字修正</span> 關掉。</p>
-      </div>
-      <div class="feature">
-        <h3>字體、主題、特效、按鍵音</h3>
-        <p><span class="path">⚙</span> 裡可以換主題顏色、按鍵造型（圓角、果凍、貓耳、雲朵、兔兔、狗狗、布丁、水母、火焰、水滴、鴨鴨）、字體（粉圓、芫荽、文楷）、<b>按鍵特效</b>（按下去冒出星星、愛心、花花…），還有<b>可愛按鍵音</b>（iPhone：系統聲、柔和叮叮；Android：泡泡、木琴、叮鈴、啵啵）。字體只改變你鍵盤上的樣子。</p>
-      </div>
-      <div class="feature">
-        <h3>剪貼簿、表符、翻譯、手寫</h3>
-        <p><span class="key">剪貼</span> 可手動保存文字，也能在 ⚙ → 隱私與安全開啟自動記錄（預設關閉），請勿保存密碼。<span class="key">☺</span> 表情、<span class="key">(•ᴗ•)</span> 顏文字、<span class="key">譯</span> 先打中文再翻成外文、<span class="key">✍</span> 用手指寫字。</p>
-      </div>
-    </div>
+  <section aria-labelledby="feature-return">
+    <h2 id="feature-return">裝好了，開始試試</h2>
+    <p>輸入法、選字、表符、照片與剪貼簿的入口，都整理在上方功能清單。</p>
+    <a href="#features">回到完整功能與使用方式 ↑</a>
   </section>
 
   <section>
@@ -488,4 +505,5 @@
 
 <script src="preview.js?v=1" defer></script>
 <script src="downloads.js" defer></script>
+<script src="features.js?v=1" defer></script>
 </body></html>
