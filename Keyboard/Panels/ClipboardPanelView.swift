@@ -3,6 +3,7 @@ import UIKit
 /// 剪貼簿紀錄：點一下貼上、釘選常用的、左右滑動刪除或釘選
 final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelegate {
     var onInsert: ((String) -> Void)?
+    var onTransfer: (() -> Void)?
     var onAddCurrent: (() -> Void)?
     var onBack: (() -> Void)?
     var onBackspace: (() -> Void)?
@@ -19,6 +20,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
     private let table = UITableView(frame: .zero, style: .plain)
     private let header = UIView()
     private let titleLabel = UILabel()
+    private let transferButton = UIButton(type: .system)
     private let addButton = UIButton(type: .system)
     private let clearButton = UIButton(type: .system)
     private let emptyLabel = UILabel()
@@ -45,6 +47,10 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         clearButton.titleLabel?.font = .rounded(14)
         clearButton.addAction(UIAction { [weak self] _ in self?.clearTapped() }, for: .touchUpInside)
         header.addSubview(clearButton)
+        transferButton.setTitle("匯入／匯出・剪貼簿搬家", for: .normal)
+        transferButton.titleLabel?.font = .rounded(14, .semibold)
+        transferButton.addAction(UIAction { [weak self] _ in self?.onTransfer?() }, for: .touchUpInside)
+        header.addSubview(transferButton)
         addSubview(header)
 
         table.backgroundColor = .clear
@@ -92,11 +98,12 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
     override func layoutSubviews() {
         super.layoutSubviews()
         let w = bounds.width
-        let headerH: CGFloat = 34, barH: CGFloat = 40
+        let headerH: CGFloat = 68, barH: CGFloat = 40
         header.frame = CGRect(x: 0, y: 0, width: w, height: headerH)
-        titleLabel.frame = CGRect(x: 12, y: 0, width: 80, height: headerH)
-        clearButton.frame = CGRect(x: w - 96, y: 0, width: 88, height: headerH)
-        addButton.frame = CGRect(x: w - 96 - 150, y: 0, width: 150, height: headerH)
+        titleLabel.frame = CGRect(x: 12, y: 0, width: 80, height: 34)
+        clearButton.frame = CGRect(x: w - 96, y: 0, width: 88, height: 34)
+        addButton.frame = CGRect(x: w - 96 - 150, y: 0, width: 150, height: 34)
+        transferButton.frame = CGRect(x: 12, y: 34, width: w - 24, height: 34)
         table.frame = CGRect(x: 0, y: headerH, width: w, height: bounds.height - headerH - barH)
         emptyLabel.frame = table.frame.insetBy(dx: 20, dy: 10)
         bar.frame = CGRect(x: 0, y: bounds.height - barH, width: w, height: barH)
@@ -105,6 +112,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
     private func applyStyle() {
         let t = style.theme
         titleLabel.textColor = t.keyText
+        transferButton.tintColor = t.isDark ? t.accent : t.specialText
         addButton.tintColor = t.isDark ? t.accent : t.specialText
         clearButton.tintColor = t.keyText.withAlphaComponent(0.7)
         emptyLabel.textColor = t.keyText.withAlphaComponent(0.7)

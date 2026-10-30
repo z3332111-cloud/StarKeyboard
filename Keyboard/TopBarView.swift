@@ -15,6 +15,14 @@ final class TopBarView: UIView {
         case editor(prompt: String, text: String, extra: String, confirm: String, source: String? = nil)
     }
 
+    var onScriptToggle: (() -> Void)?
+    var scriptTitle: String? {
+        didSet {
+            scriptButton.setTitle(scriptTitle, for: .normal)
+            scriptButton.accessibilityLabel = scriptTitle == "繁" ? "目前繁體，點一下切換簡體" : "目前簡體，點一下切換繁體"
+        }
+    }
+    private let scriptButton = UIButton(type: .system)
     var onToolbar: ((ToolbarItem) -> Void)?
     var onCandidate: ((Int) -> Void)?
     var onTrailing: ((Trailing) -> Void)?
@@ -68,6 +76,9 @@ final class TopBarView: UIView {
             toolbarButtons.append(b)
         }
         addSubview(toolbar)
+        scriptButton.titleLabel?.font = .rounded(15, .bold)
+        scriptButton.addAction(UIAction { [weak self] _ in self?.onScriptToggle?() }, for: .touchUpInside)
+        addSubview(scriptButton)
 
         compositionLabel.font = .rounded(15, .bold)
         compositionScroll.showsHorizontalScrollIndicator = false
@@ -150,6 +161,7 @@ final class TopBarView: UIView {
         }
         // 整條（工具列、選字區、編輯框）都墊一層半透明的底，放背景照片時圖示和字才看得清楚（深色主題墊深色）
         backgroundColor = (style.theme.isDark ? UIColor.black.withAlphaComponent(0.35) : UIColor.white.withAlphaComponent(0.6))
+        scriptButton.isHidden = scriptTitle == nil || isEditor
         toolbar.isHidden = !isToolbar
         compositionScroll.isHidden = !isCandidates || (compositionLabel.text ?? "").isEmpty
         candidateScroll.isHidden = !isCandidates
@@ -199,12 +211,13 @@ final class TopBarView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         let w = bounds.width, h = bounds.height
-        toolbar.frame = CGRect(x: 4, y: 0, width: w - 8, height: h)
+        let scriptW: CGFloat = scriptButton.isHidden ? 0 : 44
+        toolbar.frame = CGRect(x: 4, y: 0, width: w - 8 - scriptW, height: h)
         separator.frame = CGRect(x: 0, y: h - 0.5, width: w, height: 0.5)
 
         let hasComposition = !compositionScroll.isHidden
         let top: CGFloat = hasComposition ? 18 : 0
-        compositionScroll.frame = CGRect(x: 12, y: 1, width: max(0, w - 60), height: 17)
+        compositionScroll.frame = CGRect(x: 12, y: 1, width: max(0, w - 60 - scriptW), height: 17)
         let readingWidth = ceil(compositionLabel.intrinsicContentSize.width)
         compositionLabel.frame = CGRect(x: 0, y: 0, width: max(compositionScroll.bounds.width, readingWidth), height: 17)
         compositionScroll.contentSize = compositionLabel.bounds.size
@@ -218,7 +231,8 @@ final class TopBarView: UIView {
         }
         let trailingW: CGFloat = trailingButton.isHidden ? 0 : 44
         trailingButton.frame = CGRect(x: w - 44, y: 0, width: 44, height: h)
-        candidateScroll.frame = CGRect(x: 0, y: top, width: w - trailingW, height: h - top)
+        scriptButton.frame = CGRect(x: w - trailingW - scriptW, y: 0, width: scriptW, height: h)
+        candidateScroll.frame = CGRect(x: 0, y: top, width: w - trailingW - scriptW, height: h - top)
         var x: CGFloat = 6
         let ch = candidateScroll.bounds.height
         for (i, b) in candidateButtons.enumerated() {
@@ -257,6 +271,7 @@ final class TopBarView: UIView {
             b.setTitleColor(tint, for: .normal)
         }
         compositionLabel.textColor = t.keyText
+        scriptButton.tintColor = tint
         trailingButton.tintColor = tint
         editorLabel.textColor = t.keyText
         editorCancel.tintColor = tint

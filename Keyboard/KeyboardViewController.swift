@@ -36,6 +36,9 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private let settings = KeyboardSettings.shared
+    private lazy var clipboardTransfer = ClipboardTransferController(presenter: self, store: clipStore) { [weak self] in
+        (self?.panelView as? ClipboardPanelView)?.reload()
+    }
     private lazy var clipStore = ClipboardStore(fileURL: Storage.url("clipboard.json"), limit: settings.clipLimit)
     private lazy var emoStore = EmoticonStore(directory: Storage.directory)
     private lazy var engine: ZhuyinEngine? = {
@@ -261,6 +264,12 @@ final class KeyboardViewController: UIInputViewController {
             guard let self = self, !self.isComposing else { return }
             self.finishHangul()
             self.textDocumentProxy.adjustTextPosition(byCharacterOffset: steps)
+        }
+        topBar.onScriptToggle = { [weak self] in
+            guard let self = self, self.mode == .pinyin else { return }
+            self.settings.pinyinSimplified.toggle()
+            self.clearSuggestions(refresh: false)
+            self.updateCandidates()
         }
         topBar.onToolbar = { [weak self] item in self?.toolbarTapped(item) }
         topBar.onCandidate = { [weak self] i in self?.selectCandidate(at: i, learn: true) }
@@ -930,6 +939,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func refreshTopBar() {
         guard topBar != nil else { return }
+        topBar.scriptTitle = mode == .pinyin && editorResult == nil ? (settings.pinyinSimplified ? "簡" : "繁") : nil
         if let r = editorResult {
             topBar.show(.candidates(composition: r.title, items: r.items + ["✏️ 修改"], trailing: .close))
         } else if isComposing {
@@ -1048,6 +1058,11 @@ final class KeyboardViewController: UIInputViewController {
             p.onInsert = { [weak self] s in
                 self?.feedback()
                 self?.output(s)
+            }
+            p.onTransfer = { [weak self] in
+                guard let self = self else { return }
+                guard self.hasFullAccess else { self.toast("請先開啟允許完整取用，再使用剪貼簿搬家"); return }
+                self.clipboardTransfer.show()
             }
             p.onAddCurrent = { [weak self] in self?.addCurrentClipboard() }
             p.onBack = { [weak self] in self?.closePanel() }
@@ -1587,7 +1602,7 @@ final class KeyboardViewController: UIInputViewController {
         let latest = settings.latestBuild
         guard latest > ReleaseChecker.currentBuild, latest > settings.notifiedBuild else { return }
         settings.notifiedBuild = latest
-        toast("有新版（第 \(latest) 版）！打開糯糯鍵盤 App 看更新內容")
+        toast("有新版！打開糯糯鍵盤 App 看更新內容")
     }
 
     // MARK: - 回饋

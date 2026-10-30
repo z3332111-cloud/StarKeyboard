@@ -180,6 +180,8 @@ enum class ToolbarItem(val label: String) {
 /** 鍵盤最上面那一條：工具列／候選字／編輯框（新增表符、翻譯） */
 @SuppressLint("ViewConstructor")
 class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
+    var scriptTitle: String? = null
+    var onScriptToggle: (() -> Unit)? = null
     var onToolbar: ((ToolbarItem) -> Unit)? = null
     var onCandidate: ((Int) -> Unit)? = null
     var onTrailing: ((Trailing) -> Unit)? = null
@@ -225,11 +227,16 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
                     row.addView(Tap(context, item.label, size, tint, true) { onToolbar?.invoke(item) },
                         LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
                 }
+                scriptTitle?.let { title ->
+                    row.addView(Tap(context, title, 15f, tint, true) { onScriptToggle?.invoke() },
+                        LinearLayout.LayoutParams(dpi(44f), LayoutParams.MATCH_PARENT))
+                }
                 addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT).apply {
                     leftMargin = dpi(4f); rightMargin = dpi(4f)
                 })
             }
             is Content.Candidates -> {
+                val scriptWidth = if (scriptTitle != null) dpi(44f) else 0
                 val top = if (c.composition.isNotEmpty()) dpi(18f) else 0
                 if (c.composition.isNotEmpty()) {
                     addView(TextView(context).apply {
@@ -239,7 +246,7 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
                         paint.isFakeBoldText = true
                         maxLines = 1
                         ellipsize = TextUtils.TruncateAt.START
-                    }, LayoutParams(LayoutParams.MATCH_PARENT, dpi(18f)).apply { leftMargin = dpi(12f); rightMargin = dpi(48f) })
+                    }, LayoutParams(LayoutParams.MATCH_PARENT, dpi(18f)).apply { leftMargin = dpi(12f); rightMargin = dpi(48f) + scriptWidth })
                 }
                 val scroll = HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false }
                 val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
@@ -260,8 +267,13 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
                 }
                 scroll.addView(row, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
                 addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT).apply {
-                    topMargin = top; rightMargin = dpi(44f); leftMargin = dpi(4f)
+                    topMargin = top; rightMargin = dpi(44f) + scriptWidth; leftMargin = dpi(4f)
                 })
+                scriptTitle?.let { title ->
+                    addView(Tap(context, title, 15f, tint, true) { onScriptToggle?.invoke() }.apply {
+                        contentDescription = if (title == "繁") "目前繁體，點一下切換簡體" else "目前簡體，點一下切換繁體"
+                    }, LayoutParams(dpi(44f), LayoutParams.MATCH_PARENT, Gravity.END).apply { rightMargin = dpi(44f) })
+                }
                 if (c.items.isNotEmpty() || c.trailing == Trailing.CLOSE) {
                     addView(Tap(context, if (c.trailing == Trailing.EXPAND) "⌄" else "✕", 18f, tint, true) {
                         onTrailing?.invoke(c.trailing)

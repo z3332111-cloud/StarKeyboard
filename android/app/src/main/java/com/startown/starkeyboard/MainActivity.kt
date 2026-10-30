@@ -82,8 +82,9 @@ class MainActivity : Activity() {
             text = "糯糯鍵盤"; textSize = 30f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.parseColor("#43262F"))
         })
         text("注音、手寫、英文、韓文、日文、表符、顏文字、剪貼簿、翻譯，還有可愛的主題。")
-        text("目前是 Android 第 ${BuildInfo.current(this)} 版")
+        text("目前版本 v${BuildInfo.version(this)}")
 
+        button("剪貼簿匯入／匯出") { startActivity(Intent(this, ClipboardTransferActivity::class.java)) }
         updateBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
         col.addView(updateBox)
         UpdateFetcher.fetch { info ->

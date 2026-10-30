@@ -19,7 +19,8 @@
     if (!release) return;
     document.getElementById("download-" + platform).href = base + "download/" + release.tag_name + "/" + filename;
     document.getElementById("release-" + platform).href = base + "tag/" + release.tag_name;
-    document.getElementById("version-" + platform).textContent = "最新已發布：第 " + Number(release.tag_name.slice(prefix.length)) + " 版";
+    var version = String(release.name || "").match(/\bv(\d+\.\d+\.\d+)\b/);
+    document.getElementById("version-" + platform).textContent = version ? "最新已發布：v" + version[1] : "最新版本已發布";
   }
   fetch("https://api.github.com/repos/z3332111-cloud/StarKeyboard/releases?per_page=100", {
     headers: { Accept: "application/vnd.github+json" }, cache: "no-store"

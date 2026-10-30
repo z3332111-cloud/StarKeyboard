@@ -232,9 +232,9 @@ final class SettingsPanelView: UIView {
         }
         let current = ReleaseChecker.currentBuild
         if settings.latestBuild > current {
-            stack.addArrangedSubview(note("🎉 有新版（第 \(settings.latestBuild) 版）：打開「糯糯鍵盤」App 看更新內容和下載方法"))
+            stack.addArrangedSubview(note("🎉 有新版：打開「糯糯鍵盤」App 看更新內容和下載方法"))
         }
-        stack.addArrangedSubview(note("糯糯鍵盤 第 \(current) 版 ・ 注音字典來自小麥注音（MIT 授權）"))
+        stack.addArrangedSubview(note("糯糯鍵盤 v\(ReleaseChecker.currentVersion) ・ 注音字典來自小麥注音（MIT 授權）"))
 
         setNeedsLayout()
         layoutIfNeeded()

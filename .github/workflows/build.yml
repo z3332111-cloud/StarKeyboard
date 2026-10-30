@@ -26,6 +26,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: 讀取公開版本
+        run: echo "APP_VERSION=$(cat VERSION)" >> "$GITHUB_ENV"
+
       - name: 下載並轉換字典（小麥注音 MIT、OpenCC 繁簡 Apache 2.0）
         run: |
           git clone --depth 1 https://github.com/openvanilla/McBopomofo.git "$RUNNER_TEMP/McBopomofo"
@@ -64,6 +67,7 @@ jobs:
           xcodebuild -project StarKeyboard.xcodeproj -scheme StarKeyboard -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="$APP_VERSION" \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             build > build.log 2>&1 || { grep -E "error:" build.log | sort -u | head -60; tail -40 build.log; exit 1; }
           grep -E "warning:" build.log | grep -v "/build/" | sort -u | head -40 || true
@@ -98,7 +102,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name == 'main' && 'build' || 'dev' }}-${{ github.run_number }}
-          name: 糯糯鍵盤 ${{ github.ref_name != 'main' && '開發版 ' || '' }}第 ${{ github.run_number }} 版
+          name: 糯糯鍵盤 ${{ github.ref_name != 'main' && '開發版 ' || '' }}v${{ env.APP_VERSION }}
           body_path: release_notes.md
           files: StarKeyboard.ipa
           prerelease: ${{ github.ref_name != 'main' }}

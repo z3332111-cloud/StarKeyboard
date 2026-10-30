@@ -7,11 +7,15 @@ enum JSONFile {
     }
 
     static func save<T: Encodable>(_ value: T, to url: URL) {
-        guard let data = try? JSONEncoder().encode(value) else { return }
+        try? write(value, to: url)
+    }
+
+    static func write<T: Encodable>(_ value: T, to url: URL) throws {
+        let data = try JSONEncoder().encode(value)
         #if os(iOS)
-        try? data.write(to: url, options: [.atomic, .completeFileProtection])
+        try data.write(to: url, options: [.atomic, .completeFileProtection])
         #else
-        try? data.write(to: url, options: .atomic)
+        try data.write(to: url, options: .atomic)
         #endif
         var protectedURL = url
         var values = URLResourceValues()
@@ -69,6 +73,42 @@ final class ClipboardStore {
         trim()
         save()
         return true
+    }
+
+    struct ImportResult { let added: Int; let duplicates: Int; let skipped: Int }
+
+    /// Prepare and persist before changing memory. Imported entries never evict existing history.
+    func importEntries(_ entries: [ClipboardArchive.Entry]) throws -> ImportResult {
+        guard entries.count <= ClipboardArchive.maxEntries else { throw ClipboardArchive.Failure.tooMany }
+        guard entries.allSatisfy({ $0.text.unicodeScalars.count <= Self.maxTextLength }) else { throw ClipboardArchive.Failure.tooLong }
+        var existing = items
+        var unique: [ClipboardArchive.Entry] = []
+        var index: [String: Int] = [:]
+        var duplicates = 0
+        for entry in entries where !entry.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if let i = existing.firstIndex(where: { $0.text == entry.text }) {
+                existing[i].pinned = existing[i].pinned || entry.pinned
+                duplicates += 1
+            } else if let i = index[entry.text] {
+                unique[i].pinned = unique[i].pinned || entry.pinned
+                duplicates += 1
+            } else {
+                index[entry.text] = unique.count
+                unique.append(entry)
+            }
+        }
+        var capacity = max(0, limit - existing.filter { !$0.pinned }.count)
+        var added: [ClipItem] = []
+        var skipped = 0
+        for entry in unique {
+            guard entry.pinned || capacity > 0 else { skipped += 1; continue }
+            if !entry.pinned { capacity -= 1 }
+            added.append(ClipItem(id: UUID(), text: entry.text, pinned: entry.pinned, date: Date()))
+        }
+        let merged = added + existing
+        if let url = fileURL { try JSONFile.write(merged, to: url) }
+        items = merged
+        return ImportResult(added: added.count, duplicates: duplicates, skipped: skipped)
     }
 
     func togglePin(_ id: UUID) {

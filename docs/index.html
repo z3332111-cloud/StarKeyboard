@@ -168,6 +168,19 @@
     <div><span aria-hidden="true">♡</span><h3>隱私設定說清楚</h3><p>自動剪貼簿紀錄與外部翻譯預設關閉；App 裡有完整風險說明。</p></div>
   </section>
 
+  <section id="clipboard-move">
+    <h2>拼音直接打繁體，剪貼簿也能搬家</h2>
+    <p><b>拼音繁／簡切換：</b>切到拼音後，按候選列右側的「繁／簡」。顯示「繁」時就會送出繁體字；正在打的拼音會保留。</p>
+    <p><b>剪貼簿匯入／匯出：</b>鍵盤 → 剪貼簿 →「匯入／匯出・剪貼簿搬家」。Android 也可從 App 首頁開啟。JSON 保留多行內容和釘選，iPhone 與 Android 可互相搬移；TXT 每行視為一筆。</p>
+    <ol>
+      <li>在舊鍵盤找「匯出／備份」或「全選複製」，將內容存為 JSON／UTF-8 TXT，或複製文字清單。</li>
+      <li>在糯糯鍵盤選「匯入檔案」或「匯入目前複製的文字」。貼上時可選每行一筆，或整段保留換行。</li>
+      <li>查看預覽後按匯入。重複文字會合併，原有紀錄會保留，超過未釘選容量的新內容會跳過並顯示筆數。</li>
+    </ol>
+    <p class="note">支援 JSON 文字陣列、items 清單，以及 text／content 文字欄位。每次最多 2 MB、1,000 筆，單筆最多 20,000 字。其他鍵盤若沒有匯出功能，需要先手動複製內容；無法直接讀取它的私人資料。</p>
+    <p class="tip">匯出檔是明文；存到雲端可能同步或備份。先檢查有沒有密碼、驗證碼與私密內容，並妥善保存或刪除檔案。</p>
+  </section>
+
   <div class="switch" id="install">
     <div class="tabs big" role="tablist" aria-label="手機種類">
       <button class="tab" role="tab" id="tab-iphone" aria-controls="panel-iphone" aria-selected="true">iPhone</button>
@@ -194,7 +207,7 @@
       <h2>下載安裝檔（在電腦上）</h2>
       <div class="download">
         <a id="download-iphone" class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/build-34/StarKeyboard.ipa">下載 iPhone 安裝檔</a>
-        <span id="version-iphone" class="note" aria-live="polite">已發布：第 34 版</span>
+        <span id="version-iphone" class="note" aria-live="polite">iPhone 最新版本</span>
         <a id="release-iphone" href="https://github.com/z3332111-cloud/StarKeyboard/releases/tag/build-34">更新內容</a>
       </div>
       <p class="note">安裝檔會直接下載到電腦。這裡只提供已完成打包的版本；新版完成後重新開啟此頁即可。舊版 App 名稱可能仍顯示「星星鍵盤」。</p>
@@ -313,9 +326,9 @@
       <h2>下載並安裝</h2>
       <div class="download">
         <a id="download-android" class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/android-29/StarKeyboard.apk">下載 Android 安裝檔</a>
-        <span id="version-android" class="note" aria-live="polite">已發布：第 29 版</span>
+        <span id="version-android" class="note" aria-live="polite">Android 最新版本</span>
         <a id="release-android" href="https://github.com/z3332111-cloud/StarKeyboard/releases/tag/android-29">更新內容</a>
-        <span class="note">本頁會自動取得最新已發布版本；新版打包完成後，重新開啟此頁即可。各版本的更新內容在 <a href="https://github.com/z3332111-cloud/StarKeyboard/releases">所有版本</a>（名稱有「Android 第幾版」的）。</span>
+        <span class="note">本頁會自動取得最新已發布版本；新版打包完成後，重新開啟此頁即可。各版本的更新內容在 <a href="https://github.com/z3332111-cloud/StarKeyboard/releases">所有版本</a>（名稱有「Android」的）。</span>
       </div>
       <ol class="steps">
         <li><div>用 Android 手機打開這一頁，按上面的「下載 Android 安裝檔」。瀏覽器如果問「要下載嗎？」或說「這類檔案可能有害」，按<b>下載</b>／<b>仍要下載</b>。</div></li>

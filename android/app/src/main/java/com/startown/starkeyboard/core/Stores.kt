@@ -56,6 +56,49 @@ class ClipboardStore(private val file: File?, limit: Int = 200) {
         return true
     }
 
+    data class ImportResult(val added: Int, val duplicates: Int, val skipped: Int)
+
+    fun importEntries(entries: List<ClipboardArchive.Entry>): ImportResult {
+        require(entries.size <= ClipboardArchive.MAX_ENTRIES) { "最多一次匯入 1,000 筆。" }
+        require(entries.all { it.text.codePointCount(0, it.text.length) <= MAX_TEXT }) { "單筆文字太長。" }
+        val existing = items.map { it.copy() }
+        val unique = LinkedHashMap<String, ClipboardArchive.Entry>()
+        var duplicates = 0
+        for (entry in entries.filter { it.text.isNotBlank() }) {
+            val old = existing.find { it.text == entry.text }
+            val pending = unique[entry.text]
+            if (old != null) {
+                old.pinned = old.pinned || entry.pinned
+                duplicates++
+            } else if (pending != null) {
+                unique[entry.text] = pending.copy(pinned = pending.pinned || entry.pinned)
+                duplicates++
+            } else unique[entry.text] = entry
+        }
+        var capacity = maxOf(0, limit - existing.count { !it.pinned })
+        var skipped = 0
+        val added = ArrayList<ClipItem>()
+        for (entry in unique.values) {
+            if (!entry.pinned && capacity <= 0) { skipped++; continue }
+            if (!entry.pinned) capacity--
+            added.add(ClipItem(UUID.randomUUID().toString(), entry.text, entry.pinned, System.currentTimeMillis()))
+        }
+        val merged = added + existing
+        file?.let { target ->
+            val arr = JSONArray()
+            for (item in merged) arr.put(JSONObject().put("id", item.id).put("text", item.text).put("pinned", item.pinned).put("date", item.date))
+            val temp = File.createTempFile("clipboard-import-", ".tmp", target.absoluteFile.parentFile)
+            try {
+                temp.writeText(arr.toString())
+                java.nio.file.Files.move(temp.toPath(), target.toPath(),
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            } finally { temp.delete() }
+        }
+        items.clear()
+        items.addAll(merged)
+        return ImportResult(added.size, duplicates, skipped)
+    }
+
     fun togglePin(id: String) {
         items.find { it.id == id }?.let { it.pinned = !it.pinned }
         save()
@@ -196,7 +239,7 @@ object ReleaseChecker {
                     if (asset.optString("name").endsWith(".apk")) apk = asset.optString("browser_download_url")
                 }
             }
-            best = ReleaseInfo(build, o.optString("name", "Android 第 $build 版"), o.optString("body"), apk, o.optString("html_url", PAGE))
+            best = ReleaseInfo(build, o.optString("name", "糯糯鍵盤 Android 更新"), o.optString("body"), apk, o.optString("html_url", PAGE))
         }
         return best
     }

@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "android/**"
+      - "VERSION"
       - "tools/build_dict.py"
       - "tools/chat_phrases.txt"
       - "tools/build_fonts.py"
@@ -28,6 +29,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: 讀取公開版本
+        run: echo "APP_VERSION=$(cat VERSION)" >> "$GITHUB_ENV"
 
       - name: 下載並轉換字典（小麥注音 MIT、OpenCC 繁簡 Apache 2.0）
         run: |
@@ -96,7 +100,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-${{ github.run_number }}
-          name: 糯糯鍵盤 Android 第 ${{ github.run_number }} 版
+          name: 糯糯鍵盤 Android v${{ env.APP_VERSION }}
           body_path: release_notes.md
           files: StarKeyboard.apk
           make_latest: "false"

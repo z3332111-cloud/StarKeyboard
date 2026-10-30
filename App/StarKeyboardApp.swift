@@ -31,7 +31,7 @@ struct ContentView: View {
                         Text("注音、手寫、英文、表符、顏文字、剪貼簿，還有可愛的主題。")
                             .font(.system(.subheadline, design: .rounded))
                             .foregroundStyle(.secondary)
-                        Text(ReleaseChecker.currentBuild > 1 ? "目前是第 \(ReleaseChecker.currentBuild) 版" : "開發版")
+                        Text("目前版本 v\(ReleaseChecker.currentVersion)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

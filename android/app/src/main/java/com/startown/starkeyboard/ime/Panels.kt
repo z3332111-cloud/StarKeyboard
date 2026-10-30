@@ -183,6 +183,7 @@ class ClipboardPanel(
     private val style: KeyboardStyle,
     private val onInsert: (String) -> Unit,
     private val onAddCurrent: () -> Unit,
+    private val onTransfer: () -> Unit,
     onBack: () -> Unit,
     onBackspace: () -> Unit,
 ) : LinearLayout(context) {
@@ -203,6 +204,8 @@ class ClipboardPanel(
         clearButton = Tap(context, "清除", 13f, t.keyText.withAlpha(0.7f)) { clearTapped() }.apply { setPadding(dpi(10f), 0, dpi(12f), 0) }
         header.addView(clearButton, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, dpi(34f)))
+        addView(Tap(context, "匯入／匯出・剪貼簿搬家", 14f, t.specialText, true) { onTransfer() },
+            LayoutParams(LayoutParams.MATCH_PARENT, dpi(34f)))
         val scroll = ScrollView(context)
         scroll.addView(list)
         addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
@@ -533,13 +536,17 @@ class SettingsPanel(
         header("其他")
         button("清除選字學習紀錄") { onResetLearning() }
         if (settings.latestBuild > BuildInfo.current(context)) {
-            note("🎉 有新版（Android 第 ${settings.latestBuild} 版）：打開「糯糯鍵盤」App 更新")
+            note("🎉 有新版：打開「糯糯鍵盤」App 更新")
         }
-        note("糯糯鍵盤 Android 第 ${BuildInfo.current(context)} 版 ・ 注音字典來自小麥注音（MIT 授權）")
+        note("糯糯鍵盤 Android v${BuildInfo.version(context)} ・ 注音字典來自小麥注音（MIT 授權）")
     }
 }
 
 object BuildInfo {
+    fun version(context: Context): String = runCatching {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.2.0"
+    }.getOrDefault("0.2.0")
+
     fun current(context: Context): Int = runCatching {
         @Suppress("DEPRECATION")
         context.packageManager.getPackageInfo(context.packageName, 0).versionCode

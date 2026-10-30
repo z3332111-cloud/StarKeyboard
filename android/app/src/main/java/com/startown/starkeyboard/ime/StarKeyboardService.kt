@@ -273,6 +273,13 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         keyboard.onLongPress = { showImePicker() }
         keyboard.onCursorMove = { steps -> if (!isComposing) moveCursor(steps) }
         keyboard.onGlide = { path, centers, kw -> glideTyped(path, centers, kw) }
+        topBar.onScriptToggle = {
+            if (mode == InputMode.PINYIN) {
+                settings.pinyinSimplified = !settings.pinyinSimplified
+                clearSuggestions()
+                updateCandidates()
+            }
+        }
         topBar.onToolbar = { toolbarTapped(it) }
         topBar.onCandidate = { selectCandidate(it, true) }
         topBar.onTrailing = { trailing ->
@@ -838,6 +845,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun refreshTopBar() {
         if (root == null) return
+        topBar.scriptTitle = if (mode == InputMode.PINYIN && editorResult == null) (if (settings.pinyinSimplified) "簡" else "繁") else null
         val tr = editorResult
         val ed = editorText
         when {
@@ -1021,6 +1029,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 ClipboardPanel(this, clipStore, style,
                     onInsert = { feedback(); output(it) },
                     onAddCurrent = { addCurrentClipboard() },
+                    onTransfer = {
+                        startActivity(Intent(this, com.startown.starkeyboard.ClipboardTransferActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    },
                     onBack = { closePanel() },
                     onBackspace = { deleteOutput() })
             }
@@ -1477,6 +1488,6 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val latest = settings.latestBuild
         if (latest <= BuildInfo.current(this) || latest <= settings.notifiedBuild) return
         settings.notifiedBuild = latest
-        toast("有新版（Android 第 $latest 版）！打開糯糯鍵盤 App 更新")
+        toast("有新版！打開糯糯鍵盤 App 更新")
     }
 }

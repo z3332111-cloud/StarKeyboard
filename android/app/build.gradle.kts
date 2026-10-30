@@ -16,7 +16,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = buildNumber
-        versionName = "0.1.$buildNumber"
+        versionName = rootProject.projectDir.parentFile.resolve("VERSION").readText().trim()
         // 只放手機用的 CPU 版本，安裝檔小很多（Google 手寫、翻譯的程式庫每種 CPU 各一份）
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
