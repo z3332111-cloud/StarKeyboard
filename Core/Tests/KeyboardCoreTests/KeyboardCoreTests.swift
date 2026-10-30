@@ -186,7 +186,9 @@ final class ZhuyinEngineTests: XCTestCase {
         e.learn(readings: ["ㄋㄧˇ"], text: "妳")
         XCTAssertEqual(e.candidates(for: ["ㄋㄧ*"]).first?.text, "妳")
         e.learn(readings: ["ㄋ*", "ㄏ*"], text: "妳好")
-        XCTAssertTrue(e.phrases(["ㄋㄧˇ", "ㄏㄠˇ"]).contains { $0.text == "妳好" })
+        // 簡拼仍記得偏好，但不能把未知完整讀音推測成確定的候選。
+        XCTAssertGreaterThan(e.userModel.boost(reading: "ㄋㄧˇ-ㄏㄠˇ", phrase: "妳好"), 0)
+        XCTAssertFalse(e.phrases(["ㄋㄧˇ", "ㄏㄠˇ"]).contains { $0.text == "妳好" })
         XCTAssertFalse(e.phrases(["ㄕˋ", "ㄏㄠˇ"]).contains { $0.text == "妳好" })
         e.resetLearning()
         XCTAssertEqual(e.candidates(for: ["ㄋㄧ*"]).first?.text, "你")
@@ -463,7 +465,9 @@ final class FuzzyTests: XCTestCase {
 
     func testForgotTone() {
         let e = makeEngine(extra: [("ㄋㄧ", "妮", -5.5)])
-        XCTAssertEqual(sentence(e, ["ㄋㄧ", "ㄏㄠˇ"]), "你好")
+        // 有符合輸入的字時尊重原音；容錯的「你」仍可另選。
+        XCTAssertEqual(sentence(e, ["ㄋㄧ", "ㄏㄠˇ"]), "妮好")
+        XCTAssertTrue(e.candidates(for: ["ㄋㄧ"]).contains { $0.text == "你" })
         e.fuzzy.tones = false
         XCTAssertEqual(sentence(e, ["ㄋㄧ", "ㄏㄠˇ"]), "妮好")
     }

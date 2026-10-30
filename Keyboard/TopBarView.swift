@@ -1,5 +1,10 @@
 import UIKit
 
+// 立即把按下事件交給選字按鈕；真正開始滑動時仍取消選取，避免誤送字。
+private final class CandidateScrollView: UIScrollView {
+    override func touchesShouldCancel(in view: UIView) -> Bool { true }
+}
+
 enum ToolbarItem: CaseIterable {
     case clipboard, emoji, kaomoji, symbols, fancy, translate, handwriting, voice, settings, dismiss
 }
@@ -41,7 +46,7 @@ final class TopBarView: UIView {
     private let compositionScroll = UIScrollView()
     private let compositionLabel = UILabel()
     private var scrollCompositionToEnd = false
-    private let candidateScroll = UIScrollView()
+    private let candidateScroll = CandidateScrollView()
     private var candidateButtons: [UIButton] = []
     private let trailingButton = UIButton(type: .system)
     private let editorLabel = UILabel()
@@ -85,6 +90,7 @@ final class TopBarView: UIView {
         compositionScroll.showsHorizontalScrollIndicator = false
         compositionScroll.addSubview(compositionLabel)
         addSubview(compositionScroll)
+        candidateScroll.delaysContentTouches = false
         candidateScroll.showsHorizontalScrollIndicator = false
         candidateScroll.alwaysBounceHorizontal = true
         addSubview(candidateScroll)
@@ -242,7 +248,7 @@ final class TopBarView: UIView {
             let bw = max(40, ceil(textW) + 22)
             if i == 0 {
                 // 膠囊：上下留一點空，左右也留一點才不會跟下一個字黏在一起
-                let pill = CGRect(x: x, y: 4, width: bw, height: max(20, ch - 8))
+                let pill = CGRect(x: x, y: 1, width: bw, height: max(20, ch - 2))
                 b.frame = pill
                 b.layer.cornerRadius = pill.height / 2
                 // 給陰影現成的形狀，iPhone 才不用每一幀從按鈕內容重算陰影（打字時會卡）
@@ -451,6 +457,7 @@ final class ChipGridView: UIView, UICollectionViewDataSource, UICollectionViewDe
         collectionView.backgroundColor = .clear
         collectionView.dataSource = self
         collectionView.delegate = self
+        collectionView.delaysContentTouches = false
         collectionView.alwaysBounceVertical = true
         collectionView.register(ChipCell.self, forCellWithReuseIdentifier: "chip")
         let lp = UILongPressGestureRecognizer(target: self, action: #selector(longPressed(_:)))

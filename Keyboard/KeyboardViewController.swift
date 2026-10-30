@@ -8,7 +8,7 @@ private final class KeyboardInputView: UIInputView, UIInputViewAudioFeedback {
 
 final class KeyboardViewController: UIInputViewController {
     private enum Metrics {
-        static let barHeight: CGFloat = 50
+        static let barHeight: CGFloat = 64
     }
 
     private enum SuggestionSource { case association, handwriting, spelling, glide }
@@ -48,7 +48,7 @@ final class KeyboardViewController: UIInputViewController {
     private lazy var emoStore = EmoticonStore(directory: Storage.directory)
     private lazy var engine: ZhuyinEngine? = {
         guard let path = Bundle.main.path(forResource: "zhuyin", ofType: "sqlite"),
-              let e = ZhuyinEngine(path: path, userModel: UserPhraseModel(fileURL: Storage.url("learned.json"))) else { return nil }
+              let e = ZhuyinEngine(path: path, userModel: UserPhraseModel(fileURL: Storage.url("learned.json"), asynchronousWrites: true)) else { return nil }
         e.fuzzy = self.fuzzyOptions
         return e
     }()
@@ -56,7 +56,7 @@ final class KeyboardViewController: UIInputViewController {
     private lazy var pinyinEngine: PinyinEngine? = {
         guard let path = Bundle.main.path(forResource: "zhuyin", ofType: "sqlite"),
               let db = SQLiteDB(path: path),
-              let e = ZhuyinEngine(path: path, userModel: UserPhraseModel(fileURL: Storage.url("learned-pinyin.json")), column: "plain")
+              let e = ZhuyinEngine(path: path, userModel: UserPhraseModel(fileURL: Storage.url("learned-pinyin.json"), asynchronousWrites: true), column: "plain")
         else { return nil }
         return PinyinEngine(engine: e, table: PinyinEngine.loadTable(from: db))
     }()
@@ -224,6 +224,8 @@ final class KeyboardViewController: UIInputViewController {
         super.viewWillDisappear(animated)
         clipboardTimer?.invalidate()
         clipboardTimer = nil
+        engine?.userModel.flushPendingWrites()
+        pinyinEngine?.engine.userModel.flushPendingWrites()
         finishHangul()
         finishPhotoAdjust()
     }

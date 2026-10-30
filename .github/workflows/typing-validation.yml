@@ -1,0 +1,27 @@
+name: 選字回歸與效能比較
+on:
+  push:
+    branches: [fix/typing-responsiveness]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 使用既有公開版的字典
+        run: |
+          curl -fLsS --retry 3 -o "$RUNNER_TEMP/keyboard.ipa" https://github.com/z3332111-cloud/StarKeyboard/releases/download/build-41/StarKeyboard.ipa
+          unzip -p "$RUNNER_TEMP/keyboard.ipa" Payload/StarKeyboard.app/PlugIns/StarKeyboardExtension.appex/zhuyin.sqlite > "$RUNNER_TEMP/typing.sqlite"
+          echo "TYPING_DICTIONARY=$RUNNER_TEMP/typing.sqlite" >> "$GITHUB_ENV"
+      - name: 新版核心回歸與效能
+        run: swift test -c release --package-path Core
+      - name: 同機比較修正前版本
+        run: |
+          git worktree add "$RUNNER_TEMP/baseline" 982c53319b0185b173b8b319fde27d68db383e10
+          cp Core/Tests/KeyboardCoreTests/TypingBenchmarkTests.swift "$RUNNER_TEMP/baseline/Core/Tests/KeyboardCoreTests/"
+          swift test -c release --package-path "$RUNNER_TEMP/baseline/Core" --filter TypingBenchmarkTests

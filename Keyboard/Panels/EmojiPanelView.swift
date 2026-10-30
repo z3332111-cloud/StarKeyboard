@@ -235,6 +235,7 @@ final class CandidatePanelView: UIView {
 
     private let grid: ChipGridView
     private let bar: PanelBottomBar
+    private var displayedCandidates: [String] = []
 
     init(style: KeyboardStyle) {
         self.style = style
@@ -253,6 +254,8 @@ final class CandidatePanelView: UIView {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func setCandidates(_ texts: [String]) {
+        guard texts != displayedCandidates else { return }
+        displayedCandidates = texts
         grid.items = texts.map { .text($0) }
         grid.scrollToTop()
     }

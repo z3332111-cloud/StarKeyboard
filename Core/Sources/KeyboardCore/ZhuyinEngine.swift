@@ -18,6 +18,7 @@ final class ZhuyinEngine {
     struct Scored {
         let text: String
         let score: Double
+        var corrections: Int = 0
     }
 
     static let maxPhraseLength = 6
@@ -30,6 +31,7 @@ final class ZhuyinEngine {
     /// 用哪一欄查：注音用 reading（有聲調），拼音用 plain（沒聲調）
     private let column: String
     private var cache: [String: [Scored]] = [:]
+    private var lookupCache: [String: [(phrase: String, score: Double)]] = [:]
     private var fuzzyCache: [String: [Scored]] = [:]
     private struct Completion {
         let text: String
@@ -141,7 +143,12 @@ final class ZhuyinEngine {
 
     /// 查字典：讀音裡有沒打完的音節（*）就用開頭注音查，再一個一個比
     private func lookup(_ key: String) -> [(phrase: String, score: Double)] {
+        if let cached = lookupCache[key] { return cached }
         var out: [(phrase: String, score: Double)] = []
+        defer {
+            if lookupCache.count >= 512 { lookupCache.removeAll() }
+            lookupCache[key] = out
+        }
         guard key.contains("*") else {
             db.run("SELECT phrase, score FROM phrases WHERE \(column) = ?1 ORDER BY score DESC LIMIT 80", [.text(key)]) { stmt in
                 out.append((SQLiteDB.text(stmt, 0), SQLiteDB.double(stmt, 1)))
@@ -199,13 +206,19 @@ final class ZhuyinEngine {
         if let cached = fuzzyCache[key] { return cached }
         var best: [String: Double] = [:]
         var order: [String] = []
-        func merge(_ list: [Scored], _ penalty: Double) {
+        var corrections: [String: Int] = [:]
+        func merge(_ list: [Scored], _ penalty: Double, corrected: Bool = false) {
             for p in list {
                 let s = p.score + penalty
+                let errors = corrected ? 1 : 0
                 if let old = best[p.text] {
-                    if s > old { best[p.text] = s }
+                    if errors < corrections[p.text]! || (errors == corrections[p.text]! && s > old) {
+                        best[p.text] = s
+                        corrections[p.text] = errors
+                    }
                 } else {
                     best[p.text] = s
+                    corrections[p.text] = errors
                     order.append(p.text)
                 }
             }
@@ -217,7 +230,7 @@ final class ZhuyinEngine {
             for alt in alternatives(for: syllables[j]) {
                 var variant = syllables
                 variant[j] = alt.reading
-                merge(phrases(variant[...]), alt.penalty)
+                merge(phrases(variant[...]), alt.penalty, corrected: true)
             }
         }
         // 簡拼的 ㄎㄞ 也當成 ㄎ＋ㄞ 兩個字試試（第一個組合是都不拆，上面已經查過）
@@ -229,8 +242,12 @@ final class ZhuyinEngine {
         for variant in variants.dropFirst() where variant.count <= Self.maxPhraseLength {
             merge(phrases(variant[...]), Self.splitBonus)
         }
-        var list = order.enumerated().map { (i, text) in (i, Scored(text: text, score: best[text]!)) }
-        list.sort { $0.1.score != $1.1.score ? $0.1.score > $1.1.score : $0.0 < $1.0 }
+        var list = order.enumerated().map { (i, text) in (i, Scored(text: text, score: best[text]!, corrections: corrections[text]!)) }
+        // 容錯只排在符合輸入的候選後面，學習分數不能蓋過已輸入的音。
+        list.sort {
+            if $0.1.corrections != $1.1.corrections { return $0.1.corrections < $1.1.corrections }
+            return $0.1.score != $1.1.score ? $0.1.score > $1.1.score : $0.0 < $1.0
+        }
         let result = list.map { $0.1 }
         fuzzyCache[key] = result
         return result
@@ -297,21 +314,27 @@ final class ZhuyinEngine {
         let n = readings.count
         guard n > 0 else { return [] }
         var best = [Double](repeating: -.infinity, count: n + 1)
+        var errors = [Int](repeating: Int.max, count: n + 1)
         var back = [(start: Int, text: String, score: Double)](repeating: (0, "", 0), count: n + 1)
         best[0] = 0
+        errors[0] = 0
         for i in 1...n {
             for k in 1...min(Self.maxPhraseLength, i) {
                 let start = i - k
                 guard best[start] > -.infinity else { continue }
                 if let top = fuzzyPhrases(readings[start..<i]).first {
                     let s = best[start] + top.score
-                    if s > best[i] {
+                    let count = errors[start] + top.corrections
+                    if count < errors[i] || (count == errors[i] && s > best[i]) {
+                        errors[i] = count
                         best[i] = s
                         back[i] = (start, top.text, top.score)
                     }
                 } else if k == 1 {
                     let s = best[start] + Self.unknownPenalty
-                    if s > best[i] {
+                    let count = errors[start] + 1
+                    if count < errors[i] || (count == errors[i] && s > best[i]) {
+                        errors[i] = count
                         best[i] = s
                         back[i] = (start, Self.display(readings[start]), Self.unknownPenalty)
                     }
@@ -362,9 +385,9 @@ final class ZhuyinEngine {
         let related = completions(after: context)
         // 同音單字結合字頻、使用者選字與前文詞彙；加分有限，不蓋過反覆選過的偏好。
         if readings.count == 1, !related.isEmpty {
-            let scores = Dictionary(fuzzyPhrases(readings[...]).map { ($0.text, $0.score) },
+            let scores = Dictionary(fuzzyPhrases(readings[...]).filter { $0.corrections == 0 }.map { ($0.text, $0.score) },
                                     uniquingKeysWith: max)
-            let ranked = out.enumerated().filter { $0.element.text.count == 1 && $0.element.kind != .literal }
+            let ranked = out.enumerated().filter { $0.element.text.count == 1 && scores[$0.element.text] != nil }
                 .map { index, candidate -> (Int, Double) in
                     let support = related.filter {
                         $0.text.hasPrefix(candidate.text) &&
@@ -543,12 +566,33 @@ final class UserPhraseModel {
     private var counts: [String: [String: Int]] = [:]
     private let fileURL: URL?
     private var matchingCache: [String: [String: Int]] = [:]
+    private var readingBuckets: [String: Set<String>] = [:]
+    private var wildcardBuckets: [String: Set<String>] = [:]
+    private var readingParts: [String: [Substring]] = [:]
+    private var learnedCache: [(reading: String, phrase: String)]?
+    private let saveQueue = DispatchQueue(label: "keyboard.learning.save", qos: .utility)
+    private let asynchronousWrites: Bool
 
-    init(fileURL: URL?) {
+    init(fileURL: URL?, asynchronousWrites: Bool = false) {
+        self.asynchronousWrites = asynchronousWrites
         self.fileURL = fileURL
         if let url = fileURL, let saved = JSONFile.load([String: [String: Int]].self, from: url) {
             counts = saved
         }
+        for reading in counts.keys where !reading.isEmpty { index(reading) }
+    }
+
+    private static func bucket(_ parts: [Substring]) -> String {
+        String(parts.compactMap { $0.first })
+    }
+
+    private func index(_ reading: String) {
+        guard readingParts[reading] == nil else { return }
+        let parts = reading.split(separator: "-")
+        readingParts[reading] = parts
+        let key = Self.bucket(parts)
+        readingBuckets[key, default: []].insert(reading)
+        if reading.contains("*") { wildcardBuckets[key, default: []].insert(reading) }
     }
 
     /// 只記字、不管怎麼拼的那一欄（key 是空字串）
@@ -564,15 +608,22 @@ final class UserPhraseModel {
 
     func phrases(for reading: String) -> [String] {
         guard !reading.isEmpty else { return [] }
-        return matchingCounts(for: reading).keys.sorted()
+        let query = reading.split(separator: "-")
+        // 模糊的舊記錄只能在相同或更寬的輸入下新增候選；不能用 ㄋ* 推斷 ㄋㄠ 的字。
+        let eligible = (readingBuckets[Self.bucket(query)] ?? []).filter { saved in
+            ZhuyinEngine.matchPenalty(query, readingParts[saved]!) != nil
+        }
+        return Set(eligible.flatMap { Array(counts[$0, default: [:]].keys) }).sorted()
     }
 
     /// 可用於詞語補全的完整讀音；不把只記了簡拼的資料當成確定的聲調。
     func learnedPhrases() -> [(reading: String, phrase: String)] {
+        if let cached = learnedCache { return cached }
         var out: [(reading: String, phrase: String)] = []
         for (reading, phrases) in counts where !reading.isEmpty && !reading.contains("*") {
             for phrase in phrases.keys { out.append((reading: reading, phrase: phrase)) }
         }
+        learnedCache = out
         return out
     }
 
@@ -590,9 +641,12 @@ final class UserPhraseModel {
     private func matchingCounts(for reading: String) -> [String: Int] {
         if let cached = matchingCache[reading] { return cached }
         let query = reading.split(separator: "-")
-        var result: [String: Int] = [:]
-        for (saved, phrases) in counts where !saved.isEmpty {
-            let parts = saved.split(separator: "-")
+        var result = counts[reading] ?? [:]
+        let key = Self.bucket(query)
+        let possible = reading.contains("*") ? readingBuckets[key] : wildcardBuckets[key]
+        for saved in possible ?? [] where saved != reading {
+            let phrases = counts[saved] ?? [:]
+            let parts = readingParts[saved]!
             guard parts.count == query.count else { continue }
             let matches = zip(query, parts).allSatisfy { want, have in
                 want == have ||
@@ -603,6 +657,7 @@ final class UserPhraseModel {
                 for (phrase, count) in phrases { result[phrase] = max(result[phrase] ?? 0, count) }
             }
         }
+        if matchingCache.count >= 512 { matchingCache.removeAll() }
         matchingCache[reading] = result
         return result
     }
@@ -610,6 +665,8 @@ final class UserPhraseModel {
     func record(reading: String, phrase: String) {
         guard !reading.isEmpty, !phrase.isEmpty else { return }
         matchingCache.removeAll()
+        learnedCache = nil
+        index(reading)
         counts[reading, default: [:]][phrase, default: 0] += 1
         counts[Self.anyReading, default: [:]][phrase, default: 0] += 1
         save()
@@ -617,11 +674,26 @@ final class UserPhraseModel {
 
     func reset() {
         counts = [:]
+        readingBuckets.removeAll()
+        wildcardBuckets.removeAll()
+        readingParts.removeAll()
+        learnedCache = nil
         matchingCache.removeAll()
         save()
     }
 
+    func flushPendingWrites() {
+        if asynchronousWrites { saveQueue.sync {} }
+    }
+
     private func save() {
-        if let url = fileURL { JSONFile.save(counts, to: url) }
+        guard let url = fileURL else { return }
+        let snapshot = counts
+        if asynchronousWrites {
+            // 串行寫入不可亂序；鍵盤收起前會等最後一筆落盤。
+            saveQueue.async { JSONFile.save(snapshot, to: url) }
+        } else {
+            JSONFile.save(snapshot, to: url)
+        }
     }
 }
