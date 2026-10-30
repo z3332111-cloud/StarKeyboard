@@ -856,6 +856,10 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val ed = editorText
         val namingFolder = ed != null && editorPurpose == EditorPurpose.CLIPBOARD_CATEGORY
         folderNameBox.visibility = if (namingFolder) View.VISIBLE else View.GONE
+        (toastView.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+            val margin = ((if (namingFolder) 138 else 54) * dp).toInt()
+            if (params.topMargin != margin) { params.topMargin = margin; toastView.layoutParams = params }
+        }
         if (namingFolder) folderNameBox.update(ed ?: "", renamingCategory != null, style)
         when {
             tr != null -> topBar.showCandidates(tr.title, tr.items + "✏️ 修改", Trailing.CLOSE)
@@ -1187,6 +1191,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         editorResult = null
         rebuildKeys()
         refreshTopBar()
+        if (purpose == EditorPurpose.CLIPBOARD_CATEGORY) return
         toast(when (purpose) {
             EditorPurpose.EMOTICON -> "用鍵盤打字，或按 (•ᴗ•) 挑顏文字零件"
             EditorPurpose.TRANSLATE -> "先打要翻譯的話，按「→語言」換目標語言"
