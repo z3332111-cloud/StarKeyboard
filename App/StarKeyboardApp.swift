@@ -54,7 +54,7 @@ struct ContentView: View {
                             Text(latest.notes)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
-                            Text("更新方法：下載新的 StarKeyboard.ipa，接電腦用 Sideloadly 直接裝。不要先刪掉舊的，設定、剪貼簿、自製表符都會保留。")
+                            Text("更新方法：在電腦下載新的 StarKeyboard.ipa，用原 Apple ID 和 Sideloadly 直接安裝；完成 Wi-Fi 配對後可免插線。保留自動續簽設定，讓 Daemon 改用新版。不要先刪掉舊 App，以保留設定與資料。")
                                 .font(.footnote)
                         }
                         .padding(.vertical, 4)
@@ -102,7 +102,9 @@ struct ContentView: View {
                     tip("翻譯", "工具列的「譯」：先打中文，按「→英文」換語言，再按「翻譯」，點結果就送出。")
                     tip("自製表符", "在 ⭐ 我的 按 ＋ 就能新增；長按可以刪除。")
                     tip("空白鍵", "按住空白鍵左右滑，可以移動游標。")
-                    tip("免費 Apple ID", "用免費帳號安裝的話，每 7 天要用 Sideloadly 重新安裝一次（資料不會不見）。")
+                    tip("Wi-Fi 自動續簽", "免費 Apple ID 的簽章有效 7 天。首次插線配對並啟用 Wi-Fi 同步及 Sideloadly 自動續簽後，可由 Daemon 在快到期時無線續簽。電腦須開著且保持喚醒，Daemon 有執行，手機能在同一網路被找到。")
+                    tip("續簽與新版", "Daemon 續簽的是已登錄的版本，不會自動下載 GitHub 新版。更新時下載新 IPA，用原 Apple ID 安裝並保留自動續簽；不要先刪除舊 App。")
+                    Link("查看 Wi-Fi 續簽設定步驟", destination: URL(string: "https://z3332111-cloud.github.io/StarKeyboard/#wifi-refresh")!)
                 }
             }
             .navigationTitle("糯糯鍵盤")

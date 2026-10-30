@@ -407,14 +407,18 @@ final class ZhuyinEngine {
     func learn(readings: [String], text: String) {
         // 簡拼拆開選到的詞（ㄎㄞ*~ 選了「可愛」、單獨的 ㄨㄢ* 選了「晚安」）記成拆開的讀音（ㄎ*-ㄞ*）；
         // 字數對不上就是沒拆（選了「開」）
-        func parts(_ r: String) -> [String]? { Self.splitAbbreviation(r.hasSuffix("*") ? r + "~" : r) }
+        func parts(_ r: String) -> [String]? {
+            // 只有單獨一個音節可額外嘗試拆開；多音節時尊重組字器的 ~，
+            // 避免把 ㄋㄧ* ㄏ* ㄎㄞ*~ 的「你」也拆開，破壞「你好可愛」的學習。
+            Self.splitAbbreviation(readings.count == 1 && r.hasSuffix("*") ? r + "~" : r)
+        }
         let splits = readings.compactMap(parts)
         let split = !splits.isEmpty && text.count == readings.count + splits.count
         let used = readings.flatMap { r -> [String] in
             if split, let parts = parts(r) { return parts }
             return [r.hasSuffix("~") ? String(r.dropLast()) : r]
         }
-        guard !used.isEmpty, used.count <= Self.maxPhraseLength else { return }
+        guard !used.isEmpty, used.count == text.count, used.count <= Self.maxPhraseLength else { return }
         userModel.record(reading: used.joined(separator: "-"), phrase: text)
         cache.removeAll()
         fuzzyCache.removeAll()

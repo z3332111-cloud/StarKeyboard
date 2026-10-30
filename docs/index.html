@@ -176,13 +176,13 @@
 
   <!-- ===================== iPhone ===================== -->
   <div class="panel" id="panel-iphone" role="tabpanel" aria-labelledby="tab-iphone">
-    <p class="tip">iPhone 沒上架的 App 要用電腦裝，第一次大約 15 分鐘。用免費 Apple ID 裝的 App 每 7 天要用電腦重裝一次（資料不會不見）。</p>
+    <p class="tip">第一次用電腦與傳輸線安裝，之後可設定 <a href="#wifi-refresh">Wi-Fi 自動續簽</a>，不用每週插線。免費 Apple ID 的簽章有效 7 天；續簽時電腦須開著、Daemon 有執行，手機與電腦能在同一個區域網路互相找到。</p>
 
     <section>
       <h2>先準備</h2>
       <div class="need">
         <div><b>iPhone</b>iOS 15 以上</div>
-        <div><b>傳輸線</b>能接電腦的線（充電線不一定能傳資料）</div>
+        <div><b>傳輸線</b>首次配對用，要能傳資料</div>
         <div><b>電腦</b>Windows 或 Mac</div>
         <div><b>Apple ID</b>免費的就可以</div>
       </div>
@@ -218,6 +218,7 @@
               <li>把 <span class="path">StarKeyboard.ipa</span> 拖到左上角的方框（或按方框選檔案）</li>
               <li>「iDevice」選你的 iPhone</li>
               <li>「Apple account」填你的 Apple ID</li>
+              <li>啟用 <b>自動續簽（Automatic Refresh）</b>，讓這個 App 加入 Sideloadly Daemon 的續簽清單</li>
               <li>按 <b>Start</b>，輸入 Apple ID 密碼；有兩步驟驗證就輸入手機收到的驗證碼</li>
             </ul></div></li>
           <li><div>等下面的進度跑完、出現 <b>Done</b> 就裝好了，接著做下面的「iPhone 上的設定」。</div></li>
@@ -234,6 +235,7 @@
               <li>把 <span class="path">StarKeyboard.ipa</span> 拖到左上角的方框</li>
               <li>「iDevice」選你的 iPhone</li>
               <li>「Apple account」填你的 Apple ID</li>
+              <li>啟用 <b>自動續簽（Automatic Refresh）</b>，讓這個 App 加入 Sideloadly Daemon 的續簽清單</li>
               <li>按 <b>Start</b>，輸入 Apple ID 密碼；有兩步驟驗證就輸入驗證碼</li>
             </ul></div></li>
           <li><div>等下面出現 <b>Done</b> 就裝好了，接著做下面的「iPhone 上的設定」。</div></li>
@@ -266,11 +268,24 @@
       </ol>
     </section>
 
+    <section id="wifi-refresh">
+      <h2>設定 Wi-Fi 自動續簽</h2>
+      <p>第一次用線配對，之後讓 Sideloadly Daemon 在簽章快到期時自動續簽。<b>不用等到第 7 天才開電腦</b>，也不用每週插線。</p>
+      <ol class="steps">
+        <li><div><b>首次連線設定</b>：用傳輸線連接並解鎖 iPhone。Windows 打開 iTunes，選手機圖示 › 摘要 › 選項，勾選「透過 Wi-Fi 與此 iPhone 同步」，按套用／同步。Mac 在 Finder 選 iPhone › 一般，勾選「在 Wi-Fi 連線時顯示此 iPhone」，再套用／同步。</div></li>
+        <li><div><b>加入續簽清單</b>：在 Sideloadly 開啟自動續簽（Automatic Refresh），用原本的 Apple ID 安裝糯糯鍵盤。完成後，在工作列通知區／選單列的 Sideloadly Daemon 確認清單有糯糯鍵盤；依目前版本選單開啟登入時啟動。</div></li>
+        <li><div><b>拔線驗證</b>：手機與電腦連到同一個區域網路，拔掉傳輸線，確認 Sideloadly 仍找得到 iPhone，再從 Daemon 對糯糯鍵盤執行一次手動 Refresh。成功後才算無線流程設定完成。</div></li>
+        <li><div><b>平常使用</b>：電腦開機且保持喚醒、Daemon 持續執行，讓 iPhone 在到期前有機會連回同一網路。找不到手機時先解鎖螢幕、開啟 iTunes，檢查是否用了隔離裝置的訪客 Wi-Fi。</div></li>
+      </ol>
+      <p class="tip">電腦關機、睡眠，或手機長時間不在同一網路時，無法續簽。若已到期，回到可連線的環境手動 Refresh；無線仍失敗時再插線。沿用原 Apple ID 與 App 識別碼，<b>不要先刪掉舊 App</b>，以保留資料。</p>
+      <p class="note">依 <a href="https://sideloadly.io/faq">Sideloadly 官方 FAQ</a> 整理。Apple ID 密碼與驗證碼只在你信任的本機安裝工具輸入，請勿上傳到 GitHub。</p>
+    </section>
+
     <section>
-      <h2>每 7 天重裝、裝新版</h2>
-      <p>免費 Apple ID 裝的 App 只能用 7 天，到期時鍵盤會叫不出來、App 一打開就閃退。這時候照上面「用電腦裝進 iPhone」再裝一次就好，<b>不用刪掉舊的</b>，設定、照片、剪貼簿紀錄、自製表符都會保留。</p>
-      <p>有新版時鍵盤上方會提醒你。裝新版也是一樣的步驟：到下載頁拿最新的 <span class="path">StarKeyboard.ipa</span>，用 Sideloadly 直接裝，會蓋過舊版。重裝會重新算 7 天，所以順便更新最划算。</p>
-      <p class="note">開發者模式和「信任」通常只要設定一次。如果重裝後又打不開，再去「VPN 與裝置管理」按一次信任。</p>
+      <h2>自動建置、續簽，與安裝新版</h2>
+      <p><b>GitHub 自動建置</b>：程式更新後會測試、打包，再發布安裝檔；這個網頁會取得最新已發布版本。</p>
+      <p><b>Daemon 自動續簽</b>：延長電腦裡已登錄版本的使用期限，<b>不會自動下載 GitHub 的新版 IPA</b>。</p>
+      <p>要更新功能時，在電腦下載最新 <span class="path">StarKeyboard.ipa</span>，用相同 Apple ID、相同 App 識別碼，保留自動續簽設定，再用 Sideloadly 安裝一次；Wi-Fi 配對成功後可無線安裝。這會更新 Daemon 保存的版本。<b>不用刪除舊 App</b>，設定和資料可保留。</p>
     </section>
   </div>
 
@@ -403,9 +418,9 @@
     <h2>常見問題</h2>
     <dl>
       <div><dt>iPhone：App 一打開就閃退，或說「無法驗證 App」</dt>
-        <dd>還沒開開發者模式，或還沒在「VPN 與裝置管理」按信任。裝超過 7 天也會這樣，用電腦重裝一次就好。</dd></div>
+        <dd>請確認所需的開發者模式與開發者信任已設定。也可能是簽章到期：先檢查 Daemon 是否執行、手機是否能被找到，再手動 Refresh。詳見上方 Wi-Fi 自動續簽教學。</dd></div>
       <div><dt>iPhone：Sideloadly 找不到手機</dt>
-        <dd>換一條線或換一個 USB 孔，手機保持解鎖，重新按一次「信任」。Windows 可以先打開 iTunes，看看有沒有出現手機。</dd></div>
+        <dd>先解鎖手機、開啟 iTunes 確認是否看得到裝置。無線連線需先完成一次插線配對與 Wi-Fi 同步設定，手機和電腦在同一個區域網路；仍找不到再換傳輸線或 USB 孔。</dd></div>
       <div><dt>iPhone：Sideloadly 說 App ID 數量到上限</dt>
         <dd>免費帳號 7 天內最多建立 10 個 App ID。等幾天，或改用另一個 Apple ID。</dd></div>
       <div><dt>iPhone：鍵盤清單裡找不到糯糯鍵盤</dt>

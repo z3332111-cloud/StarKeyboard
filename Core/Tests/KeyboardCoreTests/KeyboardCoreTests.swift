@@ -262,6 +262,16 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertFalse(f.candidates(for: ["ㄋㄧ*"]).contains { $0.text == "那一" })
     }
 
+    func testLearnMixedFullPrefixAndSplitAbbreviation() {
+        let e = makeEngine()
+        e.learn(readings: ["ㄋㄧ*", "ㄏ*", "ㄎㄞ*~"], text: "你好可愛")
+        XCTAssertTrue(e.userModel.phrases(for: "ㄋㄧ*-ㄏ*-ㄎ*-ㄞ*").contains("你好可愛"))
+        XCTAssertFalse(e.userModel.phrases(for: "ㄋㄧ*-ㄏ*-ㄎㄞ*").contains("你好可愛"))
+        // 無法對應字數的讀音不應寫入學習資料。
+        e.learn(readings: ["ㄋㄧ*", "ㄏ*"], text: "你好可愛")
+        XCTAssertFalse(e.userModel.phrases(for: "ㄋㄧ*-ㄏ*").contains("你好可愛"))
+    }
+
     func testPredictions() {
         let e = makeEngine()
         // 打完 ㄋㄧˇ：第一個還是「你」，接著預測以它開頭的詞，選了要記成完整讀音
