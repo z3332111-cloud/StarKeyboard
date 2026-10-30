@@ -315,8 +315,9 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
 @SuppressLint("ViewConstructor", "ClickableViewAccessibility")
 class PanelBottomBar(context: Context, private val style: KeyboardStyle, tabs: List<String>, selected: Int,
                      backTitle: String = "ABC", showBackspace: Boolean = true,
-                     onBack: () -> Unit, onTab: (Int) -> Unit, onBackspace: () -> Unit) : LinearLayout(context) {
+                     onBack: () -> Unit, onTab: (Int) -> Unit, onBackspace: () -> Unit, onAdd: (() -> Unit)? = null) : LinearLayout(context) {
     private val tabViews = ArrayList<TextView>()
+    private val tabScroll = HorizontalScrollView(context)
     private val mainHandler = Handler(Looper.getMainLooper())
 
     init {
@@ -326,7 +327,7 @@ class PanelBottomBar(context: Context, private val style: KeyboardStyle, tabs: L
         addView(Tap(context, backTitle, 15f, t.specialText, true, onBack).apply {
             background = roundRect(t.special.withAlpha(style.keyAlpha), dp(8f))
         }, LayoutParams(dpi(56f), LayoutParams.MATCH_PARENT))
-        val scroll = HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false }
+        val scroll = tabScroll.apply { isHorizontalScrollBarEnabled = false }
         val row = LinearLayout(context)
         for ((i, s) in tabs.withIndex()) {
             val v = Tap(context, s, if (s.codePointCount(0, s.length) <= 2) 18f else 14f, t.keyText, true) {
@@ -340,6 +341,11 @@ class PanelBottomBar(context: Context, private val style: KeyboardStyle, tabs: L
         }
         scroll.addView(row)
         addView(scroll, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply { leftMargin = dpi(4f); rightMargin = dpi(4f) })
+        if (onAdd != null) {
+            addView(Tap(context, "＋", 22f, t.specialText, true, onAdd).apply {
+                contentDescription = "新增剪貼簿資料夾"
+            }, LayoutParams(dpi(44f), LayoutParams.MATCH_PARENT))
+        }
         if (showBackspace) {
             val del = Tap(context, "⌫", 18f, t.specialText, true) {}.apply {
                 background = roundRect(t.special.withAlpha(style.keyAlpha), dp(8f))
@@ -363,6 +369,9 @@ class PanelBottomBar(context: Context, private val style: KeyboardStyle, tabs: L
     }
 
     fun select(i: Int) {
+        tabViews.getOrNull(i)?.let { selected ->
+            tabScroll.post { selected.requestRectangleOnScreen(android.graphics.Rect(0, 0, selected.width, selected.height), true) }
+        }
         val t = style.theme
         for ((j, v) in tabViews.withIndex()) {
             val on = j == i

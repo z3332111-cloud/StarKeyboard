@@ -286,6 +286,9 @@ final class TopBarView: UIView {
 
 /// 面板最下面那條：返回鍵盤、分頁、刪除
 final class PanelBottomBar: UIView {
+    var onAdd: (() -> Void)?
+    var showsAdd = false { didSet { addButton.isHidden = !showsAdd; setNeedsLayout() } }
+    private let addButton = UIButton(type: .system)
     var onBack: (() -> Void)?
     var onBackspace: (() -> Void)?
     var onTab: ((Int) -> Void)?
@@ -322,6 +325,12 @@ final class PanelBottomBar: UIView {
         }
         addSubview(deleteButton)
 
+        addButton.setTitle("＋", for: .normal)
+        addButton.titleLabel?.font = .rounded(22, .semibold)
+        addButton.accessibilityLabel = "新增剪貼簿資料夾"
+        addButton.isHidden = true
+        addButton.addAction(UIAction { [weak self] _ in self?.onAdd?() }, for: .touchUpInside)
+        addSubview(addButton)
         scroll.showsHorizontalScrollIndicator = false
         addSubview(scroll)
         applyStyle()
@@ -352,7 +361,9 @@ final class PanelBottomBar: UIView {
         let h = bounds.height
         backButton.frame = CGRect(x: 4, y: 3, width: 56, height: h - 6)
         deleteButton.frame = CGRect(x: bounds.width - 56, y: 3, width: 52, height: h - 6)
-        let right = showsBackspace ? deleteButton.frame.minX - 4 : bounds.width - 4
+        let edge = showsBackspace ? deleteButton.frame.minX - 4 : bounds.width - 4
+        addButton.frame = CGRect(x: edge - 44, y: 0, width: 44, height: h)
+        let right = edge - (showsAdd ? 44 : 0)
         scroll.frame = CGRect(x: 64, y: 0, width: right - 64, height: h)
         var x: CGFloat = 0
         for b in tabButtons {
@@ -366,6 +377,7 @@ final class PanelBottomBar: UIView {
 
     private func applyStyle() {
         let t = style.theme
+        addButton.tintColor = t.specialText
         backButton.backgroundColor = t.specialKey.withAlphaComponent(style.keyAlpha)
         backButton.setTitleColor(t.specialText, for: .normal)
         deleteButton.backgroundColor = t.specialKey.withAlphaComponent(style.keyAlpha)
@@ -375,6 +387,12 @@ final class PanelBottomBar: UIView {
             b.backgroundColor = selected ? t.key.withAlphaComponent(style.keyAlpha) : .clear
             b.setTitleColor(selected ? t.keyText : t.keyText.withAlphaComponent(0.6), for: .normal)
         }
+    }
+
+    func revealSelectedTab() {
+        layoutIfNeeded()
+        guard tabButtons.indices.contains(selectedTab) else { return }
+        scroll.scrollRectToVisible(tabButtons[selectedTab].frame, animated: false)
     }
 
     private func startDeleting() {

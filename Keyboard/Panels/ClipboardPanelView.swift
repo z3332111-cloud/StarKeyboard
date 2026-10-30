@@ -78,11 +78,10 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
 
         bar.onTab = { [weak self] i in
             guard let self = self else { return }
-            if i == self.store.categories.count + 3 {
-                self.bar.selectedTab = self.selected
-                self.onEditCategory?(nil)
-            } else { self.selected = i; self.reload() }
+            self.selected = i; self.reload()
         }
+        bar.showsAdd = true
+        bar.onAdd = { [weak self] in self?.onEditCategory?(nil) }
         bar.onBack = { [weak self] in self?.onBack?() }
         bar.onBackspace = { [weak self] in self?.onBackspace?() }
         addSubview(bar)
@@ -93,25 +92,30 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    func selectCategory(_ name: String) {
+        selected = store.categories.firstIndex(of: name).map { $0 + 2 } ?? 0
+        reload(); setNeedsLayout(); layoutIfNeeded(); bar.revealSelectedTab()
+    }
+
     func reload() {
-        let titles = ["全部", "📌 釘選", "未分類"] + store.categories.map { "📁 " + $0 } + ["＋分類"]
+        let titles = ["全部", "📌 釘選"] + store.categories
         if titles != tabTitles { tabTitles = titles; bar.setTabs(titles) }
-        if selected >= titles.count - 1 { selected = 0 }
+        if selected >= titles.count { selected = 0 }
         bar.selectedTab = selected
         if selected == 1 { rows = store.ordered.filter { $0.pinned } }
-        else if selected == 2 { rows = store.ordered.filter { $0.category == nil } }
-        else if selected >= 3 { rows = store.ordered.filter { $0.category == store.categories[selected - 3] } }
+        else if selected >= 2 { rows = store.ordered.filter { $0.category == store.categories[selected - 2] } }
         else { rows = store.ordered }
+        categoryButton.isHidden = store.categories.isEmpty
         updateCategoryMenu()
         table.reloadData()
         if !hasFullAccess {
             emptyLabel.text = "要記錄剪貼簿，請到\n設定 › 一般 › 鍵盤 › 鍵盤 › 糯糯鍵盤\n打開「允許完整取用」"
         } else if selected == 1 {
             emptyLabel.text = "還沒有釘選的內容\n在項目上往右滑，或點 📌 就能釘選"
-        } else if selected >= 3 {
+        } else if selected >= 2 {
             emptyLabel.text = "這個分類還沒有內容\n點每筆右側的資料夾圖示來歸類"
         } else {
-            emptyLabel.text = "點「＋」手動儲存複製的文字\n或到 ⚙ 隱私與安全開啟自動記錄"
+            emptyLabel.text = "點上方「加入目前複製的」儲存文字\n或到 ⚙ 隱私與安全開啟自動記錄"
         }
         emptyLabel.isHidden = !rows.isEmpty
     }
@@ -216,7 +220,9 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
             }
         } + [UIAction(title: "＋新增分類") { [weak self] _ in self?.onEditCategory?(nil) }])
         let actions = UIView(frame: CGRect(x: 0, y: 0, width: 72, height: 36))
-        actions.addSubview(pin); actions.addSubview(folder)
+        actions.addSubview(pin)
+        if !store.categories.isEmpty { actions.addSubview(folder) }
+        else { actions.frame.size.width = 36 }
         cell.accessoryView = actions
         return cell
     }

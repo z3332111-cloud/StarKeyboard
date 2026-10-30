@@ -198,6 +198,7 @@ class ClipboardPanel(
     private val backspace = onBackspace
     private var confirmClear = false
     private lateinit var clearButton: TextView
+    private lateinit var manage: TextView
 
     init {
         orientation = VERTICAL
@@ -213,7 +214,7 @@ class ClipboardPanel(
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, dpi(34f)))
         val tools = LinearLayout(context)
         tools.addView(Tap(context, "匯入／匯出", 14f, t.specialText, true) { onTransfer() }, LayoutParams(0, dpi(34f), 1f))
-        val manage = Tap(context, "資料夾管理", 14f, t.specialText, true) {}
+        manage = Tap(context, "資料夾管理", 14f, t.specialText, true) {}
         manage.setOnClickListener {
             val menu = PopupMenu(context, manage)
             menu.menu.add("＋新增分類").setOnMenuItemClickListener { onEditCategory(null); true }
@@ -232,30 +233,34 @@ class ClipboardPanel(
         reload()
     }
 
+    fun selectCategory(name: String) {
+        selected = store.categories.indexOf(name).takeIf { it >= 0 }?.plus(2) ?: 0
+        reload()
+    }
+
     fun reload() {
         list.removeAllViews()
         val t = style.theme
-        val titles = listOf("全部", "📌 釘選", "未分類") + store.categories.map { "📁 $it" } + "＋分類"
-        if (selected >= titles.size - 1) selected = 0
+        val titles = listOf("全部", "📌 釘選") + store.categories
+        manage.visibility = if (store.categories.isEmpty()) View.GONE else View.VISIBLE
+        if (selected >= titles.size) selected = 0
         if (tabTitles != titles) {
             bar?.let { removeView(it) }
             tabTitles = titles
             bar = PanelBottomBar(context, style, titles, selected, onBack = back, onTab = { index ->
-                if (index == store.categories.size + 3) { bar?.select(selected); onEditCategory(null) }
-                else { selected = index; reload() }
-            }, onBackspace = backspace)
+                selected = index; reload()
+            }, onBackspace = backspace, onAdd = { onEditCategory(null) })
             addView(bar, LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
         }
         bar?.select(selected)
         val rows = when (selected) {
             1 -> store.ordered.filter { it.pinned }
-            2 -> store.ordered.filter { it.category == null }
-            in 3..Int.MAX_VALUE -> store.ordered.filter { it.category == store.categories[selected - 3] }
+            in 2..Int.MAX_VALUE -> store.ordered.filter { it.category == store.categories[selected - 2] }
             else -> store.ordered
         }
         if (rows.isEmpty()) {
             list.addView(TextView(context).apply {
-                text = if (selected >= 3) "分類還沒有內容，點每筆右側的 📁 來歸類" else if (selected == 1) "還沒有釘選的內容\n點項目右邊的 📌 就能釘選" else "按「＋」手動儲存，或到 ⚙ 隱私與安全開啟自動記錄\n請勿保存密碼或驗證碼"
+                text = if (selected >= 2) "分類還沒有內容，點每筆右側的 📁 來歸類" else if (selected == 1) "還沒有釘選的內容\n點項目右邊的 📌 就能釘選" else "按上方「加入目前複製的」儲存，或到 ⚙ 隱私與安全開啟自動記錄\n請勿保存密碼或驗證碼"
                 textSize = 14f
                 gravity = Gravity.CENTER
                 setTextColor(t.keyText.withAlpha(0.7f))
@@ -284,7 +289,7 @@ class ClipboardPanel(
                 }
                 menu.show()
             }
-            row.addView(folder, LayoutParams(dpi(40f), dpi(40f)))
+            if (store.categories.isNotEmpty()) row.addView(folder, LayoutParams(dpi(40f), dpi(40f)))
             row.addView(Tap(context, "✕", 15f, t.keyText.withAlpha(0.5f)) { store.remove(item.id); reload() }, LayoutParams(dpi(40f), dpi(40f)))
             row.setOnClickListener { onInsert(item.text) }
             list.addView(row)

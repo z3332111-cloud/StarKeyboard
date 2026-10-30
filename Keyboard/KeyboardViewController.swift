@@ -16,6 +16,9 @@ final class KeyboardViewController: UIInputViewController {
     /// 上面那條編輯框的用途：新增表符，或是先打中文再翻譯
     private enum EditorPurpose { case emoticon, translate, fancy, shortcutPhrase, shortcutCode, clipboardCategory }
     private var renamingCategory: String?
+    private var folderNameBox: FolderNameBox!
+    private var namingFolder: Bool { editorText != nil && editorPurpose == .clipboardCategory }
+    private var folderBoxHeight: CGFloat { namingFolder ? 84 : 0 }
 
     private func editorLabel(_ p: EditorPurpose) -> String {
         switch p {
@@ -165,6 +168,13 @@ final class KeyboardViewController: UIInputViewController {
 
         topBar = TopBarView(style: style)
         view.addSubview(topBar)
+        folderNameBox = FolderNameBox()
+        folderNameBox.isHidden = true
+        folderNameBox.onSave = { [weak self] in self?.confirmEditor() }
+        folderNameBox.onCancel = { [weak self] in
+            self?.endEditor(); self?.openPanel(.clipboard)
+        }
+        view.addSubview(folderNameBox)
         view.addSubview(contentView)
         grid = KeyboardGridView(style: style)
         contentView.addSubview(grid)
@@ -228,14 +238,15 @@ final class KeyboardViewController: UIInputViewController {
         backgroundImageView.frame = backgroundFrame(in: b)
         photoAdjustView?.frame = b
         tintOverlay.frame = b
-        topBar.frame = CGRect(x: 0, y: 0, width: b.width, height: Metrics.barHeight)
-        contentView.frame = CGRect(x: 0, y: Metrics.barHeight, width: b.width, height: max(0, b.height - Metrics.barHeight))
+        folderNameBox.frame = CGRect(x: 10, y: 6, width: b.width - 20, height: max(0, folderBoxHeight - 10))
+        topBar.frame = CGRect(x: 0, y: folderBoxHeight, width: b.width, height: Metrics.barHeight)
+        contentView.frame = CGRect(x: 0, y: folderBoxHeight + Metrics.barHeight, width: b.width, height: max(0, b.height - Metrics.barHeight - folderBoxHeight))
         grid.frame = contentView.bounds
         panelView?.frame = contentView.bounds
         candidatePanel?.frame = contentView.bounds
         handwritingView?.frame = contentView.bounds
         let toastW = min(b.width - 40, 300)
-        toastLabel.frame = CGRect(x: (b.width - toastW) / 2, y: Metrics.barHeight + 8, width: toastW, height: 44)
+        toastLabel.frame = CGRect(x: (b.width - toastW) / 2, y: folderBoxHeight + Metrics.barHeight + 8, width: toastW, height: 44)
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -941,6 +952,10 @@ final class KeyboardViewController: UIInputViewController {
 
     private func refreshTopBar() {
         guard topBar != nil else { return }
+        folderNameBox.isHidden = !namingFolder
+        if namingFolder {
+            folderNameBox.update(name: editorText ?? "", renaming: renamingCategory != nil, style: style)
+        }
         topBar.scriptTitle = mode == .pinyin && editorResult == nil ? (settings.pinyinSimplified ? "簡" : "繁") : nil
         if let r = editorResult {
             topBar.show(.candidates(composition: r.title, items: r.items + ["✏️ 修改"], trailing: .close))
@@ -949,6 +964,8 @@ final class KeyboardViewController: UIInputViewController {
             let prefix = editorText.map { editorLabel(editorPurpose) + $0 + " ｜ " } ?? ""
             topBar.show(.candidates(composition: prefix + compositionText, items: candidates.map { $0.text },
                                     trailing: .expand))
+        } else if namingFolder && suggestions.isEmpty {
+            topBar.show(.candidates(composition: "用下方鍵盤輸入名稱，再按建立", items: [], trailing: .expand))
         } else if let text = editorText, suggestions.isEmpty || suggestionSource == .association {
             switch editorPurpose {
             case .emoticon:
@@ -1190,7 +1207,7 @@ final class KeyboardViewController: UIInputViewController {
         case .fancy: toast("打想變花樣的字（英文樣式最多），再按「變花樣」")
         case .shortcutPhrase: toast("先打常用的整段話，例如地址、自我介紹")
         case .shortcutCode: toast("再打縮寫")
-        case .clipboardCategory: toast("自己取一個分類名稱，最多 40 字")
+        case .clipboardCategory: break
         }
     }
 
@@ -1218,6 +1235,7 @@ final class KeyboardViewController: UIInputViewController {
                 if let old = renamingCategory { try clipStore.renameCategory(old, to: trimmed) }
                 else { try clipStore.addCategory(trimmed) }
                 endEditor(); openPanel(.clipboard)
+                (panelView as? ClipboardPanelView)?.selectCategory(trimmed)
             } catch { toast(error.localizedDescription) }
         case .emoticon:
             if !trimmed.isEmpty {
@@ -1590,7 +1608,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         // 使用者自己調的高度；橫放時螢幕矮，最多只放大到 1.1 倍
         let scale = isLandscape ? min(settings.heightScale, 1.1) : settings.heightScale
-        let h = Metrics.barHeight + (content * scale).rounded()
+        let h = folderBoxHeight + Metrics.barHeight + (content * scale).rounded()
         if let c = heightConstraint {
             if c.constant != h { c.constant = h }
         } else {

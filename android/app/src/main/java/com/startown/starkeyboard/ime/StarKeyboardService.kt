@@ -55,6 +55,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private enum class SuggestionSource { ASSOCIATION, HANDWRITING, SPELLING, GLIDE }
     private enum class EditorPurpose { EMOTICON, TRANSLATE, FANCY, SHORTCUT_PHRASE, SHORTCUT_CODE, CLIPBOARD_CATEGORY }
     private var renamingCategory: String? = null
+    private lateinit var folderNameBox: FolderNameBox
 
     private fun editorLabel(p: EditorPurpose) = when (p) {
         EditorPurpose.EMOTICON -> "表符："
@@ -205,6 +206,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         content = FrameLayout(this).apply { clipChildren = false }
         keyboard = KeyboardView(this, style)
         content.addView(keyboard, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        folderNameBox = FolderNameBox(this, onSave = { confirmEditor() }, onCancel = { endEditor(); openPanel(PanelKind.CLIPBOARD) })
+        folderNameBox.visibility = View.GONE
+        column.addView(folderNameBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (84 * dp).toInt()))
         column.addView(topBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (50 * dp).toInt()))
         column.addView(content, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, contentHeight()))
         r.addView(column, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
@@ -850,12 +854,16 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         topBar.scriptTitle = if (mode == InputMode.PINYIN && editorResult == null) (if (settings.pinyinSimplified) "簡" else "繁") else null
         val tr = editorResult
         val ed = editorText
+        val namingFolder = ed != null && editorPurpose == EditorPurpose.CLIPBOARD_CATEGORY
+        folderNameBox.visibility = if (namingFolder) View.VISIBLE else View.GONE
+        if (namingFolder) folderNameBox.update(ed ?: "", renamingCategory != null, style)
         when {
             tr != null -> topBar.showCandidates(tr.title, tr.items + "✏️ 修改", Trailing.CLOSE)
             isComposing -> {
                 val prefix = if (ed != null) editorLabel(editorPurpose) + ed + " ｜ " else ""
                 topBar.showCandidates(if (ed != null) prefix + compositionText else "", candidates.map { it.text }, Trailing.EXPAND)
             }
+            namingFolder && suggestions.isEmpty() -> topBar.showCandidates("用下方鍵盤輸入名稱，再按建立", emptyList(), Trailing.EXPAND)
             ed != null && (suggestions.isEmpty() || suggestionSource == SuggestionSource.ASSOCIATION) -> {
                 val pending = if (hangulComposing) hangul.composing else ""
                 when (editorPurpose) {
@@ -1185,7 +1193,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             EditorPurpose.FANCY -> "打想變花樣的字（英文樣式最多），再按「變花樣」"
             EditorPurpose.SHORTCUT_PHRASE -> "先打常用的整段話，例如地址、自我介紹"
             EditorPurpose.SHORTCUT_CODE -> "再打縮寫"
-            EditorPurpose.CLIPBOARD_CATEGORY -> "自己取一個分類名稱，最多 40 字"
+            EditorPurpose.CLIPBOARD_CATEGORY -> "輸入名稱後按建立；取消不會新增資料夾"
         })
     }
 
@@ -1220,6 +1228,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                     val old = renamingCategory
                     if (old == null) clipStore.addCategory(text) else clipStore.renameCategory(old, text)
                     endEditor(); openPanel(PanelKind.CLIPBOARD)
+                    (panelView as? ClipboardPanel)?.selectCategory(text)
                 } catch (e: Exception) { toast(e.message ?: "無法儲存分類") }
                 return
             }
