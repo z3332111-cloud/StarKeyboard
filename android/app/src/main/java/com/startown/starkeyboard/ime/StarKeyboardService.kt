@@ -53,7 +53,8 @@ import java.util.Locale
 
 class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheckerSessionListener {
     private enum class SuggestionSource { ASSOCIATION, HANDWRITING, SPELLING, GLIDE }
-    private enum class EditorPurpose { EMOTICON, TRANSLATE, FANCY, SHORTCUT_PHRASE, SHORTCUT_CODE }
+    private enum class EditorPurpose { EMOTICON, TRANSLATE, FANCY, SHORTCUT_PHRASE, SHORTCUT_CODE, CLIPBOARD_CATEGORY }
+    private var renamingCategory: String? = null
 
     private fun editorLabel(p: EditorPurpose) = when (p) {
         EditorPurpose.EMOTICON -> "表符："
@@ -61,6 +62,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         EditorPurpose.FANCY -> "花式文字："
         EditorPurpose.SHORTCUT_PHRASE -> "片語內容："
         EditorPurpose.SHORTCUT_CODE -> "縮寫："
+        EditorPurpose.CLIPBOARD_CATEGORY -> "分類名稱："
     }
 
     private fun editorConfirmTitle(p: EditorPurpose) = when (p) {
@@ -985,6 +987,10 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             ToolbarItem.EMOJI -> togglePanel(PanelKind.EMOJI)
             ToolbarItem.KAOMOJI -> togglePanel(PanelKind.KAOMOJI)
             ToolbarItem.SYMBOLS -> togglePanel(PanelKind.SYMBOLS)
+            ToolbarItem.VOICE -> {
+                commitAll()
+                startActivity(Intent(this, com.startown.starkeyboard.VoiceInputActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
             ToolbarItem.SETTINGS -> togglePanel(PanelKind.SETTINGS)
             ToolbarItem.TRANSLATE -> beginEditor(EditorPurpose.TRANSLATE)
             ToolbarItem.FANCY -> beginEditor(EditorPurpose.FANCY)
@@ -1029,6 +1035,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 ClipboardPanel(this, clipStore, style,
                     onInsert = { feedback(); output(it) },
                     onAddCurrent = { addCurrentClipboard() },
+                    onEditCategory = { name ->
+                        renamingCategory = name
+                        beginEditor(EditorPurpose.CLIPBOARD_CATEGORY)
+                        editorText = name ?: ""
+                        refreshTopBar()
+                    },
                     onTransfer = {
                         startActivity(Intent(this, com.startown.starkeyboard.ClipboardTransferActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     },
@@ -1156,7 +1168,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         commitAll()
         finishHangul()
         suggestions = emptyList()
-        editorReturnPanel = if (purpose == EditorPurpose.EMOTICON || purpose == EditorPurpose.SHORTCUT_PHRASE) panel else null
+        editorReturnPanel = if (purpose == EditorPurpose.EMOTICON || purpose == EditorPurpose.SHORTCUT_PHRASE || purpose == EditorPurpose.CLIPBOARD_CATEGORY) panel else null
         closePanel()
         if (purpose != EditorPurpose.TRANSLATE && mode == InputMode.HANDWRITING) {
             mode = settings.enabledModes.firstOrNull { it != InputMode.HANDWRITING } ?: InputMode.ZHUYIN
@@ -1173,6 +1185,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             EditorPurpose.FANCY -> "打想變花樣的字（英文樣式最多），再按「變花樣」"
             EditorPurpose.SHORTCUT_PHRASE -> "先打常用的整段話，例如地址、自我介紹"
             EditorPurpose.SHORTCUT_CODE -> "再打縮寫"
+            EditorPurpose.CLIPBOARD_CATEGORY -> "自己取一個分類名稱，最多 40 字"
         })
     }
 
@@ -1202,6 +1215,14 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             return
         }
         when (editorPurpose) {
+            EditorPurpose.CLIPBOARD_CATEGORY -> {
+                try {
+                    val old = renamingCategory
+                    if (old == null) clipStore.addCategory(text) else clipStore.renameCategory(old, text)
+                    endEditor(); openPanel(PanelKind.CLIPBOARD)
+                } catch (e: Exception) { toast(e.message ?: "無法儲存分類") }
+                return
+            }
             EditorPurpose.FANCY -> {
                 if (text.isEmpty()) { toast("先打想變花樣的字"); return }
                 editorResult = EditorResult("點一個樣式送出（可以左右滑）", FancyText.variants(text))

@@ -13,7 +13,7 @@ final class ClipboardArchiveTests: XCTestCase {
         XCTAssertEqual(try ClipboardArchive.decode(Data(#"["你好", {"content":"世界","pinned":true}]"#.utf8)).count, 2)
         XCTAssertEqual(try ClipboardArchive.decode(Data("甲\r\n乙\n\n".utf8), plainText: true).map { $0.text }, ["甲", "乙"])
         XCTAssertEqual(try ClipboardArchive.textEntries("甲\n乙", splitLines: false).map { $0.text }, ["甲\n乙"])
-        for input in [#"{"format":"nuonuo-clipboard","version":2,"items":[]}"#, #"[{"secret":"x"}]"#, "broken"] {
+        for input in [#"{"format":"nuonuo-clipboard","version":99,"items":[]}"#, #"[{"secret":"x"}]"#, "broken"] {
             XCTAssertThrowsError(try ClipboardArchive.decode(Data(input.utf8)))
         }
         XCTAssertThrowsError(try ClipboardArchive.decode(Data(repeating: 65, count: ClipboardArchive.maxBytes + 1)))

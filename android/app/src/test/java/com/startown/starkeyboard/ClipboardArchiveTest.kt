@@ -12,7 +12,7 @@ class ClipboardArchiveTest {
         assertEquals(listOf("甲", "乙"), ClipboardArchive.decode("甲\r\n乙\n".toByteArray(), true).map { it.text })
     }
     @Test fun rejectsInvalidAndOversizeData() {
-        for (input in listOf("broken", """[{"password":"x"}]""", """{"format":"nuonuo-clipboard","version":2,"items":[]}""")) {
+        for (input in listOf("broken", """[{"password":"x"}]""", """{"format":"nuonuo-clipboard","version":99,"items":[]}""")) {
             assertTrue(runCatching { ClipboardArchive.decode(input.toByteArray()) }.isFailure)
         }
         assertTrue(runCatching { ClipboardArchive.decode(ByteArray(ClipboardArchive.MAX_BYTES + 1)) }.isFailure)

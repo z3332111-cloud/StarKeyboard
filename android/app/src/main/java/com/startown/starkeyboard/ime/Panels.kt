@@ -15,6 +15,8 @@ import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
+import android.widget.PopupMenu
+import android.widget.Toast
 import com.startown.starkeyboard.core.ClipboardStore
 import com.startown.starkeyboard.core.EmoticonStore
 import com.startown.starkeyboard.core.ShortcutStore
@@ -184,11 +186,16 @@ class ClipboardPanel(
     private val onInsert: (String) -> Unit,
     private val onAddCurrent: () -> Unit,
     private val onTransfer: () -> Unit,
+    private val onEditCategory: (String?) -> Unit,
     onBack: () -> Unit,
     onBackspace: () -> Unit,
 ) : LinearLayout(context) {
     private val list = LinearLayout(context).apply { orientation = VERTICAL }
-    private var pinnedOnly = false
+    private var selected = 0
+    private var tabTitles = emptyList<String>()
+    private var bar: PanelBottomBar? = null
+    private val back = onBack
+    private val backspace = onBackspace
     private var confirmClear = false
     private lateinit var clearButton: TextView
 
@@ -201,26 +208,54 @@ class ClipboardPanel(
         header.addView(Tap(context, "＋ 加入目前複製的", 13f, if (t.dark) t.accent else t.specialText, true) { onAddCurrent() }.apply {
             setPadding(dpi(8f), 0, dpi(8f), 0)
         }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
-        clearButton = Tap(context, "清除", 13f, t.keyText.withAlpha(0.7f)) { clearTapped() }.apply { setPadding(dpi(10f), 0, dpi(12f), 0) }
+        clearButton = Tap(context, "清暫存", 13f, t.keyText.withAlpha(0.7f)) { clearTapped() }.apply { setPadding(dpi(10f), 0, dpi(12f), 0) }
         header.addView(clearButton, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, dpi(34f)))
-        addView(Tap(context, "匯入／匯出・剪貼簿搬家", 14f, t.specialText, true) { onTransfer() },
-            LayoutParams(LayoutParams.MATCH_PARENT, dpi(34f)))
+        val tools = LinearLayout(context)
+        tools.addView(Tap(context, "匯入／匯出", 14f, t.specialText, true) { onTransfer() }, LayoutParams(0, dpi(34f), 1f))
+        val manage = Tap(context, "資料夾管理", 14f, t.specialText, true) {}
+        manage.setOnClickListener {
+            val menu = PopupMenu(context, manage)
+            menu.menu.add("＋新增分類").setOnMenuItemClickListener { onEditCategory(null); true }
+            store.categories.toList().forEach { name ->
+                val sub = menu.menu.addSubMenu(name)
+                sub.add("重新命名").setOnMenuItemClickListener { onEditCategory(name); true }
+                sub.add("移除分類（內容留在未分類）").setOnMenuItemClickListener { change { store.deleteCategory(name) }; true }
+            }
+            menu.show()
+        }
+        tools.addView(manage, LayoutParams(0, dpi(34f), 1f)); addView(tools)
         val scroll = ScrollView(context)
         scroll.addView(list)
         addView(scroll, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
-        addView(PanelBottomBar(context, style, listOf("全部", "📌 釘選"), 0, onBack = onBack,
-            onTab = { pinnedOnly = it == 1; reload() }, onBackspace = onBackspace), LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
+
         reload()
     }
 
     fun reload() {
         list.removeAllViews()
         val t = style.theme
-        val rows = if (pinnedOnly) store.ordered.filter { it.pinned } else store.ordered
+        val titles = listOf("全部", "📌 釘選", "未分類") + store.categories.map { "📁 $it" } + "＋分類"
+        if (selected >= titles.size - 1) selected = 0
+        if (tabTitles != titles) {
+            bar?.let { removeView(it) }
+            tabTitles = titles
+            bar = PanelBottomBar(context, style, titles, selected, onBack = back, onTab = { index ->
+                if (index == store.categories.size + 3) { bar?.select(selected); onEditCategory(null) }
+                else { selected = index; reload() }
+            }, onBackspace = backspace)
+            addView(bar, LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
+        }
+        bar?.select(selected)
+        val rows = when (selected) {
+            1 -> store.ordered.filter { it.pinned }
+            2 -> store.ordered.filter { it.category == null }
+            in 3..Int.MAX_VALUE -> store.ordered.filter { it.category == store.categories[selected - 3] }
+            else -> store.ordered
+        }
         if (rows.isEmpty()) {
             list.addView(TextView(context).apply {
-                text = if (pinnedOnly) "還沒有釘選的內容\n點項目右邊的 📌 就能釘選" else "按「＋」手動儲存，或到 ⚙ 隱私與安全開啟自動記錄\n請勿保存密碼或驗證碼"
+                text = if (selected >= 3) "分類還沒有內容，點每筆右側的 📁 來歸類" else if (selected == 1) "還沒有釘選的內容\n點項目右邊的 📌 就能釘選" else "按「＋」手動儲存，或到 ⚙ 隱私與安全開啟自動記錄\n請勿保存密碼或驗證碼"
                 textSize = 14f
                 gravity = Gravity.CENTER
                 setTextColor(t.keyText.withAlpha(0.7f))
@@ -240,6 +275,16 @@ class ClipboardPanel(
             row.addView(Tap(context, "📌", 15f, t.keyText) { store.togglePin(item.id); reload() }.apply {
                 alpha = if (item.pinned) 1f else 0.3f
             }, LayoutParams(dpi(40f), dpi(40f)))
+            val folder = Tap(context, "📁", 15f, t.keyText) {}
+            folder.contentDescription = "移到分類：" + (item.category ?: "未分類")
+            folder.setOnClickListener {
+                val menu = PopupMenu(context, folder)
+                (listOf<String?>(null) + store.categories).forEach { name ->
+                    menu.menu.add(name ?: "未分類").setOnMenuItemClickListener { change { store.assign(item.id, name) }; true }
+                }
+                menu.show()
+            }
+            row.addView(folder, LayoutParams(dpi(40f), dpi(40f)))
             row.addView(Tap(context, "✕", 15f, t.keyText.withAlpha(0.5f)) { store.remove(item.id); reload() }, LayoutParams(dpi(40f), dpi(40f)))
             row.setOnClickListener { onInsert(item.text) }
             list.addView(row)
@@ -247,17 +292,20 @@ class ClipboardPanel(
         }
     }
 
+    private fun change(action: () -> Unit) {
+        try { action(); reload() } catch (e: Exception) { Toast.makeText(context, e.message ?: "無法儲存分類", Toast.LENGTH_LONG).show() }
+    }
     private fun clearTapped() {
         if (confirmClear) {
             store.clearUnpinned()
             confirmClear = false
-            clearButton.text = "清除"
+            clearButton.text = "清暫存"
             reload()
             return
         }
         confirmClear = true
         clearButton.text = "確定清除？"
-        postDelayed({ confirmClear = false; clearButton.text = "清除" }, 3000)
+        postDelayed({ confirmClear = false; clearButton.text = "清暫存" }, 3000)
     }
 }
 
@@ -522,7 +570,7 @@ class SettingsPanel(
         note("預設關閉。開啟後會儲存複製的文字；會略過敏感標記，但無法辨識所有密碼。舊紀錄可在剪貼簿逐筆刪除。")
         toggle("允許外部網路翻譯", settings.allowOnlineTranslation) { settings.allowOnlineTranslation = it }
         note("預設關閉。開啟後，本機翻譯失敗時會將最多 450 字送到 MyMemory；文字在網址參數中，服務商可能保留紀錄。請勿翻譯私密資料。完整說明見 App 的「隱私與安全」。")
-        header("剪貼簿最多記幾筆")
+        header("未分類暫存上限（釘選另存）")
         val limits = LinearLayout(context).apply { orientation = HORIZONTAL }
         for (n in listOf(50, 100, 200, 500)) {
             val selected = settings.clipLimit == n

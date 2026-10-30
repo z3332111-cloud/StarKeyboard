@@ -174,7 +174,7 @@ enum class Trailing { EXPAND, CLOSE }
 
 enum class ToolbarItem(val label: String) {
     CLIPBOARD("剪貼"), EMOJI("☺︎"), KAOMOJI("(•ᴗ•)"), SYMBOLS("※"), FANCY("𝒜"), TRANSLATE("譯"),
-    HANDWRITING("✍︎"), SETTINGS("⚙︎"), DISMISS("▾"),
+    HANDWRITING("✍︎"), VOICE("🎙"), SETTINGS("⚙︎"), DISMISS("▾"),
 }
 
 /** 鍵盤最上面那一條：工具列／候選字／編輯框（新增表符、翻譯） */

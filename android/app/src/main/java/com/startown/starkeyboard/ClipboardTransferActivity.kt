@@ -24,11 +24,11 @@ class ClipboardTransferActivity : Activity() {
         fun button(label: String, action: () -> Unit) { col.addView(Button(this).apply { text = label; setOnClickListener { action() } }) }
         text("剪貼簿搬家")
         count = TextView(this); col.addView(count); updateCount()
-        text("JSON 保留多行文字與釘選，兩個平台共用。TXT 每行一筆。匯出檔是明文，請選自己信任的儲存位置。")
+        text("JSON 保留多行文字、釘選與分類，兩個平台共用。TXT 每行一筆。匯出檔是明文，請選自己信任的儲存位置。")
         button("匯出全部為 JSON 檔案") {
             safely {
                 store.load()
-                exportData = ClipboardArchive.encode(store.items)
+                exportData = ClipboardArchive.encode(store.items, store.categories)
                 startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE); type = "application/json"
                     putExtra(Intent.EXTRA_TITLE, "糯糯剪貼簿.json")
@@ -89,19 +89,20 @@ class ClipboardTransferActivity : Activity() {
                     name.endsWith(".txt", true) -> true
                     else -> contentResolver.getType(uri) == "text/plain"
                 }
-                confirm(ClipboardArchive.decode(bytes, plainText = plain))
+                val contents = ClipboardArchive.decodeContents(bytes, plainText = plain)
+                confirm(contents.entries, contents.categories)
             }
         }
     }
-    private fun confirm(entries: List<ClipboardArchive.Entry>) {
+    private fun confirm(entries: List<ClipboardArchive.Entry>, categories: List<String> = emptyList()) {
         val preview = entries.take(3).joinToString("\n\n") { it.text.take(60) }
         AlertDialog.Builder(this).setTitle("匯入 " + entries.size + " 筆？")
-            .setMessage(preview + "\n\n重複內容合併。原本紀錄會保留；超過未釘選上限的新內容會跳過。")
+            .setMessage(preview + "\n\n重複內容合併，已有分類優先保留；同名分類合併。原本紀錄會保留；未分類且未釘選的新內容超額會跳過。")
             .setNegativeButton("取消", null)
             .setPositiveButton("匯入") { _, _ ->
                 safely {
                     store.load()
-                    val r = store.importEntries(entries)
+                    val r = store.importEntries(entries, categories)
                     updateCount()
                     message("新增 " + r.added + " 筆，重複 " + r.duplicates + " 筆，容量不足跳過 " + r.skipped + " 筆。")
                 }

@@ -31,6 +31,7 @@ struct ClipItem: Codable, Equatable {
     var text: String
     var pinned: Bool
     var date: Date
+    var category: String? = nil
 }
 
 final class ClipboardStore {
@@ -38,6 +39,8 @@ final class ClipboardStore {
 
     /// 新的在前面
     private(set) var items: [ClipItem] = []
+    private(set) var categories: [String] = []
+    private struct Snapshot: Codable { let items: [ClipItem]; let categories: [String] }
     private let fileURL: URL?
     var limit: Int {
         didSet {
@@ -49,8 +52,10 @@ final class ClipboardStore {
     init(fileURL: URL?, limit: Int = 200) {
         self.fileURL = fileURL
         self.limit = limit
-        if let url = fileURL, let saved = JSONFile.load([ClipItem].self, from: url) {
-            items = saved
+        if let url = fileURL {
+            if let saved = JSONFile.load(Snapshot.self, from: url) {
+                items = saved.items; categories = saved.categories
+            } else if let legacy = JSONFile.load([ClipItem].self, from: url) { items = legacy }
         }
     }
 
@@ -78,7 +83,8 @@ final class ClipboardStore {
     struct ImportResult { let added: Int; let duplicates: Int; let skipped: Int }
 
     /// Prepare and persist before changing memory. Imported entries never evict existing history.
-    func importEntries(_ entries: [ClipboardArchive.Entry]) throws -> ImportResult {
+    func importEntries(_ entries: [ClipboardArchive.Entry], categories incoming: [String] = []) throws -> ImportResult {
+        let mergedCategories = try ClipboardArchive.validateCategories(categories + incoming + entries.compactMap { $0.category })
         guard entries.count <= ClipboardArchive.maxEntries else { throw ClipboardArchive.Failure.tooMany }
         guard entries.allSatisfy({ $0.text.unicodeScalars.count <= Self.maxTextLength }) else { throw ClipboardArchive.Failure.tooLong }
         var existing = items
@@ -88,27 +94,55 @@ final class ClipboardStore {
         for entry in entries where !entry.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             if let i = existing.firstIndex(where: { $0.text == entry.text }) {
                 existing[i].pinned = existing[i].pinned || entry.pinned
+                if existing[i].category == nil { existing[i].category = entry.category }
                 duplicates += 1
             } else if let i = index[entry.text] {
                 unique[i].pinned = unique[i].pinned || entry.pinned
+                if unique[i].category == nil { unique[i].category = entry.category }
                 duplicates += 1
             } else {
                 index[entry.text] = unique.count
                 unique.append(entry)
             }
         }
-        var capacity = max(0, limit - existing.filter { !$0.pinned }.count)
+        var capacity = max(0, limit - existing.filter { !$0.pinned && $0.category == nil }.count)
         var added: [ClipItem] = []
         var skipped = 0
         for entry in unique {
-            guard entry.pinned || capacity > 0 else { skipped += 1; continue }
-            if !entry.pinned { capacity -= 1 }
-            added.append(ClipItem(id: UUID(), text: entry.text, pinned: entry.pinned, date: Date()))
+            guard entry.pinned || entry.category != nil || capacity > 0 else { skipped += 1; continue }
+            if !entry.pinned && entry.category == nil { capacity -= 1 }
+            added.append(ClipItem(id: UUID(), text: entry.text, pinned: entry.pinned, date: Date(), category: entry.category))
         }
         let merged = added + existing
-        if let url = fileURL { try JSONFile.write(merged, to: url) }
+        if let url = fileURL { try JSONFile.write(Snapshot(items: merged, categories: mergedCategories), to: url) }
         items = merged
+        categories = mergedCategories
         return ImportResult(added: added.count, duplicates: duplicates, skipped: skipped)
+    }
+
+    /// Folder changes are committed atomically with their contents. Deleting a folder never deletes text.
+    func addCategory(_ raw: String) throws {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !categories.contains(name) else { throw ClipboardArchive.Failure.duplicateCategory }
+        try commitFolders(items, try ClipboardArchive.validateCategories(categories + [name]))
+    }
+    func renameCategory(_ old: String, to raw: String) throws {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard categories.contains(old) else { throw ClipboardArchive.Failure.invalid }
+        guard name == old || !categories.contains(name) else { throw ClipboardArchive.Failure.duplicateCategory }
+        let names = try ClipboardArchive.validateCategories(categories.map { $0 == old ? name : $0 })
+        try commitFolders(items.map { item in var copy = item; if copy.category == old { copy.category = name }; return copy }, names)
+    }
+    func deleteCategory(_ name: String) throws {
+        try commitFolders(items.map { item in var copy = item; if copy.category == name { copy.category = nil }; return copy }, categories.filter { $0 != name })
+    }
+    func assign(_ id: UUID, to category: String?) throws {
+        guard category == nil || categories.contains(category!) else { throw ClipboardArchive.Failure.invalid }
+        try commitFolders(items.map { item in var copy = item; if copy.id == id { copy.category = category }; return copy }, categories)
+    }
+    private func commitFolders(_ changed: [ClipItem], _ names: [String]) throws {
+        if let url = fileURL { try JSONFile.write(Snapshot(items: changed, categories: names), to: url) }
+        items = changed; categories = names
     }
 
     func togglePin(_ id: UUID) {
@@ -123,7 +157,7 @@ final class ClipboardStore {
     }
 
     func clearUnpinned() {
-        items.removeAll { !$0.pinned }
+        items.removeAll { !$0.pinned && $0.category == nil }
         save()
     }
 
@@ -131,14 +165,14 @@ final class ClipboardStore {
     private func trim() {
         var unpinned = 0
         items = items.filter { item in
-            if item.pinned { return true }
+            if item.pinned || item.category != nil { return true }
             unpinned += 1
             return unpinned <= limit
         }
     }
 
     private func save() {
-        if let url = fileURL { JSONFile.save(items, to: url) }
+        if let url = fileURL { JSONFile.save(Snapshot(items: items, categories: categories), to: url) }
     }
 }
 

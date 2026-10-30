@@ -220,7 +220,7 @@ final class SettingsPanelView: UIView {
             self?.settings.allowOnlineTranslation = on
         })
         stack.addArrangedSubview(note("預設關閉。開啟後，本機翻譯失敗時會將最多 450 字送到 MyMemory；文字在網址參數中，服務商可能保留紀錄。請勿翻譯密碼或私密資料。完整說明見糯糯鍵盤 App 的「隱私與安全」。"))
-        stack.addArrangedSubview(header("剪貼簿最多記幾筆"))
+        stack.addArrangedSubview(header("未分類暫存上限（釘選另存）"))
         stack.addArrangedSubview(clipLimitRow())
 
         stack.addArrangedSubview(header("其他"))

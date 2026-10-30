@@ -6,7 +6,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.2.0"
+    MARKETING_VERSION: "0.3.0"
     CURRENT_PROJECT_VERSION: "1"
     TARGETED_DEVICE_FAMILY: "1"
     DEVELOPMENT_TEAM: ""
@@ -23,6 +23,8 @@ targets:
         CFBundleDisplayName: 糯糯鍵盤
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSMicrophoneUsageDescription: 按下開始說話後，使用麥克風將你的語音轉成文字。
+        NSSpeechRecognitionUsageDescription: 將你主動錄製的語音轉成可檢查、複製的文字；開啟線上辨識時可能交由 Apple 處理。
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

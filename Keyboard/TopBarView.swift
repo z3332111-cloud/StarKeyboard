@@ -1,7 +1,7 @@
 import UIKit
 
 enum ToolbarItem: CaseIterable {
-    case clipboard, emoji, kaomoji, symbols, fancy, translate, handwriting, settings, dismiss
+    case clipboard, emoji, kaomoji, symbols, fancy, translate, handwriting, voice, settings, dismiss
 }
 
 /// 鍵盤最上面那一條：沒在打字時是工具列，打注音時是候選字，新增表符或翻譯時是編輯框
@@ -67,6 +67,7 @@ final class TopBarView: UIView {
             case .fancy: b.setTitle("𝒜", for: .normal)
             case .translate: b.setImage(Self.icon("translate"), for: .normal)
             case .handwriting: b.setImage(Self.icon("hand.draw"), for: .normal)
+            case .voice: b.setImage(Self.icon("mic"), for: .normal); b.accessibilityLabel = "語音輸入說明"
             case .settings: b.setImage(Self.icon("gearshape"), for: .normal)
             case .dismiss: b.setImage(Self.icon("keyboard.chevron.compact.down"), for: .normal)
             }

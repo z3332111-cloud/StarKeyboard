@@ -5,6 +5,8 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
     var onInsert: ((String) -> Void)?
     var onTransfer: (() -> Void)?
     var onAddCurrent: (() -> Void)?
+    var onEditCategory: ((String?) -> Void)?
+    var onError: ((String) -> Void)?
     var onBack: (() -> Void)?
     var onBackspace: (() -> Void)?
     var style: KeyboardStyle {
@@ -20,12 +22,14 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
     private let table = UITableView(frame: .zero, style: .plain)
     private let header = UIView()
     private let titleLabel = UILabel()
+    private let categoryButton = UIButton(type: .system)
     private let transferButton = UIButton(type: .system)
     private let addButton = UIButton(type: .system)
     private let clearButton = UIButton(type: .system)
     private let emptyLabel = UILabel()
     private let bar: PanelBottomBar
-    private var showPinnedOnly = false
+    private var selected = 0
+    private var tabTitles: [String] = []
     private var rows: [ClipItem] = []
     private var confirmingClear = false
 
@@ -43,14 +47,18 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         addButton.titleLabel?.font = .rounded(14, .semibold)
         addButton.addAction(UIAction { [weak self] _ in self?.onAddCurrent?() }, for: .touchUpInside)
         header.addSubview(addButton)
-        clearButton.setTitle("清除", for: .normal)
+        clearButton.setTitle("清暫存", for: .normal)
         clearButton.titleLabel?.font = .rounded(14)
         clearButton.addAction(UIAction { [weak self] _ in self?.clearTapped() }, for: .touchUpInside)
         header.addSubview(clearButton)
-        transferButton.setTitle("匯入／匯出・剪貼簿搬家", for: .normal)
+        transferButton.setTitle("匯入／匯出", for: .normal)
         transferButton.titleLabel?.font = .rounded(14, .semibold)
         transferButton.addAction(UIAction { [weak self] _ in self?.onTransfer?() }, for: .touchUpInside)
         header.addSubview(transferButton)
+        categoryButton.setTitle("資料夾管理", for: .normal)
+        categoryButton.titleLabel?.font = .rounded(14, .semibold)
+        categoryButton.showsMenuAsPrimaryAction = true
+        header.addSubview(categoryButton)
         addSubview(header)
 
         table.backgroundColor = .clear
@@ -67,10 +75,13 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         emptyLabel.font = .rounded(14)
         addSubview(emptyLabel)
 
-        bar.setTabs(["全部", "📌 釘選"])
+
         bar.onTab = { [weak self] i in
-            self?.showPinnedOnly = i == 1
-            self?.reload()
+            guard let self = self else { return }
+            if i == self.store.categories.count + 3 {
+                self.bar.selectedTab = self.selected
+                self.onEditCategory?(nil)
+            } else { self.selected = i; self.reload() }
         }
         bar.onBack = { [weak self] in self?.onBack?() }
         bar.onBackspace = { [weak self] in self?.onBackspace?() }
@@ -83,12 +94,22 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func reload() {
-        rows = showPinnedOnly ? store.ordered.filter { $0.pinned } : store.ordered
+        let titles = ["全部", "📌 釘選", "未分類"] + store.categories.map { "📁 " + $0 } + ["＋分類"]
+        if titles != tabTitles { tabTitles = titles; bar.setTabs(titles) }
+        if selected >= titles.count - 1 { selected = 0 }
+        bar.selectedTab = selected
+        if selected == 1 { rows = store.ordered.filter { $0.pinned } }
+        else if selected == 2 { rows = store.ordered.filter { $0.category == nil } }
+        else if selected >= 3 { rows = store.ordered.filter { $0.category == store.categories[selected - 3] } }
+        else { rows = store.ordered }
+        updateCategoryMenu()
         table.reloadData()
         if !hasFullAccess {
             emptyLabel.text = "要記錄剪貼簿，請到\n設定 › 一般 › 鍵盤 › 鍵盤 › 糯糯鍵盤\n打開「允許完整取用」"
-        } else if showPinnedOnly {
+        } else if selected == 1 {
             emptyLabel.text = "還沒有釘選的內容\n在項目上往右滑，或點 📌 就能釘選"
+        } else if selected >= 3 {
+            emptyLabel.text = "這個分類還沒有內容\n點每筆右側的資料夾圖示來歸類"
         } else {
             emptyLabel.text = "點「＋」手動儲存複製的文字\n或到 ⚙ 隱私與安全開啟自動記錄"
         }
@@ -103,7 +124,8 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         titleLabel.frame = CGRect(x: 12, y: 0, width: 80, height: 34)
         clearButton.frame = CGRect(x: w - 96, y: 0, width: 88, height: 34)
         addButton.frame = CGRect(x: w - 96 - 150, y: 0, width: 150, height: 34)
-        transferButton.frame = CGRect(x: 12, y: 34, width: w - 24, height: 34)
+        transferButton.frame = CGRect(x: 12, y: 34, width: w / 2 - 12, height: 34)
+        categoryButton.frame = CGRect(x: w / 2, y: 34, width: w / 2 - 12, height: 34)
         table.frame = CGRect(x: 0, y: headerH, width: w, height: bounds.height - headerH - barH)
         emptyLabel.frame = table.frame.insetBy(dx: 20, dy: 10)
         bar.frame = CGRect(x: 0, y: bounds.height - barH, width: w, height: barH)
@@ -112,6 +134,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
     private func applyStyle() {
         let t = style.theme
         titleLabel.textColor = t.keyText
+        categoryButton.tintColor = t.isDark ? t.accent : t.specialText
         transferButton.tintColor = t.isDark ? t.accent : t.specialText
         addButton.tintColor = t.isDark ? t.accent : t.specialText
         clearButton.tintColor = t.keyText.withAlphaComponent(0.7)
@@ -119,11 +142,27 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         table.separatorColor = t.shadow.withAlphaComponent(0.5)
     }
 
+    private func perform(_ action: () throws -> Void) {
+        do { try action(); reload() } catch { onError?(error.localizedDescription) }
+    }
+    private func updateCategoryMenu() {
+        let groups: [UIMenuElement] = store.categories.map { name in
+            UIMenu(title: name, children: [
+                UIAction(title: "重新命名") { [weak self] _ in self?.onEditCategory?(name) },
+                UIAction(title: "移除分類（內容留在未分類）", attributes: .destructive) { [weak self] _ in
+                    self?.perform { try self?.store.deleteCategory(name) }
+                }
+            ])
+        }
+        categoryButton.menu = UIMenu(title: "清暫存只清未分類且未釘選內容", children:
+            [UIAction(title: "＋新增分類") { [weak self] _ in self?.onEditCategory?(nil) }] + groups)
+    }
+
     private func clearTapped() {
         if confirmingClear {
             store.clearUnpinned()
             confirmingClear = false
-            clearButton.setTitle("清除", for: .normal)
+            clearButton.setTitle("清暫存", for: .normal)
             reload()
             return
         }
@@ -132,7 +171,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             guard let self = self, self.confirmingClear else { return }
             self.confirmingClear = false
-            self.clearButton.setTitle("清除", for: .normal)
+            self.clearButton.setTitle("清暫存", for: .normal)
         }
     }
 
@@ -165,7 +204,20 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
             self?.store.togglePin(id)
             self?.reload()
         }, for: .touchUpInside)
-        cell.accessoryView = pin
+        let folder = UIButton(type: .system)
+        folder.setImage(UIImage(systemName: item.category == nil ? "folder" : "folder.fill"), for: .normal)
+        folder.tintColor = t.accent
+        folder.accessibilityLabel = "移到分類：" + (item.category ?? "未分類")
+        folder.frame = CGRect(x: 36, y: 0, width: 36, height: 36)
+        folder.showsMenuAsPrimaryAction = true
+        folder.menu = UIMenu(title: "移到分類", children: ([nil] + store.categories.map { Optional($0) }).map { name in
+            UIAction(title: name ?? "未分類", state: item.category == name ? .on : .off) { [weak self] _ in
+                self?.perform { try self?.store.assign(id, to: name) }
+            }
+        } + [UIAction(title: "＋新增分類") { [weak self] _ in self?.onEditCategory?(nil) }])
+        let actions = UIView(frame: CGRect(x: 0, y: 0, width: 72, height: 36))
+        actions.addSubview(pin); actions.addSubview(folder)
+        cell.accessoryView = actions
         return cell
     }
 

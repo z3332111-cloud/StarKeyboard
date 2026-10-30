@@ -13,7 +13,7 @@ final class ClipboardTransferController: NSObject, UIDocumentPickerDelegate {
         self.presenter = presenter; self.store = store; self.changed = changed
     }
     func show() {
-        let menu = UIAlertController(title: "剪貼簿搬家", message: "JSON 保留多行文字與釘選；TXT 每行一筆。匯出檔是明文，請選自己信任的儲存位置。", preferredStyle: .actionSheet)
+        let menu = UIAlertController(title: "剪貼簿搬家", message: "JSON 保留多行文字、釘選與分類；TXT 每行一筆。匯出檔是明文，請選自己信任的儲存位置。", preferredStyle: .actionSheet)
         menu.addAction(UIAlertAction(title: "匯出全部為 JSON 檔案", style: .default) { [weak self] _ in self?.exportFile() })
         menu.addAction(UIAlertAction(title: "匯入 JSON／TXT 檔案", style: .default) { [weak self] _ in self?.importFile() })
         menu.addAction(UIAlertAction(title: "匯入目前複製的文字", style: .default) { [weak self] _ in self?.importPasteboard() })
@@ -44,7 +44,7 @@ final class ClipboardTransferController: NSObject, UIDocumentPickerDelegate {
     private func exportFile() {
         do {
             cleanup()
-            let data = try ClipboardArchive.encode(store.items)
+            let data = try ClipboardArchive.encode(store.items, categories: store.categories)
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent("clipboard-" + UUID().uuidString, isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             exportDirectory = directory
@@ -81,14 +81,14 @@ final class ClipboardTransferController: NSObject, UIDocumentPickerDelegate {
         }
         menu.addAction(UIAlertAction(title: "取消", style: .cancel)); present(menu)
     }
-    private func confirm(_ entries: [ClipboardArchive.Entry]) {
+    private func confirm(_ entries: [ClipboardArchive.Entry], categories: [String] = []) {
         let preview = entries.prefix(3).map { String($0.text.prefix(60)) }.joined(separator: "\n\n")
-        let alert = UIAlertController(title: "匯入 \(entries.count) 筆？", message: preview + "\n\n重複內容合併。原本紀錄會保留；超過未釘選上限的新內容會跳過。", preferredStyle: .alert)
+        let alert = UIAlertController(title: "匯入 \(entries.count) 筆？", message: preview + "\n\n重複內容合併，已有分類優先保留；同名分類合併。原本紀錄會保留；未分類且未釘選的新內容超額會跳過。", preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "匯入", style: .default) { [weak self] _ in
             guard let self = self else { return }
             do {
-                let result = try self.store.importEntries(entries)
+                let result = try self.store.importEntries(entries, categories: categories)
                 self.changed()
                 self.message("新增 \(result.added) 筆，重複 \(result.duplicates) 筆，容量不足跳過 \(result.skipped) 筆。")
             } catch { self.message("沒有完成匯入：\(error.localizedDescription)") }
@@ -104,8 +104,8 @@ final class ClipboardTransferController: NSObject, UIDocumentPickerDelegate {
             let handle = try FileHandle(forReadingFrom: url)
             defer { try? handle.close() }
             let data = try handle.read(upToCount: ClipboardArchive.maxBytes + 1) ?? Data()
-            let entries = try ClipboardArchive.decode(data, plainText: url.pathExtension.lowercased() == "txt")
-            controller.dismiss(animated: true) { [weak self] in self?.confirm(entries) }
+            let contents = try ClipboardArchive.decodeContents(data, plainText: url.pathExtension.lowercased() == "txt")
+            controller.dismiss(animated: true) { [weak self] in self?.confirm(contents.entries, categories: contents.categories) }
         } catch {
             controller.dismiss(animated: true) { [weak self] in self?.message(error.localizedDescription) }
         }

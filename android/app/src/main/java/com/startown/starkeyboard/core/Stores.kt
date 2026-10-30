@@ -5,7 +5,7 @@ import org.json.JSONObject
 import java.io.File
 import java.util.UUID
 
-data class ClipItem(val id: String, val text: String, var pinned: Boolean, var date: Long)
+data class ClipItem(val id: String, val text: String, var pinned: Boolean, var date: Long, var category: String? = null)
 
 /** 剪貼簿紀錄：新的在前面，釘選的不會被自動刪掉 */
 class ClipboardStore(private val file: File?, limit: Int = 200) {
@@ -14,6 +14,7 @@ class ClipboardStore(private val file: File?, limit: Int = 200) {
     }
 
     val items = ArrayList<ClipItem>()
+    val categories = ArrayList<String>()
     var limit = limit
         set(value) {
             field = value
@@ -26,13 +27,18 @@ class ClipboardStore(private val file: File?, limit: Int = 200) {
     }
 
     fun load() {
-        items.clear()
+        items.clear(); categories.clear()
         val f = file?.takeIf { it.exists() } ?: return
         runCatching {
-            val arr = JSONArray(f.readText())
+            val raw = f.readText().trim()
+            val doc = if (raw.startsWith("[")) null else JSONObject(raw)
+            val arr = doc?.getJSONArray("items") ?: JSONArray(raw)
+            doc?.optJSONArray("categories")?.let { names ->
+                categories.addAll(ClipboardArchive.validateCategories((0 until names.length()).map { names.getString(it) }))
+            }
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                items.add(ClipItem(o.getString("id"), o.getString("text"), o.optBoolean("pinned"), o.optLong("date")))
+                items.add(ClipItem(o.getString("id"), o.getString("text"), o.optBoolean("pinned"), o.optLong("date"), if (o.isNull("category")) null else o.getString("category")))
             }
         }
     }
@@ -58,7 +64,8 @@ class ClipboardStore(private val file: File?, limit: Int = 200) {
 
     data class ImportResult(val added: Int, val duplicates: Int, val skipped: Int)
 
-    fun importEntries(entries: List<ClipboardArchive.Entry>): ImportResult {
+    fun importEntries(entries: List<ClipboardArchive.Entry>, incomingCategories: List<String> = emptyList()): ImportResult {
+        val names = ClipboardArchive.validateCategories(categories + incomingCategories + entries.mapNotNull { it.category })
         require(entries.size <= ClipboardArchive.MAX_ENTRIES) { "最多一次匯入 1,000 筆。" }
         require(entries.all { it.text.codePointCount(0, it.text.length) <= MAX_TEXT }) { "單筆文字太長。" }
         val existing = items.map { it.copy() }
@@ -69,33 +76,23 @@ class ClipboardStore(private val file: File?, limit: Int = 200) {
             val pending = unique[entry.text]
             if (old != null) {
                 old.pinned = old.pinned || entry.pinned
+                if (old.category == null) old.category = entry.category
                 duplicates++
             } else if (pending != null) {
-                unique[entry.text] = pending.copy(pinned = pending.pinned || entry.pinned)
+                unique[entry.text] = pending.copy(pinned = pending.pinned || entry.pinned, category = pending.category ?: entry.category)
                 duplicates++
             } else unique[entry.text] = entry
         }
-        var capacity = maxOf(0, limit - existing.count { !it.pinned })
+        var capacity = maxOf(0, limit - existing.count { !it.pinned && it.category == null })
         var skipped = 0
         val added = ArrayList<ClipItem>()
         for (entry in unique.values) {
-            if (!entry.pinned && capacity <= 0) { skipped++; continue }
-            if (!entry.pinned) capacity--
-            added.add(ClipItem(UUID.randomUUID().toString(), entry.text, entry.pinned, System.currentTimeMillis()))
+            if (!entry.pinned && entry.category == null && capacity <= 0) { skipped++; continue }
+            if (!entry.pinned && entry.category == null) capacity--
+            added.add(ClipItem(UUID.randomUUID().toString(), entry.text, entry.pinned, System.currentTimeMillis(), entry.category))
         }
         val merged = added + existing
-        file?.let { target ->
-            val arr = JSONArray()
-            for (item in merged) arr.put(JSONObject().put("id", item.id).put("text", item.text).put("pinned", item.pinned).put("date", item.date))
-            val temp = File.createTempFile("clipboard-import-", ".tmp", target.absoluteFile.parentFile)
-            try {
-                temp.writeText(arr.toString())
-                java.nio.file.Files.move(temp.toPath(), target.toPath(),
-                    java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-            } finally { temp.delete() }
-        }
-        items.clear()
-        items.addAll(merged)
+        commitFolders(merged, names)
         return ImportResult(added.size, duplicates, skipped)
     }
 
@@ -110,23 +107,55 @@ class ClipboardStore(private val file: File?, limit: Int = 200) {
     }
 
     fun clearUnpinned() {
-        items.removeAll { !it.pinned }
+        items.removeAll { !it.pinned && it.category == null }
         save()
     }
 
     private fun trim() {
         var unpinned = 0
-        items.retainAll { it.pinned || ++unpinned <= limit }
+        items.retainAll { it.pinned || it.category != null || ++unpinned <= limit }
     }
 
-    private fun save() {
-        val f = file ?: return
-        val arr = JSONArray()
-        for (it in items) {
-            arr.put(JSONObject().put("id", it.id).put("text", it.text).put("pinned", it.pinned).put("date", it.date))
-        }
-        f.writeText(arr.toString())
+    fun addCategory(raw: String) {
+        val name = raw.trim()
+        require(name !in categories) { "已有同名分類，請換個名稱。" }
+        commitFolders(items, ClipboardArchive.validateCategories(categories + name))
     }
+    fun renameCategory(old: String, raw: String) {
+        val name = raw.trim()
+        require(old in categories && (name == old || name !in categories)) { "分類不存在或名稱重複。" }
+        commitFolders(items.map { if (it.category == old) it.copy(category = name) else it },
+            ClipboardArchive.validateCategories(categories.map { if (it == old) name else it }))
+    }
+    fun deleteCategory(name: String) {
+        commitFolders(items.map { if (it.category == name) it.copy(category = null) else it }, categories.filter { it != name })
+    }
+    fun assign(id: String, category: String?) {
+        require(category == null || category in categories) { "分類不存在。" }
+        commitFolders(items.map { if (it.id == id) it.copy(category = category) else it }, categories)
+    }
+    private fun commitFolders(changed: List<ClipItem>, names: List<String>) {
+        // Copy before clearing: callers may pass the live lists.
+        val next = changed.toList(); val folders = names.toList()
+        persist(next, folders)
+        items.clear(); items.addAll(next)
+        categories.clear(); categories.addAll(folders)
+    }
+    private fun persist(changed: List<ClipItem>, names: List<String>) {
+        val target = file ?: return
+        val arr = JSONArray()
+        changed.forEach { arr.put(JSONObject().put("id", it.id).put("text", it.text).put("pinned", it.pinned)
+            .put("date", it.date).put("category", it.category ?: JSONObject.NULL)) }
+        val document = JSONObject().put("items", arr).put("categories", JSONArray(names))
+        val temp = File.createTempFile("clipboard-", ".tmp", target.absoluteFile.parentFile)
+        try {
+            temp.writeText(document.toString())
+            java.nio.file.Files.move(temp.toPath(), target.toPath(), java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        } finally { temp.delete() }
+    }
+    private fun save() { persist(items, categories) }
+
 }
 
 /** 我的表符、自製貼圖、最近使用 */

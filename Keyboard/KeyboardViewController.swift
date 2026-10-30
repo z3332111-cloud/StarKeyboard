@@ -14,7 +14,8 @@ final class KeyboardViewController: UIInputViewController {
     private enum SuggestionSource { case association, handwriting, spelling, glide }
 
     /// 上面那條編輯框的用途：新增表符，或是先打中文再翻譯
-    private enum EditorPurpose { case emoticon, translate, fancy, shortcutPhrase, shortcutCode }
+    private enum EditorPurpose { case emoticon, translate, fancy, shortcutPhrase, shortcutCode, clipboardCategory }
+    private var renamingCategory: String?
 
     private func editorLabel(_ p: EditorPurpose) -> String {
         switch p {
@@ -23,6 +24,7 @@ final class KeyboardViewController: UIInputViewController {
         case .fancy: return "花式文字："
         case .shortcutPhrase: return "片語內容："
         case .shortcutCode: return "縮寫："
+        case .clipboardCategory: return "分類名稱："
         }
     }
 
@@ -1006,6 +1008,10 @@ final class KeyboardViewController: UIInputViewController {
         case .emoji: togglePanel(.emoji)
         case .kaomoji: togglePanel(.kaomoji)
         case .symbols: togglePanel(.symbols)
+        case .voice:
+            let alert = UIAlertController(title: "語音輸入", message: "直接說話輸入：點鍵盤右下方的系統 🎙。若沒有麥克風，請到 iPhone 設定 → 一般 → 鍵盤 → 啟用聽寫；必要時長按 🌐 切到 Apple 鍵盤。\n\n也可打開桌面的「糯糯鍵盤」App → 語音轉文字，辨識後檢查並複製回來貼上。iPhone 不允許第三方鍵盤直接錄音。", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "知道了", style: .cancel))
+            if presentedViewController == nil { present(alert, animated: true) }
         case .settings: togglePanel(.settings)
         case .translate: beginEditor(.translate)
         case .fancy: beginEditor(.fancy)
@@ -1063,6 +1069,14 @@ final class KeyboardViewController: UIInputViewController {
                 guard let self = self else { return }
                 guard self.hasFullAccess else { self.toast("請先開啟允許完整取用，再使用剪貼簿搬家"); return }
                 self.clipboardTransfer.show()
+            }
+            p.onError = { [weak self] message in self?.toast(message) }
+            p.onEditCategory = { [weak self] name in
+                guard let self = self else { return }
+                self.renamingCategory = name
+                self.beginEditor(.clipboardCategory)
+                self.editorText = name ?? ""
+                self.refreshTopBar()
             }
             p.onAddCurrent = { [weak self] in self?.addCurrentClipboard() }
             p.onBack = { [weak self] in self?.closePanel() }
@@ -1159,7 +1173,7 @@ final class KeyboardViewController: UIInputViewController {
         commitAll()
         finishHangul()
         clearSuggestions(refresh: false)
-        editorReturnPanel = purpose == .emoticon || purpose == .shortcutPhrase ? panel : nil
+        editorReturnPanel = purpose == .emoticon || purpose == .shortcutPhrase || purpose == .clipboardCategory ? panel : nil
         closePanel()
         if purpose != .translate && mode == .handwriting {
             mode = settings.enabledModes.first { $0 != .handwriting } ?? .zhuyin
@@ -1176,6 +1190,7 @@ final class KeyboardViewController: UIInputViewController {
         case .fancy: toast("打想變花樣的字（英文樣式最多），再按「變花樣」")
         case .shortcutPhrase: toast("先打常用的整段話，例如地址、自我介紹")
         case .shortcutCode: toast("再打縮寫")
+        case .clipboardCategory: toast("自己取一個分類名稱，最多 40 字")
         }
     }
 
@@ -1198,6 +1213,12 @@ final class KeyboardViewController: UIInputViewController {
         guard let text = editorText else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         switch editorPurpose {
+        case .clipboardCategory:
+            do {
+                if let old = renamingCategory { try clipStore.renameCategory(old, to: trimmed) }
+                else { try clipStore.addCategory(trimmed) }
+                endEditor(); openPanel(.clipboard)
+            } catch { toast(error.localizedDescription) }
         case .emoticon:
             if !trimmed.isEmpty {
                 emoStore.addCustom(trimmed)

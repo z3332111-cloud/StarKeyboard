@@ -84,6 +84,7 @@ class MainActivity : Activity() {
         text("注音、手寫、英文、韓文、日文、表符、顏文字、剪貼簿、翻譯，還有可愛的主題。")
         text("目前版本 v${BuildInfo.version(this)}")
 
+        button("語音轉文字") { startActivity(Intent(this, VoiceInputActivity::class.java)) }
         button("剪貼簿匯入／匯出") { startActivity(Intent(this, ClipboardTransferActivity::class.java)) }
         updateBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
         col.addView(updateBox)
