@@ -46,10 +46,12 @@ final class KeyboardViewController: UIInputViewController {
     }
     private lazy var clipStore = ClipboardStore(fileURL: Storage.url("clipboard.json"), limit: settings.clipLimit)
     private lazy var emoStore = EmoticonStore(directory: Storage.directory)
+    private var learningModels: [UserPhraseModel] = []
     private lazy var engine: ZhuyinEngine? = {
         guard let path = Bundle.main.path(forResource: "zhuyin", ofType: "sqlite"),
               let e = ZhuyinEngine(path: path, userModel: UserPhraseModel(fileURL: Storage.url("learned.json"), asynchronousWrites: true)) else { return nil }
         e.fuzzy = self.fuzzyOptions
+        learningModels.append(e.userModel)
         return e
     }()
     /// 拼音：另外開一個連線，用沒聲調的 plain 欄查；繁轉簡也用同一個字典檔
@@ -58,6 +60,7 @@ final class KeyboardViewController: UIInputViewController {
               let db = SQLiteDB(path: path),
               let e = ZhuyinEngine(path: path, userModel: UserPhraseModel(fileURL: Storage.url("learned-pinyin.json"), asynchronousWrites: true), column: "plain")
         else { return nil }
+        learningModels.append(e.userModel)
         return PinyinEngine(engine: e, table: PinyinEngine.loadTable(from: db))
     }()
     private lazy var converter: ChineseConverter? = {
@@ -224,8 +227,7 @@ final class KeyboardViewController: UIInputViewController {
         super.viewWillDisappear(animated)
         clipboardTimer?.invalidate()
         clipboardTimer = nil
-        engine?.userModel.flushPendingWrites()
-        pinyinEngine?.engine.userModel.flushPendingWrites()
+        for model in learningModels { model.flushPendingWrites() }
         finishHangul()
         finishPhotoAdjust()
     }
