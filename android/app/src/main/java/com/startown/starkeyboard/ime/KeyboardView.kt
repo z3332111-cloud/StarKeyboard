@@ -97,7 +97,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     }
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).also { it.style = Paint.Style.STROKE }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
 
     fun setLayout(newLayout: KeyboardLayout) {

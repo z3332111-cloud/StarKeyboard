@@ -322,7 +322,6 @@ enum KeyShape: String, CaseIterable {
             return p.cgPath
         case .bubble:
             return UIBezierPath(roundedRect: body, cornerRadius: min(body.width, body.height) / 2).cgPath
-            return path.cgPath
         case .bunny:
             func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
                 CGPoint(x: r.minX + r.width * x, y: r.minY + r.height * y)
