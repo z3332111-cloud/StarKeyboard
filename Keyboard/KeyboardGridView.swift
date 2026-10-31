@@ -146,8 +146,8 @@ final class KeyButton: UIView {
                 self.content.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
             }
         } else {
-            UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.45, initialSpringVelocity: 3,
-                           options: [.allowUserInteraction, .beginFromCurrentState]) {
+            // 放開後很快回到原狀。0.3 秒的彈簧會讓按鍵浮起的樣子留在畫面上。
+            UIView.animate(withDuration: 0.08, delay: 0, options: [.curveEaseOut, .allowUserInteraction, .beginFromCurrentState]) {
                 self.content.transform = .identity
             }
         }
@@ -302,7 +302,7 @@ final class KeyboardGridView: UIView {
             let dx = CGFloat.random(in: -22...22)
             let dy = CGFloat.random(in: -48 ... -26)
             let turn = CGFloat.random(in: -0.6...0.6)
-            UIView.animate(withDuration: 0.55, delay: 0, options: [.curveEaseOut, .allowUserInteraction], animations: {
+            UIView.animate(withDuration: 0.22, delay: 0, options: [.curveEaseOut, .allowUserInteraction], animations: {
                 l.center = CGPoint(x: l.center.x + dx, y: l.center.y + dy)
                 l.alpha = 0
                 l.transform = CGAffineTransform(scaleX: 1.3, y: 1.3).rotated(by: turn)
@@ -314,21 +314,45 @@ final class KeyboardGridView: UIView {
         onKey?(key.spec)
     }
 
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for touch in touches {
-            // 打很快時，新的手指按下就先送出前一個還沒放開的字
-            for (other, var track) in tracks where !track.fired && !track.cursorMode && !track.gliding
-                && (track.key.spec.action.isCharacter || track.key.spec.action == .space) {
-                track.fired = true
-                track.key.isPressed = false
-                tracks[other] = track
-                fire(track.key)
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        // 外層如果是可以滑的畫面，預設會把點擊延遲大約 300ms。鍵盤不能等。
+        var ancestor: UIView? = superview
+        while let view = ancestor {
+            if let scroll = view as? UIScrollView {
+                scroll.delaysContentTouches = false
+                scroll.canCancelContentTouches = true
             }
+            ancestor = view.superview
+        }
+    }
+
+    private func touchOrder(_ a: UITouch, _ b: UITouch) -> Bool {
+        a.timestamp < b.timestamp
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        // 先把這次按下的鍵亮起來，再處理上一拍還沒放開的字。選字不能擋住按鍵變色。
+        var fresh: [(UITouch, KeyButton)] = []
+        for touch in touches.sorted(by: touchOrder) {
             let p = touch.location(in: self)
             guard let key = key(at: p) else { continue }
+            key.isPressed = true
+            fresh.append((touch, key))
+        }
+        let pending = tracks.keys.filter { !touches.contains($0) }.sorted(by: touchOrder)
+        for other in pending {
+            guard var track = tracks[other], !track.fired, !track.cursorMode, !track.gliding,
+                  track.key.spec.action.isCharacter || track.key.spec.action == .space else { continue }
+            track.fired = true
+            track.key.isPressed = false
+            tracks[other] = track
+            fire(track.key)
+        }
+        for (touch, key) in fresh {
+            let p = touch.location(in: self)
             var track = Track(key: key, action: key.spec.action, origin: p)
             if glideEnabled && isLetter(key) { track.points.append(p) }
-            key.isPressed = true
             spawnEffect(from: key)
             tracks[touch] = track
             switch key.spec.action {
@@ -383,7 +407,7 @@ final class KeyboardGridView: UIView {
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for touch in touches {
+        for touch in touches.sorted(by: touchOrder) {
             guard let track = tracks.removeValue(forKey: touch) else { continue }
             track.key.isPressed = false
             switch track.action {
@@ -404,10 +428,17 @@ final class KeyboardGridView: UIView {
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for touch in touches {
+        // 系統把觸控取消時仍送出已經按下的字，避免快速打字時整段注音消失。
+        for touch in touches.sorted(by: touchOrder) {
             guard let track = tracks.removeValue(forKey: touch) else { continue }
             track.key.isPressed = false
-            if track.action == .backspace { stopRepeat() }
+            if track.action == .backspace {
+                stopRepeat()
+                continue
+            }
+            if !track.fired && !track.cursorMode && !track.gliding && track.action.isCharacter {
+                fire(track.key)
+            }
         }
     }
 

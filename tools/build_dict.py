@@ -155,6 +155,22 @@ def main(src, dst, opencc):
     t2s = load_opencc(opencc) if opencc else {}
     db.execute("CREATE TABLE t2s(trad TEXT PRIMARY KEY, simp TEXT NOT NULL)")
     db.executemany("INSERT INTO t2s VALUES (?, ?)", sorted(t2s.items()))
+    ngram_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "context_ngrams.txt")
+    ngrams = []
+    if os.path.exists(ngram_path):
+        with open(ngram_path, encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("#") or "\t" not in line:
+                    continue
+                gram, count = line.rstrip("\n").split("\t", 1)
+                try:
+                    n = int(count)
+                except ValueError:
+                    continue
+                if gram and n > 0:
+                    ngrams.append((gram, n))
+    db.execute("CREATE TABLE ngrams(gram TEXT PRIMARY KEY, n INTEGER NOT NULL)")
+    db.executemany("INSERT INTO ngrams VALUES (?, ?)", ngrams)
     db.commit()
     db.execute("VACUUM")
     db.close()

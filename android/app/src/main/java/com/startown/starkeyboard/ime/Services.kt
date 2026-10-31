@@ -8,6 +8,7 @@ import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
+import com.startown.starkeyboard.core.ContextModel
 import com.startown.starkeyboard.core.PhraseSource
 import com.startown.starkeyboard.core.ReleaseChecker
 import com.startown.starkeyboard.core.ReleaseInfo
@@ -21,6 +22,13 @@ import java.net.URLEncoder
 /** 注音字典：打包時放在 assets，第一次用時複製到手機裡才能用 SQLite 開 */
 /// column：注音用 reading（有聲調），拼音用 plain（沒聲調）
 class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, private val column: String) : PhraseSource {
+    private var exact: Map<String, List<Scored>> = emptyMap()
+    private var abbrs: Map<String, List<Triple<String, String, Double>>> = emptyMap()
+    private var syllableList: List<String> = emptyList()
+    private var byChar: Map<Char, List<String>> = emptyMap()
+    private var ready = false
+    private var context = ContextModel.EMPTY
+
     companion object {
         fun open(context: Context, column: String = "reading"): SQLitePhraseSource? = runCatching {
             val file = File(context.filesDir, "zhuyin.sqlite")
@@ -32,11 +40,60 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
                     stamp.writeText(version)
                 }
             }
-            SQLitePhraseSource(SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY), column)
+            SQLitePhraseSource(SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY), column).also { it.preload() }
         }.getOrNull()
     }
 
+    /** 整表讀進記憶體。之後每個按鍵不再查 SQLite。字典是小麥注音（MIT）。 */
+    fun preload() {
+        if (ready) return
+        val exactMap = HashMap<String, MutableList<Scored>>()
+        val abbrMap = HashMap<String, MutableList<Triple<String, String, Double>>>()
+        val plains = HashSet<String>()
+        val chars = HashMap<Char, MutableList<String>>()
+        val phraseSet = HashSet<String>()
+        db.rawQuery("SELECT reading, plain, abbr, phrase, score FROM phrases ORDER BY score DESC, phrase ASC", null).use { c ->
+            while (c.moveToNext()) {
+                val reading = c.getString(0) ?: continue
+                val plain = c.getString(1) ?: continue
+                val abbr = c.getString(2) ?: continue
+                val phrase = c.getString(3) ?: continue
+                val score = c.getDouble(4)
+                val key = if (column == "plain") plain else reading
+                val list = exactMap.getOrPut(key) { ArrayList() }
+                if (list.size < 80) list.add(Scored(phrase, score))
+                abbrMap.getOrPut(abbr) { ArrayList() }.add(Triple(reading, phrase, score))
+                if ('-' !in plain) plains.add(plain)
+                phraseSet.add(phrase)
+                val head = phrase.firstOrNull()
+                if (head != null) {
+                    val bucket = chars.getOrPut(head) { ArrayList() }
+                    if (bucket.size < 500) bucket.add(phrase)
+                }
+            }
+        }
+        exact = exactMap
+        abbrs = abbrMap
+        syllableList = plains.toList()
+        byChar = chars
+        val loaded = HashMap<String, Int>()
+        runCatching {
+            db.rawQuery("SELECT gram, n FROM ngrams", null).use { c ->
+                while (c.moveToNext()) {
+                    val gram = c.getString(0) ?: continue
+                    val n = c.getInt(1)
+                    if (gram.length >= 2 && n > 0) loaded[gram] = n
+                }
+            }
+        }
+        context = if (loaded.isEmpty()) ContextModel.fromPhrases(phraseSet) else ContextModel(loaded)
+        ready = true
+    }
+
+    override fun contextModel() = context
+
     override fun lookup(reading: String): List<Scored> {
+        if (ready) return exact[reading] ?: emptyList()
         val out = ArrayList<Scored>()
         db.rawQuery("SELECT phrase, score FROM phrases WHERE $column = ? ORDER BY score DESC LIMIT 80", arrayOf(reading)).use { c ->
             while (c.moveToNext()) out.add(Scored(c.getString(0), c.getDouble(1)))
@@ -45,6 +102,7 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
     }
 
     override fun byAbbreviation(abbr: String, pattern: String?): List<Triple<String, String, Double>> {
+        if (ready) return abbrs[abbr] ?: emptyList()
         val out = ArrayList<Triple<String, String, Double>>()
         runCatching {
             db.rawQuery("SELECT reading, phrase, score FROM phrases WHERE abbr = ? AND $column GLOB ? ORDER BY score DESC LIMIT 400", arrayOf(abbr, pattern ?: "*")).use { c ->
@@ -55,6 +113,7 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
     }
 
     override fun syllables(): List<String> {
+        if (ready) return syllableList
         val out = ArrayList<String>()
         runCatching {
             db.rawQuery("SELECT DISTINCT plain FROM phrases WHERE plain NOT LIKE '%-%'", null).use { c ->
@@ -79,6 +138,9 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
     }.getOrNull()
 
     override fun startingWith(head: String, limit: Int): List<String> {
+        if (ready && head.isNotEmpty()) {
+            return (byChar[head[0]] ?: emptyList()).filter { it.length > head.length && it.startsWith(head) }.distinct().take(limit)
+        }
         val out = ArrayList<String>()
         db.rawQuery(
             "SELECT phrase, MAX(score) AS s FROM phrases WHERE phrase > ? AND phrase < ? GROUP BY phrase ORDER BY s DESC LIMIT ?",

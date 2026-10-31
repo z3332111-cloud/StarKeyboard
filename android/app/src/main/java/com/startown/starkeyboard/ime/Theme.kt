@@ -574,6 +574,10 @@ class KeyboardSettings(context: Context) {
     var allowOnlineTranslation: Boolean
         get() = p.getBoolean("allowOnlineTranslation", false)
         set(v) = p.edit().putBoolean("allowOnlineTranslation", v).apply()
+    /** 選字列高度（dp）。設定滑桿會記下來，字跟著變大。 */
+    var candidateBarHeight: Float
+        get() = p.getFloat("candidateBarHeight", 50f).coerceIn(40f, 88f)
+        set(v) = p.edit().putFloat("candidateBarHeight", v.coerceIn(40f, 88f)).apply()
     var clipLimit: Int
         get() = p.getInt("clipLimit", 200)
         set(v) = p.edit().putInt("clipLimit", v).apply()
@@ -581,9 +585,9 @@ class KeyboardSettings(context: Context) {
     var pinyinSimplified: Boolean
         get() = p.getBoolean("pinyinSimplified", false)
         set(v) = p.edit().putBoolean("pinyinSimplified", v).apply()
-    /** 中文符號頁用全形（＃＊）還是半形（# *）；預設半形，Discord 語法才能用 */
+    /** 舊的全形開關。程式／Markdown 符號一律半形，不受這個值影響。 */
     var fullWidthSymbols: Boolean
-        get() = p.getBoolean("fullWidthSymbols", false)
+        get() = p.getBoolean("fullWidthSymbols", true)
         set(v) = p.edit().putBoolean("fullWidthSymbols", v).apply()
     /** 翻譯的原文語言："auto" 是自己猜 */
     var translateSource: String

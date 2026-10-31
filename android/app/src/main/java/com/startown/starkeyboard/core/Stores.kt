@@ -96,6 +96,17 @@ class ClipboardStore(private val file: File?, limit: Int = 200) {
         return ImportResult(added.size, duplicates, skipped)
     }
 
+    /** 改已存的文字。取消編輯時不要呼叫。空白不會覆蓋原本的內容。 */
+    fun updateText(id: String, text: String): Boolean {
+        val stored = if (text.length > MAX_TEXT) text.substring(0, MAX_TEXT) else text
+        if (stored.isBlank()) return false
+        val i = items.indexOfFirst { it.id == id }
+        if (i < 0) return false
+        items[i] = items[i].copy(text = stored)
+        save()
+        return true
+    }
+
     fun togglePin(id: String) {
         items.find { it.id == id }?.let { it.pinned = !it.pinned }
         save()

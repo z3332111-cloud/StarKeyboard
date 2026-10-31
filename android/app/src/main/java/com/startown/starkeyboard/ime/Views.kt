@@ -189,6 +189,7 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
     var onEditorExtra: (() -> Unit)? = null
     var onEditorSource: (() -> Unit)? = null
 
+    var candidateFontSp = 23f
     var style = style
         set(value) {
             field = value
@@ -253,7 +254,7 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
                 // 字加粗；第一個（按空白會送出的）放在主題色的膠囊裡，一眼就看得到
                 for ((i, s) in c.items.take(40).withIndex()) {
                     val first = i == 0
-                    row.addView(Tap(context, s, 23f, if (first) t.accentText else t.keyText, true) { onCandidate?.invoke(i) }.apply {
+                    row.addView(Tap(context, s, candidateFontSp, if (first) t.accentText else t.keyText, true) { onCandidate?.invoke(i) }.apply {
                         setPadding(dpi(11f), 0, dpi(11f), 0)
                         val base = KeyFonts.get(context, style.fontId) ?: android.graphics.Typeface.DEFAULT
                         typeface = android.graphics.Typeface.create(base, android.graphics.Typeface.BOLD)

@@ -16,7 +16,6 @@ import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
-import android.view.animation.OvershootInterpolator
 import kotlin.math.abs
 
 /** 一整片按鍵：自己畫、自己處理觸控（多指連打、滑動修正、刪除鍵連續刪、空白鍵拖曳移動游標） */
@@ -250,7 +249,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         val it = particles.iterator()
         while (it.hasNext()) {
             val p = it.next()
-            val t = (now - p.start) / 550f
+            val t = (now - p.start) / 240f
             if (t >= 1f) { it.remove(); continue }
             val ease = 1 - (1 - t) * (1 - t)
             val x = p.x + p.dx * ease
@@ -273,7 +272,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         val anim = if (pressed) {
             ValueAnimator.ofFloat(k.scale, 0.9f).setDuration(50)
         } else {
-            ValueAnimator.ofFloat(k.scale, 1f).setDuration(280).apply { interpolator = OvershootInterpolator(3f) }
+            ValueAnimator.ofFloat(k.scale, 1f).setDuration(80)
         }
         anim.addUpdateListener { k.scale = it.animatedValue as Float; invalidate() }
         anim.start()
@@ -289,20 +288,20 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                // 打很快時，新的手指按下就先送出前一個還沒放開的字
+                val i = e.actionIndex
+                val key = keyAt(e.getX(i), e.getY(i)) ?: return true
+                // 先亮起這顆鍵，再送出上一拍還沒放開的字。選字不能擋住按鍵變色。
+                setPressed(key, true)
+                val track = Track(key, key.spec.action, e.getX(i))
+                if (glideEnabled && key.isLetter) track.points.add(Pt(e.getX(i), e.getY(i)))
+                tracks[e.getPointerId(i)] = track
                 for (t in tracks.values) {
-                    if (!t.fired && !t.cursorMode && !t.gliding && (t.action.isCharacter || t.action == KeyAction.Space)) {
+                    if (t !== track && !t.fired && !t.cursorMode && !t.gliding && (t.action.isCharacter || t.action == KeyAction.Space)) {
                         t.fired = true
                         setPressed(t.key, false)
                         fire(t.key)
                     }
                 }
-                val i = e.actionIndex
-                val key = keyAt(e.getX(i), e.getY(i)) ?: return true
-                val track = Track(key, key.spec.action, e.getX(i))
-                if (glideEnabled && key.isLetter) track.points.add(Pt(e.getX(i), e.getY(i)))
-                tracks[e.getPointerId(i)] = track
-                setPressed(key, true)
                 when (key.spec.action) {
                     KeyAction.Backspace -> {
                         track.fired = true
@@ -372,10 +371,12 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 } else if (!t.fired && !t.cursorMode && t.action != KeyAction.Backspace && t.action != KeyAction.Shift) fire(t.key)
             }
             MotionEvent.ACTION_CANCEL -> {
+                val pending = tracks.values.filter { !it.fired && !it.cursorMode && !it.gliding && it.action.isCharacter }
                 for (t in tracks.values) setPressed(t.key, false)
                 tracks.clear()
                 stopRepeat()
                 longPressRunnable?.let { mainHandler.removeCallbacks(it) }
+                for (t in pending) fire(t.key)
             }
         }
         return true

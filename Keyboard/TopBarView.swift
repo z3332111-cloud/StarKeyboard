@@ -30,6 +30,9 @@ final class TopBarView: UIView {
     private let scriptButton = UIButton(type: .system)
     var onToolbar: ((ToolbarItem) -> Void)?
     var onCandidate: ((Int) -> Void)?
+    /// 選字列變高時字也變大。
+    var candidateFontSize: CGFloat = 24
+    var onHeightDrag: ((CGFloat) -> Void)?
     var onTrailing: ((Trailing) -> Void)?
     var onEditor: ((Bool) -> Void)?
     var onEditorExtra: (() -> Void)?
@@ -55,6 +58,7 @@ final class TopBarView: UIView {
     private let editorExtra = UIButton(type: .system)
     private let editorSource = UIButton(type: .system)
     private let separator = UIView()
+    private let heightGrip = UIView()
 
     init(style: KeyboardStyle) {
         self.style = style
@@ -94,6 +98,11 @@ final class TopBarView: UIView {
         candidateScroll.showsHorizontalScrollIndicator = false
         candidateScroll.alwaysBounceHorizontal = true
         addSubview(candidateScroll)
+        heightGrip.accessibilityLabel = "拖曳調整選字列高度"
+        heightGrip.isAccessibilityElement = true
+        let drag = UIPanGestureRecognizer(target: self, action: #selector(dragBarHeight(_:)))
+        heightGrip.addGestureRecognizer(drag)
+        addSubview(heightGrip)
         trailingButton.addAction(UIAction { [weak self] _ in
             guard let self = self else { return }
             self.onTrailing?(self.trailing)
@@ -200,7 +209,7 @@ final class TopBarView: UIView {
             let b = candidateButtons[i]
             if b.title(for: .normal) != text { b.setTitle(text, for: .normal) }
             // 字加粗；第一個（按空白會送出的）放在主題色的膠囊裡，一眼就看得到
-            b.titleLabel?.font = KeyFonts.font(style.fontID, size: 24, weight: i == 0 ? .heavy : .semibold)
+            b.titleLabel?.font = KeyFonts.font(style.fontID, size: candidateFontSize, weight: i == 0 ? .heavy : .semibold)
             if i == 0 {
                 b.backgroundColor = style.theme.accent
                 b.setTitleColor(style.theme.accentText, for: .normal)
@@ -239,10 +248,15 @@ final class TopBarView: UIView {
         let trailingW: CGFloat = trailingButton.isHidden ? 0 : 44
         trailingButton.frame = CGRect(x: w - 44, y: 0, width: 44, height: h)
         scriptButton.frame = CGRect(x: w - trailingW - scriptW, y: 0, width: scriptW, height: h)
-        candidateScroll.frame = CGRect(x: 0, y: top, width: w - trailingW - scriptW, height: h - top)
+        heightGrip.frame = CGRect(x: 0, y: max(0, h - 10), width: 18, height: 10)
+        heightGrip.backgroundColor = style.theme.keyText.withAlphaComponent(0.25)
+        heightGrip.layer.cornerRadius = 2
+        bringSubviewToFront(heightGrip)
+        candidateScroll.frame = CGRect(x: 18, y: top, width: max(0, w - trailingW - scriptW - 18), height: h - top)
         var x: CGFloat = 6
         let ch = candidateScroll.bounds.height
         for (i, b) in candidateButtons.enumerated() {
+            b.titleLabel?.font = KeyFonts.font(style.fontID, size: candidateFontSize, weight: i == 0 ? .heavy : .semibold)
             let textW = ((b.title(for: .normal) ?? "") as NSString)
                 .size(withAttributes: [.font: b.titleLabel?.font ?? UIFont.systemFont(ofSize: 20)]).width
             let bw = max(40, ceil(textW) + 22)
@@ -268,6 +282,13 @@ final class TopBarView: UIView {
         editorExtra.frame = CGRect(x: w - 208, y: 0, width: 72, height: h)
         editorCancel.frame = CGRect(x: w - 136, y: 0, width: 64, height: h)
         editorSave.frame = CGRect(x: w - 70, y: 0, width: 64, height: h)
+    }
+
+    @objc private func dragBarHeight(_ gesture: UIPanGestureRecognizer) {
+        let dy = gesture.translation(in: self).y
+        guard dy != 0 else { return }
+        onHeightDrag?(dy)
+        gesture.setTranslation(.zero, in: self)
     }
 
     private func applyStyle() {

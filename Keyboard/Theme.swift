@@ -746,9 +746,9 @@ final class KeyboardSettings {
         get { bool("pinyinSimplified", false) }
         set { d.set(newValue, forKey: "pinyinSimplified") }
     }
-    /// 中文符號頁用全形（＃＊）還是半形（# *）；預設半形，Discord 語法才能用
+    /// 舊的全形開關。程式／Markdown 符號一律半形，不受這個值影響。
     var fullWidthSymbols: Bool {
-        get { bool("fullWidthSymbols", false) }
+        get { bool("fullWidthSymbols", true) }
         set { d.set(newValue, forKey: "fullWidthSymbols") }
     }
     /// 翻譯的原文語言："auto" 是自己猜
@@ -767,6 +767,14 @@ final class KeyboardSettings {
     var allowOnlineTranslation: Bool {
         get { bool("allowOnlineTranslation", false) }
         set { d.set(newValue, forKey: "allowOnlineTranslation") }
+    }
+    /// 選字列高度（點）。拖曳或設定裡的滑桿都會記下來。
+    var candidateBarHeight: Double {
+        get {
+            let stored = d.object(forKey: "candidateBarHeight") as? Double ?? CandidateBarMetrics.defaultHeight
+            return CandidateBarMetrics.clamp(stored)
+        }
+        set { d.set(CandidateBarMetrics.clamp(newValue), forKey: "candidateBarHeight") }
     }
     var clipLimit: Int {
         get { d.object(forKey: "clipLimit") as? Int ?? 200 }

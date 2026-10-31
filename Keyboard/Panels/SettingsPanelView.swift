@@ -192,6 +192,9 @@ final class SettingsPanelView: UIView {
             self?.settings.fuzzyPhonetic = on
             self?.onChange?()
         })
+        stack.addArrangedSubview(header("選字列高度"))
+        stack.addArrangedSubview(note("也可以按住選字列左下角的小橫條往上或往下拖。字會跟著變大。"))
+        stack.addArrangedSubview(candidateHeightRow())
 
         stack.addArrangedSubview(header("翻譯"))
         stack.addArrangedSubview(note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。iOS 26 以上且已下載語言時用 iPhone 內建翻譯，只有開啟「允許外部網路翻譯」後，才會在本機翻譯不可用時使用 MyMemory（原文會傳到該服務）。"))
@@ -602,6 +605,18 @@ final class SettingsPanelView: UIView {
         row.addArrangedSubview(l)
         row.addArrangedSubview(sw)
         return row
+    }
+
+    private func candidateHeightRow() -> UIView {
+        let slider = UISlider()
+        slider.minimumValue = Float(CandidateBarMetrics.minHeight)
+        slider.maximumValue = Float(CandidateBarMetrics.maxHeight)
+        slider.value = Float(settings.candidateBarHeight)
+        slider.addAction(UIAction { [weak self] _ in
+            self?.settings.candidateBarHeight = Double(slider.value)
+            self?.onChange?()
+        }, for: .valueChanged)
+        return slider
     }
 
     private func clipLimitRow() -> UIView {
