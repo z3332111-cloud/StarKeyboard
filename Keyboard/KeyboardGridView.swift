@@ -332,8 +332,14 @@ final class KeyboardGridView: UIView {
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        // 先送出「上一拍」還沒放開的字，而且依照按下的時間。同一拍裡的鍵不能互相插隊，
-        // 否則聲調會比聲母先送出去，注音就被拆開。
+        // 先把這次按下的鍵亮起來，再處理上一拍還沒放開的字。選字不能擋住按鍵變色。
+        var fresh: [(UITouch, KeyButton)] = []
+        for touch in touches.sorted(by: touchOrder) {
+            let p = touch.location(in: self)
+            guard let key = key(at: p) else { continue }
+            key.isPressed = true
+            fresh.append((touch, key))
+        }
         let pending = tracks.keys.filter { !touches.contains($0) }.sorted(by: touchOrder)
         for other in pending {
             guard var track = tracks[other], !track.fired, !track.cursorMode, !track.gliding,
@@ -343,12 +349,10 @@ final class KeyboardGridView: UIView {
             tracks[other] = track
             fire(track.key)
         }
-        for touch in touches.sorted(by: touchOrder) {
+        for (touch, key) in fresh {
             let p = touch.location(in: self)
-            guard let key = key(at: p) else { continue }
             var track = Track(key: key, action: key.spec.action, origin: p)
             if glideEnabled && isLetter(key) { track.points.append(p) }
-            key.isPressed = true
             spawnEffect(from: key)
             tracks[touch] = track
             switch key.spec.action {

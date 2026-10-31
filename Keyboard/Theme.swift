@@ -768,6 +768,14 @@ final class KeyboardSettings {
         get { bool("allowOnlineTranslation", false) }
         set { d.set(newValue, forKey: "allowOnlineTranslation") }
     }
+    /// 選字列高度（點）。拖曳或設定裡的滑桿都會記下來。
+    var candidateBarHeight: Double {
+        get {
+            let stored = d.object(forKey: "candidateBarHeight") as? Double ?? CandidateBarMetrics.defaultHeight
+            return CandidateBarMetrics.clamp(stored)
+        }
+        set { d.set(CandidateBarMetrics.clamp(newValue), forKey: "candidateBarHeight") }
+    }
     var clipLimit: Int {
         get { d.object(forKey: "clipLimit") as? Int ?? 200 }
         set { d.set(newValue, forKey: "clipLimit") }

@@ -17,6 +17,7 @@ import android.widget.Switch
 import android.widget.TextView
 import android.widget.PopupMenu
 import android.widget.Toast
+import com.startown.starkeyboard.core.ClipItem
 import com.startown.starkeyboard.core.ClipboardStore
 import com.startown.starkeyboard.core.EmoticonStore
 import com.startown.starkeyboard.core.ShortcutStore
@@ -186,6 +187,7 @@ class ClipboardPanel(
     private val onInsert: (String) -> Unit,
     private val onAddCurrent: () -> Unit,
     private val onTransfer: () -> Unit,
+    private val onEdit: (ClipItem) -> Unit,
     private val onEditCategory: (String?) -> Unit,
     onBack: () -> Unit,
     onBackspace: () -> Unit,
@@ -277,6 +279,9 @@ class ClipboardPanel(
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(t.keyText)
             }, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+            row.addView(Tap(context, "✎", 16f, t.accent) { onEdit(item) }.apply {
+                contentDescription = "編輯"
+            }, LayoutParams(dpi(40f), dpi(40f)))
             row.addView(Tap(context, "📌", 15f, t.keyText) { store.togglePin(item.id); reload() }.apply {
                 alpha = if (item.pinned) 1f else 0.3f
             }, LayoutParams(dpi(40f), dpi(40f)))
@@ -570,6 +575,22 @@ class SettingsPanel(
         note("點一下就會播放聽聽看。")
         toggle("按鍵震動", settings.haptics) { settings.haptics = it }
 
+        header("選字列高度")
+        note("字會跟著變高。也可以在設定裡拖這個滑桿。")
+        val height = android.widget.SeekBar(context).apply {
+            max = 48
+            progress = (settings.candidateBarHeight - 40f).toInt().coerceIn(0, 48)
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: android.widget.SeekBar?, value: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    settings.candidateBarHeight = 40f + value
+                    onChange()
+                }
+                override fun onStartTrackingTouch(bar: android.widget.SeekBar?) {}
+                override fun onStopTrackingTouch(bar: android.widget.SeekBar?) {}
+            })
+        }
+        col.addView(height, LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
         header("隱私與安全")
         toggle("自動記錄剪貼簿", settings.clipboardHistoryEnabled) { settings.clipboardHistoryEnabled = it }
         note("預設關閉。開啟後會儲存複製的文字；會略過敏感標記，但無法辨識所有密碼。舊紀錄可在剪貼簿逐筆刪除。")

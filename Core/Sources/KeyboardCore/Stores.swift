@@ -145,6 +145,17 @@ final class ClipboardStore {
         items = changed; categories = names
     }
 
+    /// 改已存的文字。取消編輯時不要呼叫。空白不會覆蓋原本的內容。
+    @discardableResult
+    func updateText(_ id: UUID, _ text: String) -> Bool {
+        let stored = text.count > Self.maxTextLength ? String(text.prefix(Self.maxTextLength)) : text
+        guard !stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        guard let i = items.firstIndex(where: { $0.id == id }) else { return false }
+        items[i].text = stored
+        save()
+        return true
+    }
+
     func togglePin(_ id: UUID) {
         guard let i = items.firstIndex(where: { $0.id == id }) else { return }
         items[i].pinned.toggle()

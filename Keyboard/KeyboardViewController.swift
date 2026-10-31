@@ -14,8 +14,9 @@ final class KeyboardViewController: UIInputViewController {
     private enum SuggestionSource { case association, handwriting, spelling, glide }
 
     /// 上面那條編輯框的用途：新增表符，或是先打中文再翻譯
-    private enum EditorPurpose { case emoticon, translate, fancy, shortcutPhrase, shortcutCode, clipboardCategory }
+    private enum EditorPurpose { case emoticon, translate, fancy, shortcutPhrase, shortcutCode, clipboardCategory, clipboardItem }
     private var renamingCategory: String?
+    private var editingClipID: UUID?
     private var folderNameBox: FolderNameBox!
     private var namingFolder: Bool { editorText != nil && editorPurpose == .clipboardCategory }
     private var folderBoxHeight: CGFloat { namingFolder ? 84 : 0 }
@@ -28,6 +29,7 @@ final class KeyboardViewController: UIInputViewController {
         case .shortcutPhrase: return "片語內容："
         case .shortcutCode: return "縮寫："
         case .clipboardCategory: return "分類名稱："
+        case .clipboardItem: return "編輯剪貼簿："
         }
     }
 
@@ -54,8 +56,6 @@ final class KeyboardViewController: UIInputViewController {
     private var engine: ZhuyinEngine? { zhuyinEngineStore }
     private var pinyinEngine: PinyinEngine? { pinyinEngineStore }
     private var converter: ChineseConverter? { converterStore }
-    /// 整句組字上限。以前 20 個音節就強制送出，長句會被切掉。
-    private static let maxCompositionSyllables = 48
     private var candidateGeneration = 0
     private lazy var textChecker = UITextChecker()
     /// 剛剛自動修正的字：馬上按刪除就改回原本打的
@@ -71,12 +71,14 @@ final class KeyboardViewController: UIInputViewController {
     private var shift: ShiftState = .off
     private var lastShiftTap = Date.distantPast
     private var lastSpaceTime = Date.distantPast
-    private var composer = ZhuyinComposer()
+    private let zhuyin = ZhuyinSession()
+    private var composer: ZhuyinComposer {
+        get { zhuyin.composer }
+        set { zhuyin.composer = newValue }
+    }
     private var kanaBuffer = ""              // 日文：還沒送出的羅馬拼音
     private var pinyinBuffer = ""            // 拼音：還沒送出的字母
     private var candidateOriginals: [String] = []   // 拼音候選轉簡體前的原文（學習、聯想詞用）
-    /// 這段注音裡已經選了哪些字（全部選完時記成一個詞）
-    private var composePicks: [(readings: [String], text: String)] = []
     private var hangul = HangulComposer()
     private var hangulShown = ""             // 韓文：已經放進輸入框、還在拼的那個字
     private var candidates: [Candidate] = []
@@ -207,6 +209,7 @@ final class KeyboardViewController: UIInputViewController {
                 guard let self = self else { return }
                 zhuyin.fuzzy = self.fuzzyOptions
                 self.zhuyinEngineStore = zhuyin
+                self.zhuyin.engine = zhuyin
                 self.pinyinEngineStore = pinyin
                 self.converterStore = converter
                 self.learningModels = [zhuyinUser, pinyinUser]
@@ -262,14 +265,16 @@ final class KeyboardViewController: UIInputViewController {
         photoAdjustView?.frame = b
         tintOverlay.frame = b
         folderNameBox.frame = CGRect(x: 10, y: 6, width: b.width - 20, height: max(0, folderBoxHeight - 10))
-        topBar.frame = CGRect(x: 0, y: folderBoxHeight, width: b.width, height: Metrics.barHeight)
-        contentView.frame = CGRect(x: 0, y: folderBoxHeight + Metrics.barHeight, width: b.width, height: max(0, b.height - Metrics.barHeight - folderBoxHeight))
+        let barH = CGFloat(settings.candidateBarHeight)
+        topBar.candidateFontSize = CGFloat(CandidateBarMetrics.fontSize(barHeight: settings.candidateBarHeight))
+        topBar.frame = CGRect(x: 0, y: folderBoxHeight, width: b.width, height: barH)
+        contentView.frame = CGRect(x: 0, y: folderBoxHeight + barH, width: b.width, height: max(0, b.height - barH - folderBoxHeight))
         grid.frame = contentView.bounds
         panelView?.frame = contentView.bounds
         candidatePanel?.frame = contentView.bounds
         handwritingView?.frame = contentView.bounds
         let toastW = min(b.width - 40, 300)
-        toastLabel.frame = CGRect(x: (b.width - toastW) / 2, y: folderBoxHeight + Metrics.barHeight + 8, width: toastW, height: 44)
+        toastLabel.frame = CGRect(x: (b.width - toastW) / 2, y: folderBoxHeight + CGFloat(settings.candidateBarHeight) + 8, width: toastW, height: 44)
     }
 
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -309,6 +314,14 @@ final class KeyboardViewController: UIInputViewController {
         }
         topBar.onToolbar = { [weak self] item in self?.toolbarTapped(item) }
         topBar.onCandidate = { [weak self] i in self?.selectCandidate(at: i, learn: true) }
+        topBar.candidateFontSize = CGFloat(CandidateBarMetrics.fontSize(barHeight: settings.candidateBarHeight))
+        topBar.onHeightDrag = { [weak self] dy in
+            guard let self = self else { return }
+            self.settings.candidateBarHeight += Double(dy)
+            self.topBar.candidateFontSize = CGFloat(CandidateBarMetrics.fontSize(barHeight: self.settings.candidateBarHeight))
+            self.updateHeight()
+            self.view.setNeedsLayout()
+        }
         topBar.onTrailing = { [weak self] trailing in
             guard let self = self else { return }
             switch trailing {
@@ -460,26 +473,12 @@ final class KeyboardViewController: UIInputViewController {
 
     private func typeZhuyin(_ c: Character) {
         clearSuggestions(refresh: false)
-        if !composer.isComposing { composePicks = [] }   // 新的一段話
         if composer.validPrefixes == nil, let prefixes = engine?.syllablePrefixes(), !prefixes.isEmpty {
             composer.validPrefixes = prefixes
         }
-        guard composer.input(c) else {
-            // 聲調永遠不單獨送進文章。組字器吃不下時也只是丟掉，不當成文字。
-            if Bopomofo.tones.contains(c) {
-                refreshTopBar()
-                return
-            }
-            output(String(c))
-            refreshTopBar()
-            return
-        }
-        if composer.syllables.count >= Self.maxCompositionSyllables {
-            updateCandidatesNow()
-            commitAll()
-            return
-        }
-        // 注音立刻顯示；選字等這次觸控結束再算，手指不用等字典。
+        // 注音與聲調只進組字區。緩衝區很長時，前面那段先送出中文，這顆鍵仍留在後面。
+        let committed = zhuyin.type(c)
+        if !committed.isEmpty { output(committed) }
         refreshTopBar()
         scheduleCandidateRefresh()
     }
@@ -544,13 +543,7 @@ final class KeyboardViewController: UIInputViewController {
             updateCandidates()
             return
         }
-        if composer.isComposing {
-            composer.backspace()
-            if !composer.isComposing { composePicks = [] }
-            updateCandidatesNow()
-            return
-        }
-        if composer.consumeStrayTone() {
+        if zhuyin.backspace() {
             updateCandidatesNow()
             return
         }
@@ -567,22 +560,25 @@ final class KeyboardViewController: UIInputViewController {
 
     private func space() {
         if mode == .zhuyin && layer == .letters && composer.hasPendingSyllable {
-            // 空白鍵＝一聲。組字區留著，不把還沒打完、或不確定的句子送出去。
-            composer.confirmSyllable()
+            _ = zhuyin.space()
             updateCandidatesNow()
             return
         }
         if mode == .zhuyin && layer == .letters && composer.isComposing {
             updateCandidatesNow()
-            let unfinished = composer.syllables.contains { $0.open }
-            let top = candidates.first
-            let coversAll = top.map { $0.span == composer.readings.count && $0.kind != .literal } ?? false
-            // 還有沒標調的音節，或第一個候選蓋不住整段，都不送出。
-            if unfinished || !coversAll {
+            switch zhuyin.space() {
+            case .passthrough:
+                break
+            case .stay:
+                refreshTopBar()
+                return
+            case .commit(let text):
+                if !text.isEmpty { output(text) }
+                showAssociations(after: text)
+                refreshTopBar()
+                refreshReturnTitle()
                 return
             }
-            selectCandidate(at: 0, learn: false)
-            return
         }
         _ = composer.consumeStrayTone()
         if isComposing {
@@ -714,20 +710,61 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: - 選字（注音、日文）
 
-    /// 觸控處理完再選字，這次按下不用等字典。後一次按鍵會蓋掉還沒跑的那次。
+    private let candidateQueue = DispatchQueue(label: "star.zhuyin.candidates", qos: .userInteractive)
+
+    /// 按鍵當下只更新組字區。選字在背景算，下一個鍵會取消還沒用上的結果。
     private func scheduleCandidateRefresh() {
         candidateGeneration += 1
         let generation = candidateGeneration
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self, generation == self.candidateGeneration else { return }
-            self.updateCandidates()
+        let readings = composer.readings
+        let context = settings.associations ? (editorText ?? textDocumentProxy.documentContextBeforeInput ?? "") : ""
+        let engine = self.engine
+        candidateQueue.async { [weak self] in
+            let list = readings.isEmpty ? [] : (engine?.candidates(for: readings, before: context) ?? [])
+            DispatchQueue.main.async {
+                guard let self = self, generation == self.candidateGeneration else { return }
+                self.applyZhuyinCandidates(list)
+            }
         }
+    }
+
+    private func applyZhuyinCandidates(_ raw: [Candidate]) {
+        guard pinyinBuffer.isEmpty, kanaBuffer.isEmpty else {
+            updateCandidates()
+            return
+        }
+        if composer.readings.isEmpty {
+            candidates = []
+            zhuyin.candidates = []
+        } else {
+            let cleaned = raw.compactMap { c -> Candidate? in
+                let text = PhoneticText.commit(c.text)
+                guard !text.isEmpty else { return nil }
+                return Candidate(text: text, span: c.span, kind: c.kind, reading: c.reading)
+            }
+            candidates = withShortcuts(cleaned).filter { !PhoneticText.containsPhonetic($0.text) && !$0.text.isEmpty }
+            zhuyin.candidates = candidates
+        }
+        if !isComposing { closeCandidatePanel() }
+        candidatePanel?.setCandidates(candidates.map { $0.text })
+        refreshTopBar()
+        refreshReturnTitle()
     }
 
     /// 空白、退格、換行要馬上看見新的候選，不能用上一拍的結果。
     private func updateCandidatesNow() {
         candidateGeneration += 1
-        updateCandidates()
+        let generation = candidateGeneration
+        guard pinyinBuffer.isEmpty, kanaBuffer.isEmpty, !composer.readings.isEmpty, engine != nil else {
+            updateCandidates()
+            return
+        }
+        let readings = composer.readings
+        let context = settings.associations ? (editorText ?? textDocumentProxy.documentContextBeforeInput ?? "") : ""
+        let engine = self.engine
+        let list = candidateQueue.sync { engine?.candidates(for: readings, before: context) ?? [] }
+        guard generation == candidateGeneration else { return }
+        applyZhuyinCandidates(list)
     }
 
     private func updateCandidates() {
@@ -752,14 +789,17 @@ final class KeyboardViewController: UIInputViewController {
             candidates = texts.map { Candidate(text: $0, span: 0, kind: .phrase) }
         } else if composer.readings.isEmpty {
             candidates = []
-        } else if let engine = engine {
+        } else if engine != nil {
             let context = settings.associations ? (editorText ?? textDocumentProxy.documentContextBeforeInput ?? "") : ""
-            candidates = engine.candidates(for: composer.readings, before: context)
+            zhuyin.refresh(context: context)
+            candidates = zhuyin.candidates
         } else {
-            candidates = [Candidate(text: ZhuyinEngine.display(composer.readings.joined()), span: composer.readings.count, kind: .literal)]
+            candidates = []
+            zhuyin.candidates = []
         }
         if !composer.readings.isEmpty && pinyinBuffer.isEmpty && kanaBuffer.isEmpty {
-            candidates = withShortcuts(candidates)
+            candidates = withShortcuts(candidates).filter { !PhoneticText.containsPhonetic($0.text) && !$0.text.isEmpty }
+            zhuyin.candidates = candidates
         }
         if !isComposing { closeCandidatePanel() }
         candidatePanel?.setCandidates(candidates.map { $0.text })
@@ -842,34 +882,16 @@ final class KeyboardViewController: UIInputViewController {
             return
         }
         if composer.isComposing {
-            guard i < candidates.count else { return }
-            let c = candidates[i]
-            // 預測的詞記成它完整的讀音（只打了 ㄏㄠˇ 選「好可愛」，記成 ㄏㄠˇ-ㄎㄜˇ-ㄞˋ）
-            let used = c.reading.map { $0.components(separatedBy: "-") } ?? Array(composer.readings.prefix(c.span))
-            // 點的字都記；按空白送出的單一個詞也記（整句只有點了才記，免得記住猜錯的句子）
-            if c.kind != .literal && (learn || c.kind == .phrase) {
-                engine?.learn(readings: used, text: c.text)
-            }
-            if c.kind != .literal && (learn || c.kind == .phrase) {
-                composePicks.append((used, c.text))
-            } else {
-                // 不把未知字、快捷片語或未確認的整句跨接成學習詞。
-                composePicks = []
-            }
-            output(c.text)
-            composer.removeFirst(c.span)
+            candidateGeneration += 1
+            candidateQueue.sync {}
+            let text = zhuyin.pick(i, learn: learn)
+            if !text.isEmpty { output(text) }
+            candidates = zhuyin.candidates
             if composer.isComposing {
                 updateCandidates()
             } else {
-                // 一段話分好幾次選完：把整段記成一個詞，下次一打就出現
-                if composePicks.count > 1 {
-                    let all = composePicks.flatMap { $0.readings }
-                    engine?.learn(readings: all, text: composePicks.map { $0.text }.joined())
-                }
-                composePicks = []
-                candidates = []
                 closeCandidatePanel()
-                showAssociations(after: c.text)
+                showAssociations(after: text)
                 refreshReturnTitle()
             }
         } else if suggestionSource == .glide, i < suggestions.count {
@@ -951,7 +973,6 @@ final class KeyboardViewController: UIInputViewController {
 
     private func commitAll() {
         guard isComposing else { return }
-        composePicks = []
         var text = ""
         if !pinyinBuffer.isEmpty {
             // 拼音：送出整句（第一個候選）；完全查不到就照打的字母送出
@@ -962,15 +983,10 @@ final class KeyboardViewController: UIInputViewController {
             text = Romaji.finalize(kanaBuffer)
             kanaBuffer = ""
         } else {
-            if !composer.readings.isEmpty {
-                // 送出畫面上已排序的第一個候選，保持 Return 與空白鍵結果一致。
-                if let first = candidates.first, first.span == composer.readings.count {
-                    text = first.text
-                } else {
-                    text = engine?.bestSegments(composer.readings).map { $0.text }.joined() ?? ZhuyinEngine.display(composer.readings.joined())
-                }
-            }
-            composer.clear()
+            candidateGeneration += 1
+            candidateQueue.sync {}
+            text = zhuyin.commitAll()
+            candidates = []
         }
         candidates = []
         closeCandidatePanel()
@@ -1153,6 +1169,13 @@ final class KeyboardViewController: UIInputViewController {
                 self.editorText = name ?? ""
                 self.refreshTopBar()
             }
+            p.onEdit = { [weak self] item in
+                guard let self = self else { return }
+                self.editingClipID = item.id
+                self.beginEditor(.clipboardItem)
+                self.editorText = item.text
+                self.refreshTopBar()
+            }
             p.onAddCurrent = { [weak self] in self?.addCurrentClipboard() }
             p.onBack = { [weak self] in self?.closePanel() }
             p.onBackspace = { [weak self] in self?.deleteOutput() }
@@ -1201,7 +1224,10 @@ final class KeyboardViewController: UIInputViewController {
             if settings.keySound && hasFullAccess { playKeySound() }
         }
         engine?.fuzzy = fuzzyOptions
+        topBar.candidateFontSize = CGFloat(CandidateBarMetrics.fontSize(barHeight: settings.candidateBarHeight))
         clipStore.limit = settings.clipLimit
+        updateHeight()
+        view.setNeedsLayout()
         let modes = settings.enabledModes
         if !modes.contains(mode) {
             mode = modes[0]
@@ -1266,6 +1292,7 @@ final class KeyboardViewController: UIInputViewController {
         case .shortcutPhrase: toast("先打常用的整段話，例如地址、自我介紹")
         case .shortcutCode: toast("再打縮寫")
         case .clipboardCategory: break
+        case .clipboardItem: toast("改完按儲存。按取消會留下原本的文字")
         }
     }
 
@@ -1295,6 +1322,11 @@ final class KeyboardViewController: UIInputViewController {
                 endEditor(); openPanel(.clipboard)
                 (panelView as? ClipboardPanelView)?.selectCategory(trimmed)
             } catch { toast(error.localizedDescription) }
+        case .clipboardItem:
+            if let id = editingClipID, !trimmed.isEmpty {
+                clipStore.updateText(id, text)
+            }
+            endEditor()
         case .emoticon:
             if !trimmed.isEmpty {
                 emoStore.addCustom(trimmed)
@@ -1357,18 +1389,20 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func endEditor() {
+        let reopenClipboard = editorPurpose == .clipboardItem
         closeCandidatePanel()
-        composePicks = []
         composer.clear()
         kanaBuffer = ""
         pinyinBuffer = ""
         candidates = []
+        editingClipID = nil
         editorText = nil
         editorReturnPanel = nil
         editorResult = nil
         translating = false
         refreshTopBar()
         rebuildKeys()
+        if reopenClipboard { openPanel(.clipboard) }
     }
 
     // MARK: - 我的表符、貼圖
@@ -1666,7 +1700,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         // 使用者自己調的高度；橫放時螢幕矮，最多只放大到 1.1 倍
         let scale = isLandscape ? min(settings.heightScale, 1.1) : settings.heightScale
-        let h = folderBoxHeight + Metrics.barHeight + (content * scale).rounded()
+        let h = folderBoxHeight + CGFloat(settings.candidateBarHeight) + (content * scale).rounded()
         if let c = heightConstraint {
             if c.constant != h { c.constant = h }
         } else {

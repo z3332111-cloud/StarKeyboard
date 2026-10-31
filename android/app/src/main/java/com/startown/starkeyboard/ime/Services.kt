@@ -8,6 +8,7 @@ import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
+import com.startown.starkeyboard.core.ContextModel
 import com.startown.starkeyboard.core.PhraseSource
 import com.startown.starkeyboard.core.ReleaseChecker
 import com.startown.starkeyboard.core.ReleaseInfo
@@ -26,6 +27,7 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
     private var syllableList: List<String> = emptyList()
     private var byChar: Map<Char, List<String>> = emptyMap()
     private var ready = false
+    private var context = ContextModel.EMPTY
 
     companion object {
         fun open(context: Context, column: String = "reading"): SQLitePhraseSource? = runCatching {
@@ -49,6 +51,7 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
         val abbrMap = HashMap<String, MutableList<Triple<String, String, Double>>>()
         val plains = HashSet<String>()
         val chars = HashMap<Char, MutableList<String>>()
+        val phraseSet = HashSet<String>()
         db.rawQuery("SELECT reading, plain, abbr, phrase, score FROM phrases ORDER BY score DESC, phrase ASC", null).use { c ->
             while (c.moveToNext()) {
                 val reading = c.getString(0) ?: continue
@@ -61,6 +64,7 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
                 if (list.size < 80) list.add(Scored(phrase, score))
                 abbrMap.getOrPut(abbr) { ArrayList() }.add(Triple(reading, phrase, score))
                 if ('-' !in plain) plains.add(plain)
+                phraseSet.add(phrase)
                 val head = phrase.firstOrNull()
                 if (head != null) {
                     val bucket = chars.getOrPut(head) { ArrayList() }
@@ -72,8 +76,21 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
         abbrs = abbrMap
         syllableList = plains.toList()
         byChar = chars
+        val loaded = HashMap<String, Int>()
+        runCatching {
+            db.rawQuery("SELECT gram, n FROM ngrams", null).use { c ->
+                while (c.moveToNext()) {
+                    val gram = c.getString(0) ?: continue
+                    val n = c.getInt(1)
+                    if (gram.length >= 2 && n > 0) loaded[gram] = n
+                }
+            }
+        }
+        context = if (loaded.isEmpty()) ContextModel.fromPhrases(phraseSet) else ContextModel(loaded)
         ready = true
     }
+
+    override fun contextModel() = context
 
     override fun lookup(reading: String): List<Scored> {
         if (ready) return exact[reading] ?: emptyList()

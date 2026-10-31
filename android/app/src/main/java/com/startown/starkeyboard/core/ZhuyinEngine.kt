@@ -21,6 +21,56 @@ interface PhraseSource {
 
     /** 字典裡所有單字的讀音（沒聲調），例如 ㄋㄧ、ㄏㄠ */
     fun syllables(): List<String>
+
+    /** 前後文。沒有語料時是空的，選字就只看詞頻。 */
+    fun contextModel(): ContextModel = ContextModel.EMPTY
+}
+
+/** 字組出現次數。注音送出時用來在同音詞裡挑比較像前後文的那個。 */
+class ContextModel(private val ngrams: Map<String, Int>) {
+    fun bonus(tail: String, phrase: String): Double {
+        if (phrase.isEmpty() || ngrams.isEmpty()) return 0.0
+        var best = 0.0
+        if (tail.isNotEmpty()) {
+            val ts = tail.takeLast(2)
+            val ps = phrase.take(3)
+            for (a in 1..ts.length) {
+                for (b in 1..minOf(3, ps.length)) {
+                    val gram = ts.takeLast(a) + ps.take(b)
+                    val count = ngrams[gram] ?: continue
+                    if (count <= 0) continue
+                    val weight = if (gram.length >= 3) 0.62 else 0.28
+                    best = maxOf(best, weight * kotlin.math.log10(count + 1.0))
+                }
+            }
+        }
+        if (phrase.length >= 2) {
+            val count = ngrams[phrase]
+            if (count != null && count > 0) best = maxOf(best, 0.42 * kotlin.math.log10(count + 1.0))
+        }
+        return minOf(best, 1.8)
+    }
+
+    companion object {
+        val EMPTY = ContextModel(emptyMap())
+
+        fun fromPhrases(phrases: Collection<String>): ContextModel {
+            val map = HashMap<String, Int>()
+            for (phrase in phrases.toSet()) {
+                if (phrase.length < 2 || phrase.any { Bopomofo.kind(it) != null }) continue
+                if (phrase.length <= 4) map[phrase] = (map[phrase] ?: 0) + 1
+                for (i in 0 until phrase.length - 1) {
+                    val bi = phrase.substring(i, i + 2)
+                    map[bi] = (map[bi] ?: 0) + 1
+                    if (i + 2 < phrase.length) {
+                        val tri = phrase.substring(i, i + 3)
+                        map[tri] = (map[tri] ?: 0) + 1
+                    }
+                }
+            }
+            return ContextModel(map)
+        }
+    }
 }
 
 class MemoryPhraseSource(private val rows: List<Triple<String, String, Double>>) : PhraseSource {
@@ -40,6 +90,9 @@ class MemoryPhraseSource(private val rows: List<Triple<String, String, Double>>)
         all.filter { it.text.length > head.length && it.text.startsWith(head) }
             .groupBy { it.text }.map { (k, v) -> Scored(k, v.maxOf { it.score }) }
             .sortedByDescending { it.score }.take(limit).map { it.text }
+
+    private val context = ContextModel.fromPhrases(rows.map { it.second })
+    override fun contextModel() = context
 }
 
 /** 注音選字：整串用動態規劃找分數最高的斷詞，也會猜打錯的字 */
@@ -76,6 +129,8 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
 
         /** 畫面上顯示的注音（拿掉查字典用的 *） */
         fun display(reading: String) = reading.replace("*", "")
+
+        fun commit(text: String) = text.filter { Bopomofo.kind(it) == null }.toString()
 
         /**
          * 讀音合不合 pattern：有 * 的音節只要開頭一樣（聲調不限），其他要完全一樣。
@@ -198,29 +253,43 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         return out
     }
 
-    /** 整串注音分數最高的斷法 */
-    fun bestSegments(readings: List<String>): List<Scored> {
+    /** 整串注音分數最高的斷法。contextual 用前後文在同音詞裡挑。 */
+    fun bestSegments(readings: List<String>, contextual: Boolean = true): List<Scored> {
         val n = readings.size
         if (n == 0) return emptyList()
         val best = DoubleArray(n + 1) { Double.NEGATIVE_INFINITY }
         val backStart = IntArray(n + 1)
         val backText = arrayOfNulls<String>(n + 1)
         val backScore = DoubleArray(n + 1)
+        val tail = Array(n + 1) { "" }
+        val context = if (contextual) source.contextModel() else ContextModel.EMPTY
         best[0] = 0.0
         for (i in 1..n) {
             for (k in 1..minOf(MAX_PHRASE, i)) {
                 val start = i - k
                 if (best[start] == Double.NEGATIVE_INFINITY) continue
-                val top = fuzzyPhrases(readings.subList(start, i)).firstOrNull()
-                if (top != null) {
-                    val s = best[start] + top.score
-                    if (s > best[i]) {
-                        best[i] = s; backStart[i] = start; backText[i] = top.text; backScore[i] = top.score
+                val pool = fuzzyPhrases(readings.subList(start, i)).filter { commit(it.text) == it.text && it.text.isNotEmpty() }
+                if (pool.isNotEmpty()) {
+                    val options = if (contextual) pool.take(6) else pool.take(1)
+                    for (opt in options) {
+                        val bonus = context.bonus(tail[start], opt.text)
+                        val s = best[start] + opt.score + bonus
+                        if (s > best[i]) {
+                            best[i] = s
+                            backStart[i] = start
+                            backText[i] = opt.text
+                            backScore[i] = opt.score + bonus
+                            tail[i] = (tail[start] + opt.text).takeLast(2)
+                        }
                     }
                 } else if (k == 1) {
                     val s = best[start] + UNKNOWN_PENALTY
                     if (s > best[i]) {
-                        best[i] = s; backStart[i] = start; backText[i] = display(readings[start]); backScore[i] = UNKNOWN_PENALTY
+                        best[i] = s
+                        backStart[i] = start
+                        backText[i] = ""
+                        backScore[i] = UNKNOWN_PENALTY
+                        tail[i] = tail[start]
                     }
                 }
             }
@@ -252,8 +321,11 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
                 if (k == 1) hasSingle = true
             }
         }
-        if (!hasSingle) out.add(Candidate(display(readings[0]), 1, Candidate.Kind.LITERAL))
-        return out
+        if (!hasSingle) {
+            val literal = commit(display(readings[0]))
+            if (literal.isNotEmpty()) out.add(Candidate(literal, 1, Candidate.Kind.LITERAL))
+        }
+        return out.filter { it.text.isNotEmpty() && commit(it.text) == it.text }
     }
 
     /** 所有音節的開頭（給組字用，判斷注音能不能接在一起） */

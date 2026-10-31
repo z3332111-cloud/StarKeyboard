@@ -52,12 +52,11 @@ import com.startown.starkeyboard.core.ZhuyinEngine
 import java.io.File
 import java.util.Locale
 
-private const val MAX_COMPOSITION_SYLLABLES = 48
-
 class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheckerSessionListener {
     private enum class SuggestionSource { ASSOCIATION, HANDWRITING, SPELLING, GLIDE }
-    private enum class EditorPurpose { EMOTICON, TRANSLATE, FANCY, SHORTCUT_PHRASE, SHORTCUT_CODE, CLIPBOARD_CATEGORY }
+    private enum class EditorPurpose { EMOTICON, TRANSLATE, FANCY, SHORTCUT_PHRASE, SHORTCUT_CODE, CLIPBOARD_CATEGORY, CLIPBOARD_ITEM }
     private var renamingCategory: String? = null
+    private var editingClipId: String? = null
     private lateinit var folderNameBox: FolderNameBox
 
     private fun editorLabel(p: EditorPurpose) = when (p) {
@@ -67,6 +66,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         EditorPurpose.SHORTCUT_PHRASE -> "片語內容："
         EditorPurpose.SHORTCUT_CODE -> "縮寫："
         EditorPurpose.CLIPBOARD_CATEGORY -> "分類名稱："
+        EditorPurpose.CLIPBOARD_ITEM -> "編輯剪貼簿："
     }
 
     private fun editorConfirmTitle(p: EditorPurpose) = when (p) {
@@ -86,6 +86,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private var pinyinEngine: PinyinEngine? = null
     private var converter: ChineseConverter? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val candidateThread = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val dictLock = Any()
+    private var candidateGeneration = 0
 
     // 狀態
     private var mode = InputMode.ZHUYIN
@@ -212,7 +215,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         folderNameBox = FolderNameBox(this, onSave = { confirmEditor() }, onCancel = { endEditor(); openPanel(PanelKind.CLIPBOARD) })
         folderNameBox.visibility = View.GONE
         column.addView(folderNameBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (84 * dp).toInt()))
-        column.addView(topBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (50 * dp).toInt()))
+        column.addView(topBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (settings.candidateBarHeight * dp).toInt()))
+        topBar.candidateFontSp = 23f * settings.candidateBarHeight / 50f
         column.addView(content, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, contentHeight()))
         r.addView(column, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT))
         toastView = TextView(this).apply {
@@ -372,21 +376,40 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun typeZhuyin(c: Char) {
         suggestions = emptyList()
-        if (!composer.input(c)) {
-            if (Bopomofo.kind(c) == BopomofoKind.TONE) {
-                refreshTopBar()
-                return
-            }
-            output(c.toString())
+        if (Bopomofo.kind(c) == null) {
             refreshTopBar()
             return
         }
-        if (composer.syllables.size >= MAX_COMPOSITION_SYLLABLES) {
-            updateCandidates()
-            commitAll()
-            return
+        composer.input(c)
+        if (composer.syllables.size > 180) {
+            val count = composer.syllables.size - 8
+            val text = ZhuyinEngine.commit(synchronized(dictLock) { engine?.bestSegments(composer.readings.take(count)) }?.joinToString("") { it.text } ?: "")
+            composer.removeFirst(count)
+            if (text.isNotEmpty()) output(text)
         }
-        updateCandidates()
+        refreshTopBar()
+        scheduleCandidates()
+    }
+
+    /** 選字在背景算。空白和換行仍用 updateCandidates，因為那時候就要用結果決定送不送出。 */
+    private fun scheduleCandidates() {
+        val generation = ++candidateGeneration
+        val readings = composer.readings.toList()
+        val eng = engine
+        candidateThread.execute {
+            val list = if (readings.isEmpty() || eng == null) emptyList() else synchronized(dictLock) { eng.candidates(readings) }.mapNotNull {
+                val text = ZhuyinEngine.commit(it.text)
+                if (text.isEmpty()) null else Candidate(text, it.span, it.kind)
+            }
+            mainHandler.post {
+                if (generation != candidateGeneration) return@post
+                if (pinyinBuffer.isNotEmpty() || kanaBuffer.isNotEmpty()) return@post
+                candidates = withShortcuts(list).filter { it.text.isNotEmpty() && ZhuyinEngine.commit(it.text) == it.text }
+                candidatePanel?.setCandidates(candidates.map { it.text })
+                refreshTopBar()
+                refreshReturnTitle()
+            }
+        }
     }
 
     private fun typePinyin(c: Char) {
@@ -635,6 +658,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     // ===== 選字（注音、日文） =====
 
     private fun updateCandidates() {
+        candidateGeneration++
         candidateOriginals = emptyList()
         candidates = when {
             pinyinBuffer.isNotEmpty() -> {
@@ -656,8 +680,10 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 listOf(hira, Romaji.katakana(hira), kanaBuffer).distinct().map { Candidate(it, 0, Candidate.Kind.PHRASE) }
             }
             composer.readings.isEmpty() -> emptyList()
-            else -> safely { engine?.candidates(composer.readings) }
-                ?: listOf(Candidate(ZhuyinEngine.display(composer.readings.joinToString("")), composer.readings.size, Candidate.Kind.LITERAL))
+            else -> safely { synchronized(dictLock) { engine?.candidates(composer.readings) } }?.mapNotNull {
+                val text = ZhuyinEngine.commit(it.text)
+                if (text.isEmpty()) null else Candidate(text, it.span, it.kind)
+            } ?: emptyList()
         }
         if (composer.readings.isNotEmpty() && pinyinBuffer.isEmpty() && kanaBuffer.isEmpty()) {
             candidates = withShortcuts(candidates)
@@ -735,7 +761,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             }
             // 正在打的字也先預覽成中文（還沒打聲調、只打開頭都可以）
             if (composer.readings.isEmpty()) return ""
-            return candidates.firstOrNull()?.text ?: ZhuyinEngine.display(composer.readings.joinToString(""))
+            return ZhuyinEngine.commit(candidates.firstOrNull()?.text ?: "")
         }
 
     private fun selectCandidate(i: Int, learn: Boolean) {
@@ -787,15 +813,16 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         }
         if (composer.isComposing) {
             val c = candidates.getOrNull(i) ?: return
-            if (learn && c.kind != Candidate.Kind.LITERAL) engine?.learn(composer.readings.take(c.span), c.text)
-            output(c.text)
+            val text = ZhuyinEngine.commit(c.text)
+            if (learn && c.kind != Candidate.Kind.LITERAL && text.isNotEmpty()) synchronized(dictLock) { engine?.learn(composer.readings.take(c.span), text) }
+            if (text.isNotEmpty()) output(text)
             composer.removeFirst(c.span)
             if (composer.isComposing) {
                 updateCandidates()
             } else {
                 candidates = emptyList()
                 closeCandidatePanel()
-                showAssociations(c.text)
+                showAssociations(text)
                 refreshReturnTitle()
             }
             return
@@ -844,8 +871,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             text = Romaji.finalize(kanaBuffer)
             kanaBuffer = ""
         } else {
-            text = safely { engine?.bestSegments(composer.readings)?.joinToString("") { it.text } }
-                ?: ZhuyinEngine.display(composer.readings.joinToString(""))
+            val top = candidates.firstOrNull()
+            text = if (top != null && top.span == composer.readings.size && ZhuyinEngine.commit(top.text) == top.text) {
+                top.text
+            } else {
+                ZhuyinEngine.commit(safely { synchronized(dictLock) { engine?.bestSegments(composer.readings) }?.joinToString("") { it.text } } ?: "")
+            }
             composer.clear()
         }
         candidates = emptyList()
@@ -1070,6 +1101,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 ClipboardPanel(this, clipStore, style,
                     onInsert = { feedback(); output(it) },
                     onAddCurrent = { addCurrentClipboard() },
+                    onEdit = { item ->
+                        editingClipId = item.id
+                        beginEditor(EditorPurpose.CLIPBOARD_ITEM)
+                        editorText = item.text
+                        refreshTopBar()
+                    },
                     onEditCategory = { name ->
                         renamingCategory = name
                         beginEditor(EditorPurpose.CLIPBOARD_CATEGORY)
@@ -1154,6 +1191,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             settings.lastMode = mode
             layer = KeyboardLayer.LETTERS
         }
+        applyBarHeight()
         val oldKey = styleKey
         applyStyle()
         rebuildKeys()
@@ -1161,6 +1199,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         if (panel == PanelKind.SETTINGS && oldKey != styleKey) {
             openPanel(PanelKind.SETTINGS)
         }
+        refreshTopBar()
     }
 
     private fun openApp() {
@@ -1222,6 +1261,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             EditorPurpose.SHORTCUT_PHRASE -> "先打常用的整段話，例如地址、自我介紹"
             EditorPurpose.SHORTCUT_CODE -> "再打縮寫"
             EditorPurpose.CLIPBOARD_CATEGORY -> "輸入名稱後按建立；取消不會新增資料夾"
+            EditorPurpose.CLIPBOARD_ITEM -> "改完按儲存。按取消會留下原本的文字"
         })
     }
 
@@ -1258,6 +1298,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                     endEditor(); openPanel(PanelKind.CLIPBOARD)
                     (panelView as? ClipboardPanel)?.selectCategory(text)
                 } catch (e: Exception) { toast(e.message ?: "無法儲存分類") }
+                return
+            }
+            EditorPurpose.CLIPBOARD_ITEM -> {
+                val id = editingClipId
+                if (id != null && text.isNotEmpty()) clipStore.updateText(id, editorText ?: text)
+                endEditor()
                 return
             }
             EditorPurpose.FANCY -> {
@@ -1306,6 +1352,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     private fun endEditor() {
+        val reopenClipboard = editorPurpose == EditorPurpose.CLIPBOARD_ITEM
+        editingClipId = null
         composer.clear()
         kanaBuffer = ""
         pinyinBuffer = ""
@@ -1318,6 +1366,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         translating = false
         refreshTopBar()
         rebuildKeys()
+        if (reopenClipboard) openPanel(PanelKind.CLIPBOARD)
     }
 
     // ===== 我的表符、貼圖 =====
@@ -1429,6 +1478,14 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     private val isLandscape get() = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    private fun applyBarHeight() {
+        if (!::topBar.isInitialized || !::column.isInitialized) return
+        val px = (settings.candidateBarHeight * dp).toInt()
+        (topBar.layoutParams as? LinearLayout.LayoutParams)?.height = px
+        topBar.candidateFontSp = 23f * settings.candidateBarHeight / 50f
+        topBar.requestLayout()
+    }
 
     private fun contentHeight(): Int {
         val fiveRows = mode == InputMode.ZHUYIN && layer == KeyboardLayer.LETTERS

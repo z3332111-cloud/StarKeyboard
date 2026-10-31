@@ -105,7 +105,7 @@ class CoreTest {
         assertEquals("你好", sentence(e, listOf("ㄋㄧˇ", "ㄏ*")))
         assertEquals("你好世界", sentence(e, listOf("ㄋ*", "ㄏ*", "ㄕ*", "ㄐ*")))
         assertEquals(listOf("你", "妳"), e.candidates(listOf("ㄋㄧ*")).map { it.text })
-        assertEquals("ㄅ", e.candidates(listOf("ㄅ*")).first().text)
+        assertTrue(e.candidates(listOf("ㄅ*")).none { ZhuyinEngine.commit(it.text) != it.text })
     }
 
     @Test fun wholeSentenceIsTopCandidate() {
@@ -155,7 +155,7 @@ class CoreTest {
         assertEquals(Candidate("你好", 2, Candidate.Kind.SENTENCE), c.first())
         assertTrue(c.contains(Candidate("妳", 1, Candidate.Kind.PHRASE)))
         assertEquals(listOf("是", "事", "世"), e.candidates(listOf("ㄕˋ")).map { it.text })
-        assertEquals(Candidate.Kind.LITERAL, e.candidates(listOf("ㄅㄧㄤ")).first().kind)
+        assertTrue(e.candidates(listOf("ㄅㄧㄤ")).none { ZhuyinEngine.commit(it.text) != it.text })
     }
 
     @Test fun learningAndAssociations() {
@@ -175,7 +175,7 @@ class CoreTest {
         assertEquals("妮好", sentence(e, listOf("ㄋㄧ", "ㄏㄠˇ")))
         val f = engine()
         assertEquals("你好", sentence(f, listOf("ㄋㄧˇ", "ㄏㄡˇ")))
-        assertEquals(Candidate.Kind.LITERAL, f.candidates(listOf("ㄙˋ")).first().kind)
+        assertTrue(f.candidates(listOf("ㄙˋ")).none { ZhuyinEngine.commit(it.text) != it.text })
         f.fuzzy = f.fuzzy.copy(phonetic = true)
         assertEquals("是", f.candidates(listOf("ㄙˋ")).first().text)
         assertEquals(setOf('ㄝ', 'ㄥ', 'ㄠ'), Bopomofo.neighbors['ㄡ']!!.toSet())
@@ -242,6 +242,42 @@ class CoreTest {
         val info = ReleaseChecker.parseLatest(json)!!
         assertEquals(3, info.build)
         assertEquals("https://x/a.apk", info.apkUrl)
+    }
+
+    @Test fun clipboardEditKeepsOriginalUntilSave() {
+        val store = ClipboardStore(null)
+        assertTrue(store.add("原來的文字"))
+        val id = store.items[0].id
+        assertFalse(store.updateText(id, "   "))
+        assertEquals("原來的文字", store.items[0].text)
+        assertTrue(store.updateText(id, "改過了"))
+        assertEquals(id, store.items[0].id)
+        assertEquals("改過了", store.items[0].text)
+    }
+
+    @Test fun randomKeysNeverCommitToneMarks() {
+        val e = engine()
+        val keys = "ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄧㄨㄩㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦˊˇˋ˙".toList()
+        var state = 0xC0FFEEL
+        fun next(): Long {
+            state = state * 6364136223846793005L + 1L
+            return state
+        }
+        val doc = StringBuilder()
+        repeat(2000) {
+            val composer = ZhuyinComposer()
+            val count = 1 + (next().ushr(33) % 8).toInt()
+            repeat(count) {
+                val roll = next().ushr(33) % 8
+                if (roll == 0L) composer.backspace()
+                else composer.input(keys[(next().ushr(33) % keys.size).toInt()])
+            }
+            val text = ZhuyinEngine.commit(e.bestSegments(composer.readings).joinToString("") { it.text })
+            doc.append(text)
+            assertEquals(text, ZhuyinEngine.commit(text))
+            assertFalse(text.any { Bopomofo.kind(it) != null })
+        }
+        assertFalse(doc.any { Bopomofo.kind(it) != null })
     }
 
     @Test fun symbols() {

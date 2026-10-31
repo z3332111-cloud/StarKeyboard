@@ -574,6 +574,10 @@ class KeyboardSettings(context: Context) {
     var allowOnlineTranslation: Boolean
         get() = p.getBoolean("allowOnlineTranslation", false)
         set(v) = p.edit().putBoolean("allowOnlineTranslation", v).apply()
+    /** 選字列高度（dp）。設定滑桿會記下來，字跟著變大。 */
+    var candidateBarHeight: Float
+        get() = p.getFloat("candidateBarHeight", 50f).coerceIn(40f, 88f)
+        set(v) = p.edit().putFloat("candidateBarHeight", v.coerceIn(40f, 88f)).apply()
     var clipLimit: Int
         get() = p.getInt("clipLimit", 200)
         set(v) = p.edit().putInt("clipLimit", v).apply()

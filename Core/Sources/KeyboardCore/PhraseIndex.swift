@@ -27,10 +27,12 @@ final class PhraseIndex {
     let longerByFirstPlain: [String: [Int]]
     /// 以這個字開頭的詞，給聯想詞用
     let byFirstChar: [Character: [Int]]
+    /// 前後文用的字組出現次數。來自字典詞與 Tatoeba 中文句子（CC BY 2.0）。
+    let ngrams: [String: Int]
 
     private init(rows: [Row], byReading: [String: [Int]], byPlain: [String: [Int]], byAbbr: [String: [Int]],
                  prefixes: Set<String>, longerByFirst: [String: [Int]], longerByFirstPlain: [String: [Int]],
-                 byFirstChar: [Character: [Int]]) {
+                 byFirstChar: [Character: [Int]], ngrams: [String: Int]) {
         self.rows = rows
         self.byReading = byReading
         self.byPlain = byPlain
@@ -39,6 +41,7 @@ final class PhraseIndex {
         self.longerByFirst = longerByFirst
         self.longerByFirstPlain = longerByFirstPlain
         self.byFirstChar = byFirstChar
+        self.ngrams = ngrams
     }
 
     static func load(from db: SQLiteDB) -> PhraseIndex {
@@ -50,6 +53,7 @@ final class PhraseIndex {
         var longerByFirst: [String: [Int]] = [:]
         var longerByFirstPlain: [String: [Int]] = [:]
         var byFirstChar: [Character: [Int]] = [:]
+        var seenPhrases = Set<String>()
 
         func append(_ map: inout [String: [Int]], _ key: String, _ idx: Int, _ cap: Int) {
             guard !key.isEmpty else { return }
@@ -101,10 +105,52 @@ final class PhraseIndex {
                     byFirstChar[ch, default: []].append(idx)
                 }
             }
+            if phrase.count >= 2 { seenPhrases.insert(phrase) }
+        }
+
+        var ngrams: [String: Int] = [:]
+        db.run("SELECT gram, n FROM ngrams") { stmt in
+            let gram = SQLiteDB.text(stmt, 0)
+            let n = Int(SQLiteDB.double(stmt, 1))
+            if gram.count >= 2, n > 0 { ngrams[gram] = n }
+        }
+        if ngrams.isEmpty {
+            for phrase in seenPhrases where phrase.allSatisfy({ Bopomofo.kind(of: $0) == nil }) {
+                if phrase.count <= 4 { ngrams[phrase, default: 0] += 1 }
+                let chars = Array(phrase)
+                if chars.count >= 2 {
+                    for i in 0..<(chars.count - 1) {
+                        ngrams[String(chars[i...i+1]), default: 0] += 1
+                        if i + 2 < chars.count { ngrams[String(chars[i...i+2]), default: 0] += 1 }
+                    }
+                }
+            }
         }
 
         return PhraseIndex(rows: rows, byReading: byReading, byPlain: byPlain, byAbbr: byAbbr,
                            prefixes: prefixes, longerByFirst: longerByFirst,
-                           longerByFirstPlain: longerByFirstPlain, byFirstChar: byFirstChar)
+                           longerByFirstPlain: longerByFirstPlain, byFirstChar: byFirstChar, ngrams: ngrams)
+    }
+
+    /// 候選詞接在已經決定的字後面時，語料裡看過的接法加分。上限避免蓋過差很多的詞頻。
+    func contextBonus(tail: String, phrase: String) -> Double {
+        guard !phrase.isEmpty, !ngrams.isEmpty else { return 0 }
+        var best = 0.0
+        if !tail.isEmpty {
+            let ts = Array(tail.suffix(2))
+            let ps = Array(phrase.prefix(3))
+            for a in 1...ts.count {
+                for b in 1...min(3, ps.count) {
+                    let gram = String(ts.suffix(a)) + String(ps.prefix(b))
+                    guard let count = ngrams[gram], count > 0 else { continue }
+                    let weight = gram.count >= 3 ? 0.62 : 0.28
+                    best = max(best, weight * log10(Double(count) + 1))
+                }
+            }
+        }
+        if phrase.count >= 2, let count = ngrams[phrase], count > 0 {
+            best = max(best, 0.42 * log10(Double(count) + 1))
+        }
+        return min(best, 1.8)
     }
 }

@@ -244,8 +244,8 @@ final class ZhuyinEngineTests: XCTestCase {
 
     func testUnknownSyllableStaysAsSymbols() {
         let e = makeEngine()
-        XCTAssertEqual(e.bestSegments(["ㄅㄧㄤ"]).map { $0.text }, ["ㄅㄧㄤ"])
-        XCTAssertEqual(e.candidates(for: ["ㄅㄧㄤ"]).first?.kind, .literal)
+        XCTAssertFalse(e.bestSegments(["ㄅㄧㄤ"]).contains { PhoneticText.containsPhonetic($0.text) })
+        XCTAssertFalse(e.candidates(for: ["ㄅㄧㄤ"]).contains { PhoneticText.containsPhonetic($0.text) })
     }
 
     func testLearning() {
@@ -308,7 +308,7 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertEqual(sentence(["ㄋ*", "ㄏ*", "ㄕ*", "ㄐ*"]), "你好世界")
         XCTAssertEqual(sentence(["ㄨㄛ*", "ㄏ*", "ㄓㄜ*", "ㄧ*"]), "我會這樣")
         XCTAssertEqual(e.candidates(for: ["ㄋㄧ*"]).map { $0.text }, ["你", "你好", "你們", "妳"])
-        XCTAssertEqual(e.candidates(for: ["ㄅ*"]).first?.text, "ㄅ")
+        XCTAssertFalse(e.candidates(for: ["ㄅ*"]).contains { PhoneticText.containsPhonetic($0.text) })
     }
 
     func testSplitAbbreviation() {
@@ -571,7 +571,7 @@ final class FuzzyTests: XCTestCase {
 
     func testPhonetic() {
         let e = makeEngine()
-        XCTAssertEqual(e.candidates(for: ["ㄙˋ"]).first?.kind, .literal)
+        XCTAssertFalse(e.candidates(for: ["ㄙˋ"]).contains { PhoneticText.containsPhonetic($0.text) })
         e.fuzzy.phonetic = true
         XCTAssertEqual(e.candidates(for: ["ㄙˋ"]).first?.text, "是")
     }

@@ -70,6 +70,8 @@ final class ZhuyinEngine {
     /// 單獨一個音節（ㄨㄢ）拆開的詞，分數和最好的單字差多少以內才列出來（ㄋㄧ 的「難以」差太多就不列）
     static let loneSplitRange: Double = 1.5
     let userModel: UserPhraseModel
+    /// 選字可能在背景跑，和主執行緒的學習、送出共用同一把鎖。
+    private let queryLock = NSRecursiveLock()
 
     init(db: SQLiteDB, userModel: UserPhraseModel, column: String = "reading", sharedIndex: PhraseIndex? = nil) {
         // 建索引只發生在鍵盤打開時（或測試建立引擎時），不發生在每個按鍵。
@@ -317,27 +319,38 @@ final class ZhuyinEngine {
         return out
     }
 
-    /// 整串注音分數最高的斷法
-    func bestSegments(_ readings: [String]) -> [Scored] {
+    /// 整串注音分數最高的斷法。contextual 用前後文在同音詞裡挑；關掉就是只看詞頻的對照。
+    func bestSegments(_ readings: [String], contextual: Bool = true) -> [Scored] {
+        queryLock.lock()
+        defer { queryLock.unlock() }
         let readings = Self.settleSplits(readings)
         let n = readings.count
         guard n > 0 else { return [] }
         var best = [Double](repeating: -.infinity, count: n + 1)
         var errors = [Int](repeating: Int.max, count: n + 1)
         var back = [(start: Int, text: String, score: Double)](repeating: (0, "", 0), count: n + 1)
+        var tail = [String](repeating: "", count: n + 1)
         best[0] = 0
         errors[0] = 0
         for i in 1...n {
             for k in 1...min(Self.maxPhraseLength, i) {
                 let start = i - k
                 guard best[start] > -.infinity else { continue }
-                if let top = fuzzyPhrases(readings[start..<i]).first {
-                    let s = best[start] + top.score
-                    let count = errors[start] + top.corrections
-                    if count < errors[i] || (count == errors[i] && s > best[i]) {
-                        errors[i] = count
-                        best[i] = s
-                        back[i] = (start, top.text, top.score)
+                let pool = fuzzyPhrases(readings[start..<i]).filter { !PhoneticText.containsPhonetic($0.text) }
+                if let floor = pool.first?.corrections {
+                    let options = contextual
+                        ? pool.prefix(6).filter { $0.corrections == floor }
+                        : pool.prefix(1)
+                    for opt in options {
+                        let bonus = contextual ? index.contextBonus(tail: tail[start], phrase: opt.text) : 0
+                        let s = best[start] + opt.score + bonus
+                        let count = errors[start] + opt.corrections
+                        if count < errors[i] || (count == errors[i] && s > best[i]) {
+                            errors[i] = count
+                            best[i] = s
+                            back[i] = (start, opt.text, opt.score + bonus)
+                            tail[i] = String((tail[start] + opt.text).suffix(2))
+                        }
                     }
                 } else if k == 1 {
                     let s = best[start] + Self.unknownPenalty
@@ -345,7 +358,9 @@ final class ZhuyinEngine {
                     if count < errors[i] || (count == errors[i] && s > best[i]) {
                         errors[i] = count
                         best[i] = s
-                        back[i] = (start, Self.display(readings[start]), Self.unknownPenalty)
+                        // 查不到就留空，不要把注音或聲調送進文章。
+                        back[i] = (start, "", Self.unknownPenalty)
+                        tail[i] = tail[start]
                     }
                 }
             }
@@ -362,6 +377,8 @@ final class ZhuyinEngine {
 
     /// 候選字：第一個是整句，接著是預測的詞，再來是從開頭算起最長到最短的詞
     func candidates(for readings: [String], before context: String = "") -> [Candidate] {
+        queryLock.lock()
+        defer { queryLock.unlock() }
         guard !readings.isEmpty else { return [] }
         let readings = Self.settleSplits(readings)
         var out: [Candidate] = []
@@ -430,7 +447,7 @@ final class ZhuyinEngine {
             if extras.count == 3 { break }
         }
         out.insert(contentsOf: extras, at: min(1, out.count))
-        return out
+        return out.filter { !$0.text.isEmpty && !PhoneticText.containsPhonetic($0.text) }
     }
 
     private static func displayQuery(_ reading: String) -> String {
@@ -533,12 +550,16 @@ final class ZhuyinEngine {
 
     /// 聯想整段前文的後續詞，較長的吻合與常用詞優先，也包含已學會的片語。
     func associations(after text: String, limit: Int = 30) -> [String] {
+        queryLock.lock()
+        defer { queryLock.unlock() }
         guard limit > 0 else { return [] }
         return completions(after: text).prefix(limit).map { $0.text }
     }
 
     /// 使用者選了某個詞：之後這個詞會排更前面
     func learn(readings: [String], text: String) {
+        queryLock.lock()
+        defer { queryLock.unlock() }
         // 簡拼拆開選到的詞（ㄎㄞ*~ 選了「可愛」、單獨的 ㄨㄢ* 選了「晚安」）記成拆開的讀音（ㄎ*-ㄞ*）；
         // 字數對不上就是沒拆（選了「開」）
         func parts(_ r: String) -> [String]? {
@@ -561,6 +582,8 @@ final class ZhuyinEngine {
     }
 
     func resetLearning() {
+        queryLock.lock()
+        defer { queryLock.unlock() }
         userModel.reset()
         contextCache.removeAll()
         cache.removeAll()

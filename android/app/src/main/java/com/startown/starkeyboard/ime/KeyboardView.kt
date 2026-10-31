@@ -288,20 +288,20 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                // 打很快時，新的手指按下就先送出前一個還沒放開的字
+                val i = e.actionIndex
+                val key = keyAt(e.getX(i), e.getY(i)) ?: return true
+                // 先亮起這顆鍵，再送出上一拍還沒放開的字。選字不能擋住按鍵變色。
+                setPressed(key, true)
+                val track = Track(key, key.spec.action, e.getX(i))
+                if (glideEnabled && key.isLetter) track.points.add(Pt(e.getX(i), e.getY(i)))
+                tracks[e.getPointerId(i)] = track
                 for (t in tracks.values) {
-                    if (!t.fired && !t.cursorMode && !t.gliding && (t.action.isCharacter || t.action == KeyAction.Space)) {
+                    if (t !== track && !t.fired && !t.cursorMode && !t.gliding && (t.action.isCharacter || t.action == KeyAction.Space)) {
                         t.fired = true
                         setPressed(t.key, false)
                         fire(t.key)
                     }
                 }
-                val i = e.actionIndex
-                val key = keyAt(e.getX(i), e.getY(i)) ?: return true
-                val track = Track(key, key.spec.action, e.getX(i))
-                if (glideEnabled && key.isLetter) track.points.add(Pt(e.getX(i), e.getY(i)))
-                tracks[e.getPointerId(i)] = track
-                setPressed(key, true)
                 when (key.spec.action) {
                     KeyAction.Backspace -> {
                         track.fired = true

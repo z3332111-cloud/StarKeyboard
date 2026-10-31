@@ -6,6 +6,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
     var onTransfer: (() -> Void)?
     var onAddCurrent: (() -> Void)?
     var onEditCategory: ((String?) -> Void)?
+    var onEdit: ((ClipItem) -> Void)?
     var onError: ((String) -> Void)?
     var onBack: (() -> Void)?
     var onBackspace: (() -> Void)?
@@ -199,10 +200,16 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         cell.textLabel?.font = .systemFont(ofSize: 16)
         cell.textLabel?.textColor = t.keyText
 
+        let edit = UIButton(type: .system)
+        edit.setImage(UIImage(systemName: "pencil"), for: .normal)
+        edit.tintColor = t.accent
+        edit.accessibilityLabel = "編輯"
+        edit.frame = CGRect(x: 0, y: 0, width: 36, height: 36)
+        edit.addAction(UIAction { [weak self] _ in self?.onEdit?(item) }, for: .touchUpInside)
         let pin = UIButton(type: .system)
         pin.setImage(UIImage(systemName: item.pinned ? "pin.fill" : "pin"), for: .normal)
         pin.tintColor = item.pinned ? t.accent : t.keyText.withAlphaComponent(0.35)
-        pin.frame = CGRect(x: 0, y: 0, width: 36, height: 36)
+        pin.frame = CGRect(x: 36, y: 0, width: 36, height: 36)
         let id = item.id
         pin.addAction(UIAction { [weak self] _ in
             self?.store.togglePin(id)
@@ -212,17 +219,18 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         folder.setImage(UIImage(systemName: item.category == nil ? "folder" : "folder.fill"), for: .normal)
         folder.tintColor = t.accent
         folder.accessibilityLabel = "移到分類：" + (item.category ?? "未分類")
-        folder.frame = CGRect(x: 36, y: 0, width: 36, height: 36)
+        folder.frame = CGRect(x: 72, y: 0, width: 36, height: 36)
         folder.showsMenuAsPrimaryAction = true
         folder.menu = UIMenu(title: "移到分類", children: ([nil] + store.categories.map { Optional($0) }).map { name in
             UIAction(title: name ?? "未分類", state: item.category == name ? .on : .off) { [weak self] _ in
                 self?.perform { try self?.store.assign(id, to: name) }
             }
         } + [UIAction(title: "＋新增分類") { [weak self] _ in self?.onEditCategory?(nil) }])
-        let actions = UIView(frame: CGRect(x: 0, y: 0, width: 72, height: 36))
+        let actions = UIView(frame: CGRect(x: 0, y: 0, width: 108, height: 36))
+        actions.addSubview(edit)
         actions.addSubview(pin)
         if !store.categories.isEmpty { actions.addSubview(folder) }
-        else { actions.frame.size.width = 36 }
+        else { actions.frame.size.width = 72 }
         cell.accessoryView = actions
         return cell
     }
