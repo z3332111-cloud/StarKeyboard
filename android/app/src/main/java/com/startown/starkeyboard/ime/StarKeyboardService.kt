@@ -36,6 +36,7 @@ import com.startown.starkeyboard.core.Bopomofo
 import com.startown.starkeyboard.core.BopomofoKind
 import com.startown.starkeyboard.core.ChineseConverter
 import com.startown.starkeyboard.core.Candidate
+import com.startown.starkeyboard.core.ClipItem
 import com.startown.starkeyboard.core.ClipboardStore
 import com.startown.starkeyboard.core.EmoticonStore
 import com.startown.starkeyboard.core.FancyText
@@ -54,7 +55,7 @@ import java.util.Locale
 
 class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheckerSessionListener {
     private enum class SuggestionSource { ASSOCIATION, HANDWRITING, SPELLING, GLIDE }
-    private enum class EditorPurpose { EMOTICON, SYMBOL, TRANSLATE, FANCY, SHORTCUT_PHRASE, SHORTCUT_CODE, CLIPBOARD_CATEGORY, CLIPBOARD_ITEM }
+    private enum class EditorPurpose { EMOTICON, SYMBOL, CLIPBOARD_SEARCH, TRANSLATE, FANCY, SHORTCUT_PHRASE, SHORTCUT_CODE, CLIPBOARD_CATEGORY, CLIPBOARD_ITEM }
     private var renamingCategory: String? = null
     private var editingClipId: String? = null
     private lateinit var folderNameBox: FolderNameBox
@@ -68,6 +69,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         EditorPurpose.SHORTCUT_CODE -> "縮寫："
         EditorPurpose.CLIPBOARD_CATEGORY -> "分類名稱："
         EditorPurpose.CLIPBOARD_ITEM -> "編輯剪貼簿："
+        EditorPurpose.CLIPBOARD_SEARCH -> "搜尋剪貼簿："
     }
 
     private fun editorConfirmTitle(p: EditorPurpose) = when (p) {
@@ -112,6 +114,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private var editorCursor: Int? = null
     // 打注音打到一半，游標在注音中間時是第幾個鍵的前面；null = 在最後面（平常的打法）
     private var zyCursor: Int? = null
+    // 搜尋剪貼簿找到的（候選列的順序）
+    private var clipResults: List<ClipItem> = emptyList()
     private var editorPurpose = EditorPurpose.EMOTICON
     private var editorReturnPanel: PanelKind? = null
     /** 編輯框打完後的結果（翻譯、花式文字）：點一個送出，最後一個「✏️ 修改」回去改 */
@@ -223,6 +227,15 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             endEditor()
             if (!wasClip) openPanel(PanelKind.CLIPBOARD)
         })
+        // 改剪貼簿：點文字就把游標移過去（按住空白鍵滑也可以）
+        folderNameBox.onTapIndex = { i ->
+            val t = editorText
+            if (t != null && editorPurpose == EditorPurpose.CLIPBOARD_ITEM) {
+                if (isComposing) commitAll()
+                editorCursor = i.coerceIn(0, (editorText ?: t).length)
+                refreshTopBar()
+            }
+        }
         folderNameBox.visibility = View.GONE
         column.addView(folderNameBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (84 * dp).toInt()))
         column.addView(topBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (settings.candidateBarHeight * dp).toInt()))
@@ -310,7 +323,10 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             when (trailing) {
                 Trailing.EXPAND -> toggleCandidatePanel()
                 Trailing.CLOSE -> {
-                    if (editorResult != null) endEditor() else {
+                    // 搜尋剪貼簿：✕ 回到剪貼簿
+                    if (editorResult == null && editorText != null && editorPurpose == EditorPurpose.CLIPBOARD_SEARCH) {
+                        endEditor(); openPanel(PanelKind.CLIPBOARD)
+                    } else if (editorResult != null) endEditor() else {
                         if (suggestionSource == SuggestionSource.HANDWRITING) handwriting?.clear()
                         clearSuggestions()
                     }
@@ -319,7 +335,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         }
         topBar.onEditor = { confirm -> if (confirm) confirmEditor() else endEditor() }
         topBar.onEditorExtra = { editorExtraTapped() }
-        topBar.onEditorSource = {
+        topBar.onEditorSource = onEditorSource@{
+            // 新增表符、符號：把剪貼簿的文字貼進編輯框
+            if (editorPurpose == EditorPurpose.EMOTICON || editorPurpose == EditorPurpose.SYMBOL) {
+                pasteIntoEditor()
+                return@onEditorSource
+            }
             // 原文語言：自動 → 英文 → 日文 → … 輪流換
             val codes = listOf("auto") + Translator.targets.map { it.code }
             val i = maxOf(0, codes.indexOf(settings.translateSource))
@@ -867,6 +888,14 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         }
 
     private fun selectCandidate(i: Int, learn: Boolean) {
+        // 搜尋剪貼簿：點找到的那一筆就貼上
+        if (editorText != null && editorResult == null && editorPurpose == EditorPurpose.CLIPBOARD_SEARCH && !isComposing) {
+            val item = clipResults.getOrNull(i) ?: return
+            endEditor()
+            currentInputConnection?.commitText(item.text, 1)
+            feedback()
+            return
+        }
         editorResult?.let { r ->
             val chosen = r.items.getOrNull(i)
             editorResult = null
@@ -1023,7 +1052,13 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val namingFolder = ed != null && editorPurpose == EditorPurpose.CLIPBOARD_CATEGORY
         // 改剪貼簿：用和新增資料夾一樣的小對話框
         val editingClip = ed != null && tr == null && editorPurpose == EditorPurpose.CLIPBOARD_ITEM
-        folderNameBox.visibility = if (namingFolder || editingClip) View.VISIBLE else View.GONE
+        // 搜尋剪貼簿：小框打關鍵字，候選列列出找到的
+        val searchingClip = ed != null && tr == null && editorPurpose == EditorPurpose.CLIPBOARD_SEARCH
+        folderNameBox.visibility = if (namingFolder || editingClip || searchingClip) View.VISIBLE else View.GONE
+        if (searchingClip) {
+            clipResults = searchClipboard(ed ?: "")
+            folderNameBox.updateSearch(ed ?: "", if (isComposing) compositionText else "", style)
+        }
         (toastView.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
             val margin = ((if (namingFolder) 138 else if (editingClip) 190 else 54) * dp).toInt()
             if (params.topMargin != margin) { params.topMargin = margin; toastView.layoutParams = params }
@@ -1037,12 +1072,17 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 topBar.showCandidates(if (ed != null) prefix + compositionText else "", candidates.map { it.text }, Trailing.EXPAND)
             }
             namingFolder && suggestions.isEmpty() -> topBar.showCandidates("用下方鍵盤輸入名稱，再按建立", emptyList(), Trailing.EXPAND)
+            searchingClip && !isComposing -> {
+                val q = ed ?: ""
+                val title = if (q.isEmpty()) "打關鍵字就會開始找（最近的在前面）" else if (clipResults.isEmpty()) "找不到，換個字試試" else "找到 ${clipResults.size} 筆，點一下貼上"
+                topBar.showCandidates(title, clipResults.map { clipPreview(it.text) }, Trailing.CLOSE)
+            }
             editingClip && suggestions.isEmpty() -> topBar.showCandidates("用下方鍵盤修改，改好按上面的「儲存」", emptyList(), Trailing.EXPAND)
             ed != null && (suggestions.isEmpty() || suggestionSource == SuggestionSource.ASSOCIATION) -> {
                 val pending = if (hangulComposing) hangul.composing else ""
                 when (editorPurpose) {
-                    EditorPurpose.EMOTICON -> topBar.showEditor("新增表符：", ed + pending, "(•ᴗ•)", "儲存")
-                    EditorPurpose.SYMBOL -> topBar.showEditor("新增符號：", ed + pending, "※", "儲存")
+                    EditorPurpose.EMOTICON -> topBar.showEditor("新增表符：", ed + pending, "(•ᴗ•)", "儲存", "📋 貼上")
+                    EditorPurpose.SYMBOL -> topBar.showEditor("新增符號：", ed + pending, "※", "儲存", "📋 貼上")
                     EditorPurpose.TRANSLATE -> {
                         val name = Translator.targets.firstOrNull { it.code == settings.translateTarget }?.name ?: "英文"
                         val from = Translator.targets.firstOrNull { it.code == settings.translateSource }?.name ?: "自動"
@@ -1218,6 +1258,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 ClipboardPanel(this, clipStore, style,
                     onInsert = { feedback(); output(it) },
                     onAddCurrent = { addCurrentClipboard() },
+                    onSearch = { beginEditor(EditorPurpose.CLIPBOARD_SEARCH) },
                     onEdit = { item ->
                         editingClipId = item.id
                         beginEditor(EditorPurpose.CLIPBOARD_ITEM)
@@ -1382,6 +1423,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             EditorPurpose.SHORTCUT_CODE -> "再打縮寫"
             EditorPurpose.CLIPBOARD_CATEGORY -> "輸入名稱後按建立；取消不會新增資料夾"
             EditorPurpose.CLIPBOARD_ITEM -> "改完按儲存。按取消會留下原本的文字"
+            EditorPurpose.CLIPBOARD_SEARCH -> "打關鍵字，找到的會列在上面"
         })
     }
 
@@ -1412,8 +1454,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         }
         if (editorPurpose == EditorPurpose.EMOTICON) {
             if (text.isNotEmpty()) {
-                emoStore.addCustom(text)
-                toast("已加入我的表符")
+                // 貼了好幾行：每一行各自變成一個表符
+                val n = addEmoticonLines(text)
+                toast(if (n > 1) "已加入 $n 個表符" else "已加入我的表符")
             }
             val back = editorReturnPanel
             endEditor()
@@ -1428,6 +1471,11 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                     endEditor(); openPanel(PanelKind.CLIPBOARD)
                     (panelView as? ClipboardPanel)?.selectCategory(text)
                 } catch (e: Exception) { toast(e.message ?: "無法儲存分類") }
+                return
+            }
+            EditorPurpose.CLIPBOARD_SEARCH -> {
+                endEditor()
+                openPanel(PanelKind.CLIPBOARD)
                 return
             }
             EditorPurpose.CLIPBOARD_ITEM -> {
@@ -1524,9 +1572,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                     toast("已加入 $n 個符號到「我的」")
                     return
                 }
-                emoStore.addCustom(text)
+                val n = addEmoticonLines(text)
                 (panelView as? EmojiPanel)?.reload()
-                toast("已加入我的表符")
+                toast(if (n > 1) "已加入 $n 個表符（一行一個）" else "已加入我的表符")
             }
             EmojiPanel.AddOption.PICK_IMAGE -> {
                 startActivity(Intent(this, MainActivity::class.java)
@@ -1537,6 +1585,37 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     /** 貼圖：App 支援的話直接送出圖片，不支援就複製到剪貼簿 */
+    /** 找剪貼簿：每個關鍵字都要出現（不分大小寫），最多 40 筆，最近的在前面 */
+    private fun searchClipboard(query: String): List<ClipItem> {
+        val words = query.lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val all = clipStore.ordered
+        if (words.isEmpty()) return all.take(40)
+        return all.asSequence().filter { item -> val t = item.text.lowercase(); words.all { t.contains(it) } }.take(40).toList()
+    }
+
+    /** 候選列放不下整段：只顯示第一行前 16 個字 */
+    private fun clipPreview(text: String): String {
+        val line = text.lineSequence().firstOrNull() ?: text
+        return if (line.length > 16) line.take(16) + "…" else line
+    }
+
+    /** 一行一個表符加進「我的」，回傳加了幾個 */
+    private fun addEmoticonLines(text: String): Int {
+        val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        for (line in lines.reversed()) emoStore.addCustom(line)
+        return lines.size
+    }
+
+    /** 新增表符、符號的編輯框：把剪貼簿的文字貼在游標的位置 */
+    private fun pasteIntoEditor() {
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val text = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()
+        if (text.isNullOrEmpty()) { toast("剪貼簿裡沒有文字，先到別的地方「複製」"); return }
+        commitAll()
+        output(text)
+        refreshTopBar()
+    }
+
     private fun sendSticker(name: String) {
         val file = emoStore.stickerFile(name) ?: return
         val uri = runCatching { FileProvider.getUriForFile(this, "$packageName.files", file) }.getOrNull() ?: return

@@ -14,7 +14,7 @@ final class KeyboardViewController: UIInputViewController {
     private enum SuggestionSource { case association, handwriting, spelling, glide }
 
     /// 上面那條編輯框的用途：新增表符，或是先打中文再翻譯
-    private enum EditorPurpose { case emoticon, symbol, translate, fancy, shortcutPhrase, shortcutCode, clipboardCategory, clipboardItem }
+    private enum EditorPurpose { case emoticon, symbol, clipboardSearch, translate, fancy, shortcutPhrase, shortcutCode, clipboardCategory, clipboardItem }
     private var renamingCategory: String?
     private var editingClipID: UUID?
     /// 編輯框裡的游標位置（第幾個字後面）；nil = 永遠在最後面
@@ -23,7 +23,10 @@ final class KeyboardViewController: UIInputViewController {
     private var namingFolder: Bool { editorText != nil && editorPurpose == .clipboardCategory }
     /// 改剪貼簿：用和新增資料夾一樣的小對話框
     private var editingClipBox: Bool { editorText != nil && editorPurpose == .clipboardItem && editorResult == nil }
-    private var folderBoxHeight: CGFloat { namingFolder ? 84 : (editingClipBox ? FolderNameBox.clipHeight : 0) }
+    /// 搜尋剪貼簿：上面一個小框打關鍵字，候選列列出找到的
+    private var searchingClip: Bool { editorText != nil && editorPurpose == .clipboardSearch && editorResult == nil }
+    private var clipResults: [ClipItem] = []
+    private var folderBoxHeight: CGFloat { (namingFolder || searchingClip) ? 84 : (editingClipBox ? FolderNameBox.clipHeight : 0) }
 
     /// 編輯框顯示的字：有游標時只顯示游標附近，中間放 ▏ 表示游標
     private func editorDisplay(_ text: String) -> String {
@@ -45,6 +48,7 @@ final class KeyboardViewController: UIInputViewController {
         case .shortcutCode: return "縮寫："
         case .clipboardCategory: return "分類名稱："
         case .clipboardItem: return "編輯剪貼簿："
+        case .clipboardSearch: return "搜尋剪貼簿："
         }
     }
 
@@ -187,6 +191,13 @@ final class KeyboardViewController: UIInputViewController {
             let wasClip = self.editorPurpose == .clipboardItem
             self.endEditor()
             if !wasClip { self.openPanel(.clipboard) }
+        }
+        // 改剪貼簿：點文字就把游標移過去（按住空白鍵滑也可以）
+        folderNameBox.onTapIndex = { [weak self] i in
+            guard let self = self, self.editorPurpose == .clipboardItem, let t = self.editorText else { return }
+            if self.isComposing { self.commitAll() }
+            self.editorCursor = min(i, self.editorText?.count ?? t.count)
+            self.refreshTopBar()
         }
         view.addSubview(folderNameBox)
         view.addSubview(contentView)
@@ -373,6 +384,12 @@ final class KeyboardViewController: UIInputViewController {
                     self.endEditor()
                     return
                 }
+                // 搜尋剪貼簿：✕ 回到剪貼簿
+                if self.searchingClip {
+                    self.endEditor()
+                    self.openPanel(.clipboard)
+                    return
+                }
                 self.clearSuggestions()
                 if self.suggestionSource == .handwriting { self.handwritingView?.clear() }
             }
@@ -382,8 +399,13 @@ final class KeyboardViewController: UIInputViewController {
         }
         topBar.onEditorExtra = { [weak self] in self?.editorExtraTapped() }
         topBar.onEditorSource = { [weak self] in
-            // 原文語言：自動 → 英文 → 日文 → … 輪流換
             guard let self = self else { return }
+            // 新增表符、符號：把剪貼簿的文字貼進編輯框
+            if self.editorPurpose == .emoticon || self.editorPurpose == .symbol {
+                self.pasteIntoEditor()
+                return
+            }
+            // 原文語言：自動 → 英文 → 日文 → … 輪流換
             let codes = ["auto"] + Translator.targets.map { $0.code }
             let i = codes.firstIndex(of: self.settings.translateSource) ?? 0
             self.settings.translateSource = codes[(i + 1) % codes.count]
@@ -886,6 +908,15 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func selectCandidate(at i: Int, learn: Bool) {
+        // 搜尋剪貼簿：點找到的那一筆就貼上
+        if searchingClip && !isComposing {
+            guard i < clipResults.count else { return }
+            let text = clipResults[i].text
+            endEditor()
+            textDocumentProxy.insertText(text)
+            feedback()
+            return
+        }
         if let r = editorResult {
             editorResult = nil
             if i < r.items.count {
@@ -1081,7 +1112,11 @@ final class KeyboardViewController: UIInputViewController {
 
     private func refreshTopBar() {
         guard topBar != nil else { return }
-        folderNameBox.isHidden = !(namingFolder || editingClipBox)
+        folderNameBox.isHidden = !(namingFolder || editingClipBox || searchingClip)
+        if searchingClip {
+            clipResults = searchClipboard(editorText ?? "")
+            folderNameBox.updateSearch(text: editorText ?? "", composing: isComposing ? compositionText : "", style: style)
+        }
         if namingFolder {
             folderNameBox.update(name: editorText ?? "", renaming: renamingCategory != nil, style: style)
         } else if editingClipBox {
@@ -1098,14 +1133,18 @@ final class KeyboardViewController: UIInputViewController {
                                     trailing: .expand))
         } else if namingFolder && suggestions.isEmpty {
             topBar.show(.candidates(composition: "用下方鍵盤輸入名稱，再按建立", items: [], trailing: .expand))
+        } else if searchingClip {
+            let q = editorText ?? ""
+            let title = q.isEmpty ? "打關鍵字就會開始找（最近的在前面）" : (clipResults.isEmpty ? "找不到，換個字試試" : "找到 " + String(clipResults.count) + " 筆，點一下貼上")
+            topBar.show(.candidates(composition: title, items: clipResults.map { clipPreview($0.text) }, trailing: .close))
         } else if editingClipBox && suggestions.isEmpty {
             topBar.show(.candidates(composition: "用下方鍵盤修改，改好按上面的「儲存」", items: [], trailing: .expand))
         } else if let text = editorText, suggestions.isEmpty || suggestionSource == .association {
             switch editorPurpose {
             case .emoticon:
-                topBar.show(.editor(prompt: "新增表符：", text: text, extra: "(•ᴗ•)", confirm: "儲存"))
+                topBar.show(.editor(prompt: "新增表符：", text: text, extra: "(•ᴗ•)", confirm: "儲存", source: "📋 貼上"))
             case .symbol:
-                topBar.show(.editor(prompt: "新增符號：", text: text, extra: "※", confirm: "儲存"))
+                topBar.show(.editor(prompt: "新增符號：", text: text, extra: "※", confirm: "儲存", source: "📋 貼上"))
             case .translate:
                 let name = Translator.targets.first { $0.code == settings.translateTarget }?.name ?? "英文"
                 let from = Translator.targets.first { $0.code == settings.translateSource }?.name ?? "自動"
@@ -1241,6 +1280,7 @@ final class KeyboardViewController: UIInputViewController {
                 self.refreshTopBar()
             }
             p.onAddCurrent = { [weak self] in self?.addCurrentClipboard() }
+            p.onSearch = { [weak self] in self?.beginEditor(.clipboardSearch) }
             p.onBack = { [weak self] in self?.closePanel() }
             p.onBackspace = { [weak self] in self?.deleteOutput() }
             v = p
@@ -1358,6 +1398,7 @@ final class KeyboardViewController: UIInputViewController {
         case .shortcutCode: toast("再打縮寫")
         case .clipboardCategory: break
         case .clipboardItem: toast("改完按儲存。按取消會留下原本的文字")
+        case .clipboardSearch: break
         }
     }
 
@@ -1389,6 +1430,9 @@ final class KeyboardViewController: UIInputViewController {
                 endEditor(); openPanel(.clipboard)
                 (panelView as? ClipboardPanelView)?.selectCategory(trimmed)
             } catch { toast(error.localizedDescription) }
+        case .clipboardSearch:
+            endEditor()
+            openPanel(.clipboard)
         case .clipboardItem:
             if let id = editingClipID, !trimmed.isEmpty {
                 clipStore.updateText(id, text)
@@ -1396,8 +1440,9 @@ final class KeyboardViewController: UIInputViewController {
             endEditor()
         case .emoticon:
             if !trimmed.isEmpty {
-                emoStore.addCustom(trimmed)
-                toast("已加入我的表符")
+                // 貼了好幾行：每一行各自變成一個表符
+                let n = addEmoticonLines(text)
+                toast(n > 1 ? "已加入 \(n) 個表符" : "已加入我的表符")
             }
             let back = editorReturnPanel
             endEditor()
@@ -1501,9 +1546,9 @@ final class KeyboardViewController: UIInputViewController {
                 toast("已加入 \(n) 個符號到「我的」")
                 return
             }
-            emoStore.addCustom(s)
+            let n = addEmoticonLines(s)
             (panelView as? EmojiPanelView)?.reload()
-            toast("已加入我的表符")
+            toast(n > 1 ? "已加入 \(n) 個表符（一行一個）" : "已加入我的表符")
         case .clipboardImage:
             guard hasFullAccess else {
                 toast("要先開啟「允許完整取用」")
@@ -1517,6 +1562,53 @@ final class KeyboardViewController: UIInputViewController {
             (panelView as? EmojiPanelView)?.reload()
             toast("已做成貼圖，點一下就能複製")
         }
+    }
+
+    /// 找剪貼簿：每個關鍵字都要出現（不分大小寫），最多 40 筆，最近的在前面
+    private func searchClipboard(_ query: String) -> [ClipItem] {
+        let words = query.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        let all = clipStore.ordered
+        guard !words.isEmpty else { return Array(all.prefix(40)) }
+        var out: [ClipItem] = []
+        for item in all {
+            let t = item.text.lowercased()
+            if words.allSatisfy({ t.contains($0) }) {
+                out.append(item)
+                if out.count >= 40 { break }
+            }
+        }
+        return out
+    }
+
+    /// 候選列放不下整段：只顯示第一行前 16 個字
+    private func clipPreview(_ text: String) -> String {
+        let line = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? text
+        return line.count > 16 ? String(line.prefix(16)) + "…" : line
+    }
+
+    /// 一行一個表符加進「我的」，回傳加了幾個
+    @discardableResult
+    private func addEmoticonLines(_ text: String) -> Int {
+        let lines = text.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        for line in lines.reversed() { emoStore.addCustom(line) }
+        return lines.count
+    }
+
+    /// 新增表符、符號的編輯框：把剪貼簿的文字貼在游標的位置
+    private func pasteIntoEditor() {
+        guard hasFullAccess else {
+            toast("要先開啟「允許完整取用」才能貼上")
+            return
+        }
+        guard let s = UIPasteboard.general.string, !s.isEmpty else {
+            toast("剪貼簿裡沒有文字，先到別的地方「拷貝」")
+            return
+        }
+        commitAll()
+        output(s)
+        refreshTopBar()
     }
 
     private func copySticker(_ image: UIImage) {

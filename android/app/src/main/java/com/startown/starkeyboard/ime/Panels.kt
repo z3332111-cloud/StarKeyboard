@@ -194,6 +194,7 @@ class ClipboardPanel(
     private val onTransfer: () -> Unit,
     private val onEdit: (ClipItem) -> Unit,
     private val onEditCategory: (String?) -> Unit,
+    private val onSearch: () -> Unit = {},
     onBack: () -> Unit,
     onBackspace: () -> Unit,
 ) : LinearLayout(context) {
@@ -211,7 +212,8 @@ class ClipboardPanel(
         orientation = VERTICAL
         val t = style.theme
         val header = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        header.addView(TextView(context).apply { text = "剪貼簿"; textSize = 15f; setTextColor(t.keyText); paint.isFakeBoldText = true },
+        // 左上角原本只寫「剪貼簿」，改成搜尋按鈕
+        header.addView(Tap(context, "🔍 搜尋", 15f, t.keyText, true) { onSearch() }.apply { gravity = Gravity.CENTER_VERTICAL or Gravity.START; contentDescription = "搜尋剪貼簿" },
             LayoutParams(0, LayoutParams.MATCH_PARENT, 1f).apply { leftMargin = dpi(12f) })
         header.addView(Tap(context, "＋ 加入目前複製的", 13f, if (t.dark) t.accent else t.specialText, true) { onAddCurrent() }.apply {
             setPadding(dpi(8f), 0, dpi(8f), 0)

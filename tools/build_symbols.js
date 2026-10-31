@@ -28,7 +28,8 @@ for (const raw of src.split(/\r?\n/)) {
   }
   if (!cat) throw new Error('沒有分類就出現內容：' + line);
   const items = group === groups.kaomoji ? [line] : line.split(/\s+/);
-  for (const it of items) if (!cat.items.includes(it)) cat.items.push(it);
+  // 同一組裡重複的只留第一次出現的（顏文字很容易在好幾類都放一次）
+  for (const it of items) if (!group.some(c => c.items.includes(it))) cat.items.push(it);
 }
 for (const [name, cats] of Object.entries(groups)) {
   if (!cats.length) throw new Error('沒有 ' + name);

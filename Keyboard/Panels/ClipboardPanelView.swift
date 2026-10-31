@@ -5,6 +5,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
     var onInsert: ((String) -> Void)?
     var onTransfer: (() -> Void)?
     var onAddCurrent: (() -> Void)?
+    var onSearch: (() -> Void)?
     var onEditCategory: ((String?) -> Void)?
     var onEdit: ((ClipItem) -> Void)?
     var onError: ((String) -> Void)?
@@ -27,6 +28,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
     private let transferButton = UIButton(type: .system)
     private let addButton = UIButton(type: .system)
     private let clearButton = UIButton(type: .system)
+    private let searchButton = UIButton(type: .system)
     private let emptyLabel = UILabel()
     private let bar: PanelBottomBar
     private var selected = 0
@@ -44,6 +46,14 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         titleLabel.text = "剪貼簿"
         titleLabel.font = .rounded(15, .bold)
         header.addSubview(titleLabel)
+        // 左上角原本只寫「剪貼簿」，改成搜尋按鈕
+        titleLabel.isHidden = true
+        searchButton.setTitle("🔍 搜尋", for: .normal)
+        searchButton.titleLabel?.font = .rounded(15, .bold)
+        searchButton.contentHorizontalAlignment = .left
+        searchButton.accessibilityLabel = "搜尋剪貼簿"
+        searchButton.addAction(UIAction { [weak self] _ in self?.onSearch?() }, for: .touchUpInside)
+        header.addSubview(searchButton)
         addButton.setTitle("＋ 加入目前複製的", for: .normal)
         addButton.titleLabel?.font = .rounded(14, .semibold)
         addButton.addAction(UIAction { [weak self] _ in self?.onAddCurrent?() }, for: .touchUpInside)
@@ -127,6 +137,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         let headerH: CGFloat = 68, barH: CGFloat = 40
         header.frame = CGRect(x: 0, y: 0, width: w, height: headerH)
         titleLabel.frame = CGRect(x: 12, y: 0, width: 80, height: 34)
+        searchButton.frame = CGRect(x: 12, y: 0, width: max(70, w - 96 - 150 - 16), height: 34)
         clearButton.frame = CGRect(x: w - 96, y: 0, width: 88, height: 34)
         addButton.frame = CGRect(x: w - 96 - 150, y: 0, width: 150, height: 34)
         transferButton.frame = CGRect(x: 12, y: 34, width: w / 2 - 12, height: 34)
@@ -142,6 +153,7 @@ final class ClipboardPanelView: UIView, UITableViewDataSource, UITableViewDelega
         categoryButton.tintColor = t.isDark ? t.accent : t.specialText
         transferButton.tintColor = t.isDark ? t.accent : t.specialText
         addButton.tintColor = t.isDark ? t.accent : t.specialText
+        searchButton.tintColor = t.keyText
         clearButton.tintColor = t.keyText.withAlphaComponent(0.7)
         emptyLabel.textColor = t.keyText.withAlphaComponent(0.7)
         table.separatorColor = t.shadow.withAlphaComponent(0.5)
