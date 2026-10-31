@@ -239,7 +239,8 @@
 
   <!-- ===================== iPhone ===================== -->
   <div class="panel" id="panel-iphone" role="tabpanel" aria-labelledby="tab-iphone">
-    <p class="tip">第一次用電腦與傳輸線安裝，之後可設定 <a href="#wifi-refresh">Wi-Fi 自動續簽</a>，不用每週插線。免費 Apple ID 的簽章有效 7 天；續簽時電腦須開著、Daemon 有執行，手機與電腦能在同一個區域網路互相找到。</p>
+    <p class="tip">電腦只需要用一次。裝好之後，更新都在 iPhone 上做：下載新的 <span class="path">.ipa</span> → 打開 LocalDevVPN → SideStore 左上角 <b>＋</b> → 選檔案 → 蓋過舊版。不用每 7 天再插線。SideStore 會自己幫免費 Apple ID 的 7 天開發者簽章續期，也可以在背景續期。</p>
+    <p class="note">免費帳號最多同時 3 個側載 App（SideStore 自己算 1 個），每 7 天最多 10 個 App ID。SideStore 加上糯糯鍵盤用掉 2 個名額。只裝這個鍵盤<b>不需要</b> Sideloadly、LiveContainer、iCloud，也不用另外的 USB 無線網卡。如果已經裝了 LiveContainer，建議移除，免得佔掉第三個名額。</p>
 
     <section>
       <h2>先準備</h2>
@@ -253,18 +254,22 @@
     </section>
 
     <section>
-      <h2>下載安裝檔（在電腦上）</h2>
-      <p class="note"><b>iPhone／Android v0.4.0：</b>打幾個音就先列幾個字的詞，選過一次下次排第一；程式符號（<span class="path">* _ ~ | #</span> 等）一律半形，方便 Discord。用原本的 Apple ID 覆蓋更新，請不要先刪掉舊 App。Android 仍須先移除舊版再安裝。</p>
+      <h2>下載糯糯鍵盤</h2>
+      <p class="note"><b>v0.4.0：</b>打幾個音就先列幾個字的詞，選過一次下次排第一；程式符號（<span class="path">* _ ~ | #</span> 等）一律半形，方便 Discord。用原本的 Apple ID 蓋過安裝，請不要先刪掉舊的糯糯鍵盤。</p>
       <div class="download">
-        <a id="download-iphone" class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/build-43/StarKeyboard.ipa">下載 iPhone 安裝檔</a>
-        <span id="version-iphone" class="note" aria-live="polite">v0.3.2（備用下載）</span>
-        <a id="release-iphone" href="https://github.com/z3332111-cloud/StarKeyboard/releases/tag/build-43">更新內容</a>
+        <a id="download-iphone" class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/build-53/StarKeyboard.ipa">下載 iPhone 安裝檔</a>
+        <span id="version-iphone" class="note" aria-live="polite">v0.4.0（備用下載）</span>
+        <a id="release-iphone" href="https://github.com/z3332111-cloud/StarKeyboard/releases/tag/build-53">更新內容</a>
       </div>
-      <p class="note">安裝檔會直接下載到電腦。這裡只提供已完成打包的版本；新版完成後重新開啟此頁即可；若版本查詢暫時不可用，保留已驗證的備用下載。舊版 App 名稱可能仍顯示「星星鍵盤」。</p>
+      <p class="note">第一次裝 SideStore 時，電腦只負責安裝 SideStore。糯糯鍵盤的 <span class="path">.ipa</span> 請用 <b>iPhone</b> 打開這一頁下載，再交給 SideStore。舊版桌面名稱可能仍顯示「星星鍵盤」。</p>
     </section>
 
     <section>
-      <h2>用電腦裝進 iPhone</h2>
+      <h2>兩條路</h2>
+      <ul>
+        <li><b>Windows：</b>iTunes 或 Apple Devices → iloader → SideStore → LocalDevVPN</li>
+        <li><b>Mac：</b>iloader → SideStore → LocalDevVPN。macOS 10.15 Catalina 以後，信任和辨識 iPhone 在「訪達」；Mojave 和更早的系統才用 iTunes。</li>
+      </ul>
       <div class="tabs" role="tablist" aria-label="電腦種類">
         <button class="tab" role="tab" id="tab-windows" aria-controls="panel-windows" aria-selected="true">Windows</button>
         <button class="tab" role="tab" id="tab-mac" aria-controls="panel-mac" aria-selected="false">Mac</button>
@@ -272,47 +277,47 @@
 
       <div id="panel-windows" role="tabpanel" aria-labelledby="tab-windows">
         <ol class="steps">
-          <li><div>安裝 <b>iTunes</b>：要從 Apple 官網下載的 Windows 版，<b>不要</b>用 Microsoft Store 的版本。<br>
-            <a href="https://www.apple.com/itunes/download/win64">apple.com/itunes/download/win64</a></div></li>
-          <li><div>安裝 <b>Sideloadly</b>：到 <a href="https://sideloadly.io">sideloadly.io</a> 下載 Windows 版並安裝。<br>
-            <span class="note">如果 Sideloadly 說還缺 iCloud，照它畫面上的連結裝非 Store 版的 iCloud。</span></div></li>
-          <li><div>用傳輸線把 iPhone 接到電腦，<b>解鎖手機</b>。手機跳出「要信任這部電腦嗎？」時按<b>信任</b>，再輸入手機密碼。</div></li>
-          <li><div>打開 Sideloadly：
+          <li><div>在電腦安裝讓 Windows 認得 iPhone 的軟體，兩種擇一：
             <ul>
-              <li>把 <span class="path">StarKeyboard.ipa</span> 拖到左上角的方框（或按方框選檔案）</li>
-              <li>「iDevice」選你的 iPhone</li>
-              <li>「Apple account」填你的 Apple ID</li>
-              <li>啟用 <b>自動續簽（Automatic Refresh）</b>，讓這個 App 加入 Sideloadly Daemon 的續簽清單</li>
-              <li>按 <b>Start</b>，輸入 Apple ID 密碼；有兩步驟驗證就輸入手機收到的驗證碼</li>
-            </ul></div></li>
-          <li><div>等下面的進度跑完、出現 <b>Done</b> 就裝好了，接著做下面的「iPhone 上的設定」。</div></li>
+              <li><a href="https://www.apple.com/itunes/download/win64">Apple 官網的 iTunes（64 位元）</a></li>
+              <li>或 <a href="https://support.apple.com/en-us/118290">Apple Devices</a>（Apple 官方說明，安裝檔在 Microsoft Store）</li>
+            </ul>
+            接著安裝 <b>iloader</b>。官方只從 <a href="https://iloader.app/">iloader.app</a> 和 <a href="https://github.com/nab138/iloader/releases/latest">GitHub 發行頁</a> 下載。Windows 用 <a href="https://github.com/nab138/iloader/releases/download/v2.4.1/iloader-windows-x64.msi">MSI 安裝程式</a>。</div></li>
+          <li><div>在 iPhone 的 App Store 安裝 <a href="https://apps.apple.com/tw/app/localdevvpn/id6755608044">LocalDevVPN</a>。之後每一次安裝、更新、續期都要先打開它。</div></li>
+          <li><div>用傳輸線把 iPhone 接到電腦，<b>解鎖手機</b>。手機跳出「要信任這部電腦嗎？」按<b>信任</b>並輸入密碼。電腦如果也問，一樣按信任。</div></li>
+          <li><div>打開 iloader，用 Apple ID 登入，選你的 iPhone，按 <b>Install SideStore (Stable)</b>。有兩步驟驗證就輸入驗證碼。<br>
+            <span class="note">不放心可以把密碼交給專門註冊、只拿來簽名的 Apple ID。</span></div></li>
+          <li><div>在 iPhone：<span class="path">設定 › 一般 › VPN 與裝置管理</span>，點你的 Apple ID，按<b>信任</b>。需要開發者模式的 iOS，再到 <span class="path">設定 › 隱私權與安全性 › 開發者模式</span> 打開，手機會重新開機，開機後再確認一次。</div></li>
+          <li><div>先打開 <b>LocalDevVPN</b> 並連上。再打開 SideStore，用剛剛在 iloader 登入的<b>同一個</b> Apple ID 登入。說明見 <a href="https://sidestore.io/">sidestore.io</a> 和 <a href="https://docs.sidestore.io/docs/installation/prerequisites">安裝前提</a>。</div></li>
+          <li><div>SideStore → <b>My Apps</b>，點 SideStore 旁邊的 <b>7 DAYS</b>，先續期一次，設定才算完成。</div></li>
+          <li><div>用 iPhone 下載上面的糯糯鍵盤 <span class="path">.ipa</span>。SideStore 左上角 <b>＋</b>，選這個檔案。問到延伸功能時，選 <b>Keep App Extensions (Use Main Profile)</b>。鍵盤一定要留延伸功能，不能拿掉。</div></li>
         </ol>
       </div>
 
       <div id="panel-mac" role="tabpanel" aria-labelledby="tab-mac" hidden>
         <ol class="steps">
-          <li><div>Mac 不用裝 iTunes。到 <a href="https://sideloadly.io">sideloadly.io</a> 下載 <b>Sideloadly</b> 的 macOS 版，拖進「應用程式」。</div></li>
-          <li><div>第一次打開如果說「無法打開」：到 <span class="path">系統設定 › 隱私權與安全性</span>，往下找到 Sideloadly，按<b>強制打開</b>（或「仍要打開」）。</div></li>
-          <li><div>用傳輸線把 iPhone 接到 Mac，<b>解鎖手機</b>，手機跳出「要信任這部電腦嗎？」時按<b>信任</b>。Mac 若問「允許配件連接」也按允許。</div></li>
-          <li><div>打開 Sideloadly：
+          <li><div>在 Mac 安裝 <b>iloader</b>。官方只從 <a href="https://iloader.app/">iloader.app</a> 和 <a href="https://github.com/nab138/iloader/releases/latest">GitHub 發行頁</a> 下載，三種都可以：
             <ul>
-              <li>把 <span class="path">StarKeyboard.ipa</span> 拖到左上角的方框</li>
-              <li>「iDevice」選你的 iPhone</li>
-              <li>「Apple account」填你的 Apple ID</li>
-              <li>啟用 <b>自動續簽（Automatic Refresh）</b>，讓這個 App 加入 Sideloadly Daemon 的續簽清單</li>
-              <li>按 <b>Start</b>，輸入 Apple ID 密碼；有兩步驟驗證就輸入驗證碼</li>
-            </ul></div></li>
-          <li><div>等下面出現 <b>Done</b> 就裝好了，接著做下面的「iPhone 上的設定」。</div></li>
+              <li><a href="https://github.com/nab138/iloader/releases/download/v2.4.1/iloader-darwin-universal.dmg">DMG</a></li>
+              <li><a href="https://github.com/nab138/iloader/releases/download/v2.4.1/iloader-darwin-universal.app.tar.gz">App 壓縮檔（.app.tar.gz）</a></li>
+              <li>Homebrew（社群維護的 cask）：<span class="path">brew install --cask iloader</span>，說明在 <a href="https://formulae.brew.sh/cask/iloader">formulae.brew.sh/cask/iloader</a></li>
+            </ul>
+            Catalina（10.15）以後不用裝 iTunes，信任 iPhone 在「訪達」。Mojave 和更早才需要 iTunes。</div></li>
+          <li><div>在 iPhone 的 App Store 安裝 <a href="https://apps.apple.com/tw/app/localdevvpn/id6755608044">LocalDevVPN</a>。之後每一次安裝、更新、續期都要先打開它。</div></li>
+          <li><div>用傳輸線把 iPhone 接到 Mac，<b>解鎖手機</b>。手機按<b>信任</b>。Mac 若問「允許配件連接」也按允許。Catalina 以後在「訪達」裡確認看得到這支 iPhone。</div></li>
+          <li><div>打開 iloader，用 Apple ID 登入，選你的 iPhone，按 <b>Install SideStore (Stable)</b>。有兩步驟驗證就輸入驗證碼。</div></li>
+          <li><div>在 iPhone：<span class="path">設定 › 一般 › VPN 與裝置管理</span>，點你的 Apple ID，按<b>信任</b>。需要開發者模式的 iOS，再到 <span class="path">設定 › 隱私權與安全性 › 開發者模式</span> 打開，重新開機後再確認一次。</div></li>
+          <li><div>先打開 <b>LocalDevVPN</b> 並連上。再打開 SideStore，用剛剛在 iloader 登入的<b>同一個</b> Apple ID 登入。說明見 <a href="https://sidestore.io/">sidestore.io</a> 和 <a href="https://docs.sidestore.io/docs/installation/prerequisites">安裝前提</a>。</div></li>
+          <li><div>SideStore → <b>My Apps</b>，點 SideStore 旁邊的 <b>7 DAYS</b>，先續期一次，設定才算完成。</div></li>
+          <li><div>用 iPhone 下載上面的糯糯鍵盤 <span class="path">.ipa</span>。SideStore 左上角 <b>＋</b>，選這個檔案。問到延伸功能時，選 <b>Keep App Extensions (Use Main Profile)</b>。鍵盤一定要留延伸功能。</div></li>
         </ol>
       </div>
+      <p class="note">卡住時看 <a href="https://docs.sidestore.io/docs/troubleshooting">SideStore 故障排除</a>。Apple ID 密碼和驗證碼只在你自己的電腦和手機上輸入，不要貼到別處。</p>
     </section>
 
     <section>
       <h2>iPhone 上的設定（只要做一次）</h2>
       <ol class="steps">
-        <li><div><b>打開開發者模式</b>：<span class="path">設定 › 隱私權與安全性 › 開發者模式</span>，打開後手機會重新開機，開機後再按一次「開啟」並輸入密碼。<br>
-          <span class="note">要先用 Sideloadly 裝好 App，這個選項才會出現。</span></div></li>
-        <li><div><b>信任開發者</b>：<span class="path">設定 › 一般 › VPN 與裝置管理</span>，點你的 Apple ID（開發者 App 下面那一個），按「信任」。</div></li>
         <li><div><b>加入鍵盤</b>：<span class="path">設定 › 一般 › 鍵盤 › 鍵盤 › 新增鍵盤…</span>，往下找到「第三方鍵盤」，選<b>糯糯鍵盤</b>。</div></li>
         <li><div><b>允許完整取用</b>：回到鍵盤清單點「糯糯鍵盤」，打開「允許完整取用」，跳出提醒時按「允許」。<br>
           <span class="note">剪貼簿紀錄、按鍵聲音、震動、貼圖、背景照片、翻譯、檢查新版都需要它。</span></div></li>
@@ -333,23 +338,24 @@
     </section>
 
     <section id="wifi-refresh">
-      <h2>設定 Wi-Fi 自動續簽</h2>
-      <p>第一次用線配對，之後讓 Sideloadly Daemon 在簽章快到期時自動續簽。<b>不用等到第 7 天才開電腦</b>，也不用每週插線。</p>
+      <h2>之後更新（都在手機上）</h2>
       <ol class="steps">
-        <li><div><b>首次連線設定</b>：用傳輸線連接並解鎖 iPhone。Windows 打開 iTunes，選手機圖示 › 摘要 › 選項，勾選「透過 Wi-Fi 與此 iPhone 同步」，按套用／同步。Mac 在 Finder 選 iPhone › 一般，勾選「在 Wi-Fi 連線時顯示此 iPhone」，再套用／同步。</div></li>
-        <li><div><b>加入續簽清單</b>：在 Sideloadly 開啟自動續簽（Automatic Refresh），用原本的 Apple ID 安裝糯糯鍵盤。完成後，在工作列通知區／選單列的 Sideloadly Daemon 確認清單有糯糯鍵盤；依目前版本選單開啟登入時啟動。</div></li>
-        <li><div><b>拔線驗證</b>：手機與電腦連到同一個區域網路，拔掉傳輸線，確認 Sideloadly 仍找得到 iPhone，再從 Daemon 對糯糯鍵盤執行一次手動 Refresh。成功後才算無線流程設定完成。</div></li>
-        <li><div><b>平常使用</b>：電腦開機且保持喚醒、Daemon 持續執行，讓 iPhone 在到期前有機會連回同一網路。找不到手機時先解鎖螢幕、開啟 iTunes，檢查是否用了隔離裝置的訪客 Wi-Fi。</div></li>
+        <li><div>用 iPhone 打開這一頁，下載新的 <span class="path">.ipa</span>。</div></li>
+        <li><div>打開 <b>LocalDevVPN</b>，確認已連上。</div></li>
+        <li><div>打開 SideStore，左上角 <b>＋</b>，選剛下載的安裝檔，蓋過舊的糯糯鍵盤。延伸功能仍選 <b>Keep App Extensions (Use Main Profile)</b>。</div></li>
       </ol>
-      <p class="tip">電腦關機、睡眠，或手機長時間不在同一網路時，無法續簽。若已到期，回到可連線的環境手動 Refresh；無線仍失敗時再插線。沿用原 Apple ID 與 App 識別碼，<b>不要先刪掉舊 App</b>，以保留資料。</p>
-      <p class="note">依 <a href="https://sideloadly.io/faq">Sideloadly 官方 FAQ</a> 整理。Apple ID 密碼與驗證碼只在你信任的本機安裝工具輸入，請勿上傳到 GitHub。</p>
+      <p class="tip">不用再把手機接回電腦。SideStore 會自己續 7 天的簽章，也可以在背景續。簽章快到期時，LocalDevVPN 要開著，SideStore 的 My Apps 也看得到 <b>7 DAYS</b>。</p>
     </section>
 
     <section>
-      <h2>自動建置、續簽，與安裝新版</h2>
-      <p><b>GitHub 自動建置</b>：程式更新後會測試、打包，再發布安裝檔；這個網頁會取得最新已發布版本。</p>
-      <p><b>Daemon 自動續簽</b>：延長電腦裡已登錄版本的使用期限，<b>不會自動下載 GitHub 的新版 IPA</b>。</p>
-      <p>要更新功能時，在電腦下載最新 <span class="path">StarKeyboard.ipa</span>，用相同 Apple ID、相同 App 識別碼，保留自動續簽設定，再用 Sideloadly 安裝一次；Wi-Fi 配對成功後可無線安裝。這會更新 Daemon 保存的版本。<b>不用刪除舊 App</b>，設定和資料可保留。</p>
+      <h2>其他方法（備用）</h2>
+      <details>
+        <summary>用 Sideloadly 從電腦安裝</summary>
+        <div>
+          <p>平常請用上面的 SideStore。只有 SideStore 裝不起來時，才用 <a href="https://sideloadly.io/">Sideloadly</a> 把 <span class="path">StarKeyboard.ipa</span> 從電腦裝進手機。Windows 仍要先裝 <a href="https://www.apple.com/itunes/download/win64">Apple 官網的 iTunes</a>。細節見 <a href="https://sideloadly.io/faq">Sideloadly 官方 FAQ</a>。</p>
+          <p>Sideloadly 的自動續簽要電腦醒著、Daemon 在跑，手機和電腦在同一個網路。它<b>不會</b>自己下載 GitHub 上的新版。這種裝法也不需要 iCloud。裝好之後若改回 SideStore，LiveContainer 請不要留著，以免佔掉免費帳號的第三個名額。</p>
+        </div>
+      </details>
     </section>
   </div>
 
@@ -375,9 +381,9 @@
     <section>
       <h2>下載並安裝</h2>
       <div class="download">
-        <a id="download-android" class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/android-35/StarKeyboard.apk">下載 Android 安裝檔</a>
-        <span id="version-android" class="note" aria-live="polite">v0.3.2（備用下載）</span>
-        <a id="release-android" href="https://github.com/z3332111-cloud/StarKeyboard/releases/tag/android-35">更新內容</a>
+        <a id="download-android" class="btn" href="https://github.com/z3332111-cloud/StarKeyboard/releases/download/android-45/StarKeyboard.apk">下載 Android 安裝檔</a>
+        <span id="version-android" class="note" aria-live="polite">v0.4.0（備用下載）</span>
+        <a id="release-android" href="https://github.com/z3332111-cloud/StarKeyboard/releases/tag/android-45">更新內容</a>
         <span class="note">本頁會自動取得最新已發布版本；新版打包完成後，重新開啟此頁即可。各版本的更新內容在 <a href="https://github.com/z3332111-cloud/StarKeyboard/releases">所有版本</a>（名稱有「Android」的）。</span>
       </div>
       <ol class="steps">
