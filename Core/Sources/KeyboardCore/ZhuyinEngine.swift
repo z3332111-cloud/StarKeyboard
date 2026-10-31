@@ -550,18 +550,24 @@ final class ZhuyinEngine {
         for item in exact where listed.insert(item.text).inserted {
             out.append(Candidate(text: item.text, span: item.span, kind: .phrase))
         }
-        for extra in longerSuggestions(readings: readings, context: context, initials: initials, leading: out.first?.text, seen: &listed) {
-            out.append(extra)
-        }
         for item in shorter where listed.insert(item.text).inserted {
             out.append(Candidate(text: item.text, span: item.span, kind: .phrase))
         }
+        for extra in longerSuggestions(readings: readings, context: context, initials: initials, leading: out.first?.text, seen: &listed) {
+            out.append(extra)
+        }
+        // 單獨一個 ㄨㄢ 也可能是簡拼的兩個字。學過、分數比單字高就放第一個，否則放第二個。
         if readings.count == 1, let parts = Self.splitAbbreviation(readings[0] + "~"),
-           let best = phrases(parts[...]).first, !listed.contains(best.text) {
+           let best = phrases(parts[...]).first {
             let top = fuzzyPhrases(readings[...]).first?.score ?? -.infinity
             if best.score > top - Self.loneSplitRange {
-                listed.insert(best.text)
-                out.insert(Candidate(text: best.text, span: 1, kind: .phrase), at: best.score > top ? 0 : min(1, out.count))
+                let at = best.score > top ? 0 : min(1, out.count)
+                if let existing = out.firstIndex(where: { $0.text == best.text }) {
+                    let item = out.remove(at: existing)
+                    out.insert(item, at: min(at, out.count))
+                } else {
+                    out.insert(Candidate(text: best.text, span: 1, kind: .phrase), at: at)
+                }
             }
         }
         if !out.contains(where: { $0.span == 1 && $0.kind == .phrase }) {
@@ -582,9 +588,10 @@ final class ZhuyinEngine {
                 let fitB = b.text.count == b.span
                 if fitA != fitB { return fitA }
             }
+            // 打對的音優先於聲調猜錯。學過的字只在同樣準的候選裡往前排。
+            if a.corrections != b.corrections { return a.corrections < b.corrections }
             if pa.count != pb.count { return pa.count > pb.count }
             if pa.recency != pb.recency { return pa.recency > pb.recency }
-            if a.corrections != b.corrections { return a.corrections < b.corrections }
             if initials {
                 let rareA = pa.count == 0 && a.score < Self.initialsRareScore
                 let rareB = pb.count == 0 && b.score < Self.initialsRareScore
@@ -603,8 +610,8 @@ final class ZhuyinEngine {
         let scores = Dictionary(fuzzyPhrases(readings[...]).filter { $0.corrections == 0 }.map { ($0.text, $0.score) },
                                 uniquingKeysWith: max)
         let key = readings.joined(separator: "-")
-        let learned = items.filter { userModel.preference(reading: key, phrase: $0.text).count > 0 }
-        var rest = items.filter { userModel.preference(reading: key, phrase: $0.text).count == 0 }
+        let learned = items.filter { $0.corrections == 0 && userModel.preference(reading: key, phrase: $0.text).count > 0 }
+        var rest = items.filter { item in !learned.contains { $0.text == item.text && $0.span == item.span } }
         func support(_ text: String) -> Double {
             guard text.count == 1 else { return 0 }
             return related.filter {

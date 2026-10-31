@@ -112,7 +112,7 @@ final class RankingEvalTests: XCTestCase {
         XCTAssertTrue(youAre.prefix(3).allSatisfy { $0.text.count <= 2 })
         XCTAssertNotEqual(engine.candidates(for: ["ㄐㄧㄡˋ", "ㄕˋ", "ㄕˋ"]).first?.text, "就是是")
 
-        let learning = try learningPromotion(template: engine, words: words)
+        let learning = try learningPromotion(template: engine, byLength: byLength)
         print("RANKING learning picked=\(learning.tried) promoted=\(learning.promoted) abbr_promoted=\(learning.abbr)")
         XCTAssertGreaterThanOrEqual(learning.tried, 20)
         XCTAssertEqual(learning.promoted, learning.tried)
@@ -122,17 +122,19 @@ final class RankingEvalTests: XCTestCase {
     private struct LearningResult { var tried: Int; var promoted: Int; var abbr: Int }
 
     /// 每個長度挑幾個不是第一名的常見同音詞，選一次之後應該變第一，簡拼也一樣。
-    private func learningPromotion(template: ZhuyinEngine, words: [Word]) throws -> LearningResult {
-        var groups: [String: [Word]] = [:]
-        for word in words {
-            groups[word.syllables.joined(separator: "-"), default: []].append(word)
-        }
+    private func learningPromotion(template: ZhuyinEngine, byLength: [Int: [Word]]) throws -> LearningResult {
         var samples: [Word] = []
         for length in 1...4 {
-            let pairs = groups.filter { $0.value.count >= 2 && $0.value[0].syllables.count == length }
-            for (_, list) in pairs.sorted(by: { $0.value[0].score > $1.value[0].score }).prefix(6) {
+            var groups: [String: [Word]] = [:]
+            for word in byLength[length] ?? [] {
+                groups[word.syllables.joined(separator: "-"), default: []].append(word)
+            }
+            let pairs = groups.values.filter { $0.count >= 2 }.sorted { a, b in
+                (a.map { $0.score }.max() ?? -99) > (b.map { $0.score }.max() ?? -99)
+            }
+            for list in pairs.prefix(8) {
                 let sorted = list.sorted { $0.score > $1.score }
-                if sorted.count >= 2 { samples.append(sorted[1]) }
+                samples.append(sorted[1])
             }
         }
         var promoted = 0
