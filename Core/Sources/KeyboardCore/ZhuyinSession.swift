@@ -92,9 +92,13 @@ final class ZhuyinSession {
 
     func enter() -> String { commitAll() }
 
-    /// 換鍵盤、或必須先把組字區清掉時。
+    /// 換鍵盤、或必須先把組字區清掉時。整句送出也記進學習。
     func commitAll() -> String {
+        let readings = composer.readings
         let text = committedSentence()
+        if !readings.isEmpty, !text.isEmpty, !PhoneticText.containsPhonetic(text) {
+            learnCommitted(readings: readings, text: text)
+        }
         composer.clear()
         picks = []
         candidates = []
@@ -106,7 +110,8 @@ final class ZhuyinSession {
         let c = candidates[index]
         let text = PhoneticText.commit(c.text)
         let used = c.reading.map { $0.components(separatedBy: "-") } ?? Array(composer.readings.prefix(c.span))
-        if c.kind != .literal && (learn || c.kind == .phrase), !text.isEmpty {
+        let sentenceOK = c.kind == .sentence && learnableSentence(readings: used, text: text)
+        if c.kind != .literal && !text.isEmpty && (learn || c.kind == .phrase || sentenceOK) {
             engine?.learn(readings: used, text: text)
             picks.append((used, text))
         } else {
@@ -126,6 +131,30 @@ final class ZhuyinSession {
 
     /// 符號鍵盤上使用者自己點的字，可以是聲調。
     func insertSymbol(_ s: String) -> String { s }
+
+    /// 使用者送出的句子。和斷詞結果一樣、或不超過詞長上限時，整段記下來；更長就分段記。
+    private func learnCommitted(readings: [String], text: String) {
+        guard let engine, readings.count == text.count else { return }
+        let raw = engine.segmentSpans(readings).map { $0.text }.joined()
+        let same = PhoneticText.commit(raw) == text
+        if same && readings.count <= ZhuyinEngine.maxPhraseLength {
+            engine.learn(readings: readings, text: text)
+            return
+        }
+        for part in engine.segmentSpans(readings)
+        where part.readings.count == part.text.count && !part.text.isEmpty
+            && part.readings.count <= ZhuyinEngine.maxPhraseLength {
+            engine.learn(readings: part.readings, text: part.text)
+        }
+    }
+
+    /// 空白鍵送出整句時，只記住斷詞真的選出來的字，不記住為了避開重複字而替換的結果。
+    private func learnableSentence(readings: [String], text: String) -> Bool {
+        guard let engine else { return false }
+        let raw = engine.bestSegments(readings).map { $0.text }.joined()
+        if PhoneticText.commit(raw) == text { return true }
+        return engine.fuzzyPhrases(readings[...]).contains { $0.corrections == 0 && $0.text == text }
+    }
 
     private func committedSentence() -> String {
         guard !composer.readings.isEmpty else { return "" }

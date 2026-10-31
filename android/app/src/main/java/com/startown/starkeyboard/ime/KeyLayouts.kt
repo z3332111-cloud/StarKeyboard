@@ -1,6 +1,7 @@
 package com.startown.starkeyboard.ime
 
 import com.startown.starkeyboard.core.Bopomofo
+import com.startown.starkeyboard.core.SymbolPages
 
 enum class KeyboardLayer { LETTERS, NUMBERS, SYMBOLS }
 enum class ShiftState { OFF, ON, LOCKED }
@@ -150,25 +151,25 @@ object KeyLayouts {
 
     private fun englishSymbols(c: Context): KeyboardLayout {
         val row3 = listOf(KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.4f, KeyKind.SPECIAL, 16f)) + keys(".,?!'", width = 1.4f) + backspace()
-        return KeyboardLayout(listOf(keys("[]{}#%^*+="), keys("_\\|~<>€£¥•"), row3, bottomRow(c, 10f)), 10f)
+        return KeyboardLayout(listOf(keys(SymbolPages.ENGLISH_SYMBOL_ROW1), keys(SymbolPages.ENGLISH_SYMBOL_ROW2), row3, bottomRow(c, 10f)), 10f)
     }
 
     /** 注音的 123 頁，和 iPhone 注音鍵盤同一排列。標點用全形，減號、斜線、錢號、小老鼠和句點用半形。 */
     private fun chineseNumbers(c: Context): KeyboardLayout {
-        val row3 = listOf(KeySpec("#+=", KeyAction.Layer(KeyboardLayer.SYMBOLS), 1.4f, KeyKind.SPECIAL, 16f)) + keys("。，、？！.", 20f, 1.2f) + backspace()
-        return KeyboardLayout(listOf(keys("1234567890"), keys("-/：；（）\$@「」", 20f), row3, bottomRow(c, 10f)), 10f)
+        val row3 = listOf(KeySpec("#+=", KeyAction.Layer(KeyboardLayer.SYMBOLS), 1.4f, KeyKind.SPECIAL, 16f)) + keys(SymbolPages.ZHUYIN_NUMBER_ROW3, 20f, 1.2f) + backspace()
+        return KeyboardLayout(listOf(keys("1234567890"), keys(SymbolPages.ZHUYIN_NUMBER_ROW2, 20f), row3, bottomRow(c, 10f)), 10f)
     }
 
-    /** 注音的 #+= 頁，對齊 iPhone 的第二頁；123 頁放不下的 ～ — 『』 … ♡ 等仍留在這裡。 */
+    /** 注音的 #+= 頁。Markdown 用的符號永遠半形；中文標點維持全形。 */
     private fun chineseSymbols(c: Context): KeyboardLayout {
         val toggle = KeySpec(if (c.fullWidthSymbols) "全形" else "半形", KeyAction.ToggleWidth, 1.1f, KeyKind.SPECIAL, 14f)
         val row3 = listOf(KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.25f, KeyKind.SPECIAL, 16f)) +
             keys("『』♡☆‧→※", 18f, 0.9f) + toggle + backspace(1.35f)
-        val rows = if (c.fullWidthSymbols) {
-            listOf("【】｛｝＃％＾＊＋＝", "＿＼｜～〈〉《》…—")
-        } else {
-            listOf("[]{}#%^*+=", "_\\|~<>«»…—")
-        }
-        return KeyboardLayout(listOf(keys(rows[0], 18f), keys(rows[1], 18f), row3, bottomRow(c, 10f)), 10f)
+        return KeyboardLayout(listOf(
+            keys(SymbolPages.ZHUYIN_SYMBOL_ROW1, 18f),
+            keys(SymbolPages.ZHUYIN_SYMBOL_ROW2, 18f),
+            row3,
+            bottomRow(c, 10f),
+        ), 10f)
     }
 }

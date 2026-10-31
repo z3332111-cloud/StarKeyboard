@@ -237,9 +237,9 @@ final class ZhuyinEngineTests: XCTestCase {
         let c = e.candidates(for: ["ㄋㄧˇ", "ㄏㄠˇ"])
         XCTAssertEqual(c.first, Candidate(text: "你好", span: 2, kind: .sentence))
         XCTAssertTrue(c.contains(Candidate(text: "妳", span: 1, kind: .phrase)))
-        // 打完整的字：第一個還是「是」，接著預測以 ㄕˋ 開頭的詞（世界）
+        // 打完整的字：同長度的同音字先排完，更長的預測（世界）接在後面。
         let single = e.candidates(for: ["ㄕˋ"])
-        XCTAssertEqual(single.map { $0.text }, ["是", "世界", "事", "世"])
+        XCTAssertEqual(single.map { $0.text }, ["是", "事", "世", "世界"])
     }
 
     func testUnknownSyllableStaysAsSymbols() {
@@ -307,7 +307,7 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertEqual(sentence(["ㄋㄧˇ", "ㄏ*"]), "你好")
         XCTAssertEqual(sentence(["ㄋ*", "ㄏ*", "ㄕ*", "ㄐ*"]), "你好世界")
         XCTAssertEqual(sentence(["ㄨㄛ*", "ㄏ*", "ㄓㄜ*", "ㄧ*"]), "我會這樣")
-        XCTAssertEqual(e.candidates(for: ["ㄋㄧ*"]).map { $0.text }, ["你", "你好", "你們", "妳"])
+        XCTAssertEqual(e.candidates(for: ["ㄋㄧ*"]).map { $0.text }, ["你", "妳", "你好", "你們"])
         XCTAssertFalse(e.candidates(for: ["ㄅ*"]).contains { PhoneticText.containsPhonetic($0.text) })
     }
 
@@ -361,26 +361,26 @@ final class ZhuyinEngineTests: XCTestCase {
 
     func testPredictions() {
         let e = makeEngine()
-        // 打完 ㄋㄧˇ：第一個還是「你」，接著預測以它開頭的詞，選了要記成完整讀音
+        // 打完 ㄋㄧˇ：同長度的字先排完，接著才是預測詞，選了要記成完整讀音
         let c = e.candidates(for: ["ㄋㄧˇ"])
-        XCTAssertEqual(c.map { $0.text }, ["你", "你好", "你們", "妳"])
-        XCTAssertEqual(c[1].reading, "ㄋㄧˇ-ㄏㄠˇ")
-        XCTAssertEqual(c[1].span, 1)
+        XCTAssertEqual(c.map { $0.text }, ["你", "妳", "你好", "你們"])
+        let hello = try XCTUnwrap(c.first { $0.text == "你好" })
+        XCTAssertEqual(hello.reading, "ㄋㄧˇ-ㄏㄠˇ")
+        XCTAssertEqual(hello.span, 1)
         // 不必先打聲調，也會出現相關詞；選取仍使用完整讀音。
         let partial = e.candidates(for: ["ㄋㄧ*"])
-        XCTAssertEqual(partial.map { $0.text }, ["你", "你好", "你們", "妳"])
-        XCTAssertEqual(partial[1].reading, "ㄋㄧˇ-ㄏㄠˇ")
-        // 學過的詞排在預測的最前面
+        XCTAssertEqual(partial.map { $0.text }, ["你", "妳", "你好", "你們"])
+        XCTAssertEqual(partial.first { $0.text == "你好" }?.reading, "ㄋㄧˇ-ㄏㄠˇ")
+        // 學過的詞排在預測的最前面，但仍在同長度的字之後
         e.learn(readings: ["ㄋㄧˇ", "ㄇㄣ˙"], text: "你們")
-        XCTAssertEqual(e.candidates(for: ["ㄋㄧˇ"])[1].text, "你們")
+        XCTAssertEqual(e.candidates(for: ["ㄋㄧˇ"]).first { $0.reading != nil }?.text, "你們")
     }
 
     func testPartialPredictionsRespectTonesAndConsumption() {
         let e = makeEngine(extra: [("ㄋㄧˋ-ㄌㄧㄡˊ", "逆流", -2.0)])
         let partial = e.candidates(for: ["ㄋㄧ*"])
         XCTAssertEqual(partial.first?.text, "你")
-        XCTAssertEqual(partial[1].text, "你好")
-        let phrase = partial.first { $0.text == "你好" }!
+        let phrase = try XCTUnwrap(partial.first { $0.text == "你好" })
         XCTAssertEqual(phrase.span, 1)
         XCTAssertEqual(phrase.reading, "ㄋㄧˇ-ㄏㄠˇ")
         e.learn(readings: phrase.reading!.components(separatedBy: "-"), text: phrase.text)
@@ -452,6 +452,94 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertTrue(a.contains("好"))
         XCTAssertTrue(a.contains("們"))
         XCTAssertEqual(e.associations(after: "世"), ["界"])
+    }
+
+    func testExactLengthComesBeforeLongerWords() {
+        let e = makeEngine(extra: [
+            ("ㄊㄨㄟ", "推", -3.5), ("ㄊㄨㄟˇ", "腿", -4.7), ("ㄐㄧㄢ", "間", -3.1),
+            ("ㄊㄨㄟ-ㄐㄧㄢˋ", "推薦", -4.34),
+            ("ㄊㄨㄟ-ㄐㄧㄢˋ-ㄒㄧㄣˋ", "推薦信", -5.44),
+            ("ㄊㄨㄟ-ㄐㄧㄢˋ-ㄍㄟˇ", "推薦給", -5.46),
+            ("ㄋㄧˇ-ㄕˋ", "你是", -4.32),
+            ("ㄋㄧㄠˋ-ㄕ-ㄐㄧㄣˋ", "尿失禁", -5.51),
+            ("ㄋㄧㄢˋ-ㄕˋ-ㄐㄧˋ", "廿世紀", -5.46),
+        ])
+        let recommend = e.candidates(for: ["ㄊㄨㄟ*", "ㄐㄧㄢ*"])
+        XCTAssertEqual(recommend.first?.text, "推薦")
+        let longer = recommend.filter { $0.text.count > 2 }.map { $0.text }
+        if let firstLonger = recommend.firstIndex(where: { $0.text.count > 2 }) {
+            XCTAssertTrue(recommend[..<firstLonger].allSatisfy { $0.text.count <= 2 })
+        }
+        XCTAssertLessThanOrEqual(longer.count, 2)
+        let youAre = e.candidates(for: ["ㄋㄧ*", "ㄕ*"])
+        XCTAssertEqual(youAre.first?.text, "你是")
+        XCTAssertTrue(youAre.prefix(3).allSatisfy { $0.text.count <= 2 })
+    }
+
+    func testRepeatedCharacterIsNotTheSentence() {
+        let e = makeEngine(extra: [
+            ("ㄐㄧㄡˋ", "就", -2.7),
+            ("ㄐㄧㄡˋ-ㄕˋ", "就是", -3.05),
+            ("ㄕˋ", "是", -2.2),
+            ("ㄕˋ", "事", -3.1),
+        ])
+        let c = e.candidates(for: ["ㄐㄧㄡˋ", "ㄕˋ", "ㄕˋ"])
+        XCTAssertNotEqual(c.first?.text, "就是是")
+        XCTAssertEqual(c.first?.text.count, 3)
+        XCTAssertEqual(c.first?.span, 3)
+    }
+
+    func testOnePickPromotesWordAndAbbreviation() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("learned.json")
+        let rows: [(String, String, Double)] = [
+            ("ㄕˋ", "是", -2.0), ("ㄕˋ", "試", -7.5),
+            ("ㄋㄧˇ-ㄕˋ", "你是", -4.3), ("ㄋㄚˋ-ㄕˋ", "那是", -3.2),
+        ]
+        func engine(_ model: UserPhraseModel) -> ZhuyinEngine {
+            let db = SQLiteDB.inMemory()!
+            ZhuyinEngine.createSchema(in: db)
+            for r in rows { ZhuyinEngine.insert(into: db, reading: r.0, phrase: r.1, score: r.2) }
+            return ZhuyinEngine(db: db, userModel: model)
+        }
+        let model = UserPhraseModel(fileURL: url)
+        let e = engine(model)
+        XCTAssertEqual(e.candidates(for: ["ㄕˋ"]).first?.text, "是")
+        e.learn(readings: ["ㄕˋ"], text: "試")
+        XCTAssertEqual(e.candidates(for: ["ㄕˋ"]).first?.text, "試")
+        XCTAssertEqual(e.candidates(for: ["ㄋ*", "ㄕ*"]).first?.text, "那是")
+        e.learn(readings: ["ㄋㄧˇ", "ㄕˋ"], text: "你是")
+        XCTAssertEqual(e.candidates(for: ["ㄋ*", "ㄕ*"]).first?.text, "你是")
+        XCTAssertEqual(e.candidates(for: ["ㄋㄧˇ", "ㄕˋ"]).first?.text, "你是")
+        let reloaded = engine(UserPhraseModel(fileURL: url))
+        XCTAssertEqual(reloaded.candidates(for: ["ㄕˋ"]).first?.text, "試")
+        XCTAssertEqual(reloaded.candidates(for: ["ㄋ*", "ㄕ*"]).first?.text, "你是")
+    }
+
+    func testLegacyLearningFileStillLoads() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("learned.json")
+        let legacy = ["ㄋㄧˇ-ㄏㄠˇ": ["妳好": 2]]
+        let data = try JSONEncoder().encode(legacy)
+        try data.write(to: url)
+        let model = UserPhraseModel(fileURL: url)
+        XCTAssertEqual(model.pickCount(reading: "ㄋㄧˇ-ㄏㄠˇ", phrase: "妳好"), 2)
+        XCTAssertEqual(model.phrases(for: "ㄋ*-ㄏ*"), ["妳好"])
+    }
+
+    func testCommitLearnsTheSentence() {
+        let e = makeEngine()
+        var session = ZhuyinSession()
+        session.engine = e
+        for ch in "ㄋㄧˇㄏㄠˇ" { _ = session.type(ch) }
+        session.refresh(context: "")
+        let text = session.commitAll()
+        XCTAssertEqual(text, "你好")
+        XCTAssertEqual(e.userModel.pickCount(reading: "ㄋㄧˇ-ㄏㄠˇ", phrase: "你好"), 1)
     }
 }
 

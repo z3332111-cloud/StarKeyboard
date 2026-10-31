@@ -381,7 +381,7 @@ final class KeyboardViewController: UIInputViewController {
             clearSuggestions()
         case .toggleWidth:
             settings.fullWidthSymbols.toggle()
-            toast(settings.fullWidthSymbols ? "換成全形符號（中文排版用）" : "換成半形符號（Discord 語法用）")
+            toast("程式符號維持半形，中文標點維持全形")
             rebuildKeys()
         }
     }

@@ -234,32 +234,28 @@ enum KeyLayouts {
         var row3 = [KeySpec(face: .text("123"), action: .layer(.numbers), width: 1.4, kind: .special, fontSize: 16)]
         row3 += keys(".,?!'", width: 1.4)
         row3.append(backspace())
-        return KeyboardLayout(rows: [keys("[]{}#%^*+="), keys("_\\|~<>€£¥•"), row3, bottomRow(c, columns: 10)],
+        return KeyboardLayout(rows: [keys(SymbolPages.englishSymbolRow1), keys(SymbolPages.englishSymbolRow2), row3, bottomRow(c, columns: 10)],
                               columns: 10)
     }
 
     /// 注音的 123 頁，和 iPhone 注音鍵盤同一排列。標點用全形，減號、斜線、錢號、小老鼠和句點用半形。
     private static func chineseNumbers(_ c: Context) -> KeyboardLayout {
         var row3 = [KeySpec(face: .text("#+="), action: .layer(.symbols), width: 1.4, kind: .special, fontSize: 16)]
-        row3 += keys("。，、？！.", size: 20, width: 1.2)
+        row3 += keys(SymbolPages.zhuyinNumberRow3, size: 20, width: 1.2)
         row3.append(backspace())
-        return KeyboardLayout(rows: [keys("1234567890"), keys("-/：；（）$@「」", size: 20), row3, bottomRow(c, columns: 10)],
+        return KeyboardLayout(rows: [keys("1234567890"), keys(SymbolPages.zhuyinNumberRow2, size: 20), row3, bottomRow(c, columns: 10)],
                               columns: 10)
     }
 
-    /// 注音的 #+= 頁，對齊 iPhone 的第二頁；123 頁放不下的 ～ — 『』 … ♡ 等仍留在這裡。
+    /// 注音的 #+= 頁。Markdown 用的符號永遠半形；中文標點維持全形。全形切換不改這些鍵。
     private static func chineseSymbols(_ c: Context) -> KeyboardLayout {
         var row3 = [KeySpec(face: .text("123"), action: .layer(.numbers), width: 1.25, kind: .special, fontSize: 16)]
         row3 += keys("『』♡☆‧→※", size: 18, width: 0.9)
-        // 全形／半形切換：鍵上寫的是現在用的那一種
         row3.append(KeySpec(face: .text(c.fullWidthSymbols ? "全形" : "半形"), action: .toggleWidth, width: 1.1, kind: .special, fontSize: 14))
         row3.append(backspace(1.35))
-        // 半形：Discord、LINE 等的標題、粗體、刪除線、劇透、@提及、/指令只認半形；全形：中文排版用
-        let rows = c.fullWidthSymbols
-            ? ["【】｛｝＃％＾＊＋＝", "＿＼｜～〈〉《》…—"]
-            : ["[]{}#%^*+=", "_\\|~<>«»…—"]
-        return KeyboardLayout(rows: [keys(rows[0], size: 18), keys(rows[1], size: 18), row3,
-                                     bottomRow(c, columns: 10)],
+        return KeyboardLayout(rows: [keys(SymbolPages.zhuyinSymbolRow1, size: 18),
+                                     keys(SymbolPages.zhuyinSymbolRow2, size: 18),
+                                     row3, bottomRow(c, columns: 10)],
                               columns: 10)
     }
 }

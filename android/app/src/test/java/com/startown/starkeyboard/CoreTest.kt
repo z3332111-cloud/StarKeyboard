@@ -11,6 +11,7 @@ import com.startown.starkeyboard.core.ReleaseChecker
 import com.startown.starkeyboard.core.Romaji
 import com.startown.starkeyboard.core.Spelling
 import com.startown.starkeyboard.core.SymbolData
+import com.startown.starkeyboard.core.SymbolPages
 import com.startown.starkeyboard.core.UserPhraseModel
 import com.startown.starkeyboard.core.ZhuyinComposer
 import com.startown.starkeyboard.core.ZhuyinEngine
@@ -286,5 +287,48 @@ class CoreTest {
         }
         assertEquals(7, SymbolData.emoji.size)
         assertTrue(SymbolData.symbols.first { it.title == "單位" }.items.contains("$"))
+    }
+
+    @Test fun markdownSymbolsAreAscii() {
+        for (ch in SymbolPages.MARKDOWN) {
+            assertTrue("$ch", SymbolPages.isAscii(ch))
+        }
+        val zhuyin = SymbolPages.ZHUYIN_SYMBOL_ROW1 + SymbolPages.ZHUYIN_SYMBOL_ROW2
+        val numbers = SymbolPages.ZHUYIN_NUMBER_ROW2 + SymbolPages.ZHUYIN_NUMBER_ROW3
+        for (ch in SymbolPages.MARKDOWN) {
+            assertTrue(zhuyin.contains(ch))
+        }
+        for (ch in "-/$@.") assertTrue(numbers.contains(ch) && SymbolPages.isAscii(ch))
+        assertFalse(zhuyin.contains('＊'))
+        assertFalse(zhuyin.contains('＃'))
+        assertEquals(10, SymbolPages.ZHUYIN_SYMBOL_ROW1.length)
+        assertEquals(10, SymbolPages.ZHUYIN_NUMBER_ROW2.length)
+    }
+
+    @Test fun exactLengthAndLearning() {
+        val e = engine(listOf(
+            Triple("ㄊㄨㄟ", "推", -3.5), Triple("ㄊㄨㄟˇ", "腿", -4.7), Triple("ㄐㄧㄢ", "間", -3.1),
+            Triple("ㄊㄨㄟ-ㄐㄧㄢˋ", "推薦", -4.34),
+            Triple("ㄊㄨㄟ-ㄐㄧㄢˋ-ㄒㄧㄣˋ", "推薦信", -5.44),
+            Triple("ㄋㄧˇ-ㄕˋ", "你是", -4.32),
+            Triple("ㄋㄚˋ-ㄕˋ", "那是", -3.2),
+            Triple("ㄋㄧㄠˋ-ㄕ-ㄐㄧㄣˋ", "尿失禁", -5.51),
+            Triple("ㄐㄧㄡˋ", "就", -2.7), Triple("ㄐㄧㄡˋ-ㄕˋ", "就是", -3.05),
+            Triple("ㄕˋ", "試", -7.5),
+        ))
+        val recommend = e.candidates(listOf("ㄊㄨㄟ*", "ㄐㄧㄢ*"))
+        assertEquals("推薦", recommend.first().text)
+        assertTrue(recommend.take(3).all { it.text.length <= 2 })
+        val youAre = e.candidates(listOf("ㄋㄧ*", "ㄕ*"))
+        assertEquals("你是", youAre.first().text)
+        assertTrue(youAre.take(3).all { it.text.length <= 2 })
+        assertFalse(e.candidates(listOf("ㄐㄧㄡˋ", "ㄕˋ", "ㄕˋ")).first().text == "就是是")
+        assertEquals(3, e.candidates(listOf("ㄐㄧㄡˋ", "ㄕˋ", "ㄕˋ")).first().text.length)
+        assertEquals("是", e.candidates(listOf("ㄕˋ")).first().text)
+        e.learn(listOf("ㄕˋ"), "試")
+        assertEquals("試", e.candidates(listOf("ㄕˋ")).first().text)
+        assertEquals("那是", e.candidates(listOf("ㄋ*", "ㄕ*")).first().text)
+        e.learn(listOf("ㄋㄧˇ", "ㄕˋ"), "你是")
+        assertEquals("你是", e.candidates(listOf("ㄋ*", "ㄕ*")).first().text)
     }
 }

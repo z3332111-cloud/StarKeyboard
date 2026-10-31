@@ -356,7 +356,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             KeyAction.ClearCanvas -> { handwriting?.clear(); clearSuggestions() }
             KeyAction.ToggleWidth -> {
                 settings.fullWidthSymbols = !settings.fullWidthSymbols
-                toast(if (settings.fullWidthSymbols) "換成全形符號（中文排版用）" else "換成半形符號（Discord 語法用）")
+                toast("程式符號維持半形，中文標點維持全形")
                 rebuildKeys()
             }
         }
@@ -814,7 +814,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         if (composer.isComposing) {
             val c = candidates.getOrNull(i) ?: return
             val text = ZhuyinEngine.commit(c.text)
-            if (learn && c.kind != Candidate.Kind.LITERAL && text.isNotEmpty()) synchronized(dictLock) { engine?.learn(composer.readings.take(c.span), text) }
+            val used = composer.readings.take(c.span)
+            val sentenceOk = c.kind == Candidate.Kind.SENTENCE &&
+                synchronized(dictLock) { engine?.learnableSentence(used, text) } == true
+            if (c.kind != Candidate.Kind.LITERAL && text.isNotEmpty() && (learn || c.kind == Candidate.Kind.PHRASE || sentenceOk)) {
+                synchronized(dictLock) { engine?.learn(used, text) }
+            }
             if (text.isNotEmpty()) output(text)
             composer.removeFirst(c.span)
             if (composer.isComposing) {
@@ -871,12 +876,14 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             text = Romaji.finalize(kanaBuffer)
             kanaBuffer = ""
         } else {
+            val readings = composer.readings.toList()
             val top = candidates.firstOrNull()
-            text = if (top != null && top.span == composer.readings.size && ZhuyinEngine.commit(top.text) == top.text) {
+            text = if (top != null && top.span == readings.size && ZhuyinEngine.commit(top.text) == top.text) {
                 top.text
             } else {
-                ZhuyinEngine.commit(safely { synchronized(dictLock) { engine?.bestSegments(composer.readings) }?.joinToString("") { it.text } } ?: "")
+                ZhuyinEngine.commit(safely { synchronized(dictLock) { engine?.bestSegments(readings) }?.joinToString("") { it.text } } ?: "")
             }
+            if (text.isNotEmpty()) synchronized(dictLock) { engine?.learnCommitted(readings, text) }
             composer.clear()
         }
         candidates = emptyList()

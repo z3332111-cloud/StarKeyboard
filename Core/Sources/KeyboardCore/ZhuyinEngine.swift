@@ -85,6 +85,17 @@ final class ZhuyinEngine {
         self.init(db: db, userModel: userModel, column: column)
     }
 
+    /// 同一份字典、另一份學習紀錄。評測重載學習檔時不必再讀一次字典。
+    init(index: PhraseIndex, userModel: UserPhraseModel, column: String = "reading") {
+        self.index = index
+        self.userModel = userModel
+        self.column = column
+    }
+
+    func sharingIndex(userModel: UserPhraseModel) -> ZhuyinEngine {
+        ZhuyinEngine(index: index, userModel: userModel, column: column)
+    }
+
     // MARK: 字典格式（tools/build_dict.py 也是用這個）
 
     static func createSchema(in db: SQLiteDB) {
@@ -205,7 +216,15 @@ final class ZhuyinEngine {
         var list = order.enumerated().map { (i, phrase) in
             (i, Scored(text: phrase, score: best[phrase]! + userModel.boost(reading: key, phrase: phrase)))
         }
-        list.sort { $0.1.score != $1.1.score ? $0.1.score > $1.1.score : $0.0 < $1.0 }
+        // 選過一次就排在沒選過的前面；次數一樣再看最近一次，然後才是詞頻。
+        list.sort { a, b in
+            let pa = userModel.preference(reading: key, phrase: a.1.text)
+            let pb = userModel.preference(reading: key, phrase: b.1.text)
+            if pa.count != pb.count { return pa.count > pb.count }
+            if pa.recency != pb.recency { return pa.recency > pb.recency }
+            if a.1.score != b.1.score { return a.1.score > b.1.score }
+            return a.0 < b.0
+        }
         let result = list.map { $0.1 }
         cache[key] = result
         return result
@@ -323,7 +342,13 @@ final class ZhuyinEngine {
     func bestSegments(_ readings: [String], contextual: Bool = true) -> [Scored] {
         queryLock.lock()
         defer { queryLock.unlock() }
-        let readings = Self.settleSplits(readings)
+        segmentation(of: Self.settleSplits(readings), contextual: contextual).map {
+            Scored(text: $0.text, score: $0.score)
+        }
+    }
+
+    /// 斷詞，附上每一段用掉的起始音節。呼叫端要已持有 queryLock。
+    private func segmentation(of readings: [String], contextual: Bool) -> [(start: Int, text: String, score: Double)] {
         let n = readings.count
         guard n > 0 else { return [] }
         var best = [Double](repeating: -.infinity, count: n + 1)
@@ -369,18 +394,58 @@ final class ZhuyinEngine {
                 }
             }
         }
-        var segments: [Scored] = []
+        var parts: [(start: Int, text: String, score: Double)] = []
         var i = n
         while i > 0 {
             let b = back[i]
-            segments.append(Scored(text: b.text, score: b.score))
+            parts.append((b.start, b.text, b.score))
+            if b.start >= i { break }
             i = b.start
         }
-        return segments.reversed()
+        return parts.reversed()
     }
 
-    /// 候選字：第一個是整句，接著是預測的詞，再來是從開頭算起最長到最短的詞
+    /// 送出整句時要記住的每一段（讀音、字）。
+    func segmentSpans(_ readings: [String]) -> [(readings: [String], text: String)] {
+        queryLock.lock()
+        defer { queryLock.unlock() }
+        let readings = Self.settleSplits(readings)
+        let parts = segmentation(of: readings, contextual: true)
+        return parts.enumerated().map { index, part in
+            let end = index + 1 < parts.count ? parts[index + 1].start : readings.count
+            return (Array(readings[part.start..<end]), part.text)
+        }
+    }
+
+    /// 只打了聲母（每個音節最多一個注音）。這時罕見詞要讓給常見詞。
+    static func isInitialsQuery(_ readings: [String]) -> Bool {
+        !readings.isEmpty && readings.allSatisfy { reading in
+            reading.filter { $0 != "*" && $0 != "~" && !Bopomofo.tones.contains($0) }.count <= 1
+        }
+    }
+
+    /// 只打聲母時，調整後分數低於這條線、又沒學過的詞，排在常見詞後面。
+    /// 聲母查詢每個音節約扣 1，所以線畫在完整讀音罕見線（約 -5）再往下。
+    static let initialsRareScore = -6.2
+
+    private struct Ranked {
+        var text: String
+        var span: Int
+        var score: Double
+        var corrections: Int
+        var order: Int
+    }
+
+    /// 候選字：和打進去的音節一樣長的詞在最前面（學過的優先，然後詞頻；完整讀音優先於簡拼）。
+    /// 比輸入更長的預測最多兩個，而且不能排在同長度的詞前面。
     func candidates(for readings: [String], before context: String = "") -> [Candidate] {
+        queryLock.lock()
+        defer { queryLock.unlock() }
+        return rankedCandidates(for: readings, before: context)
+    }
+
+    /// 改排名之前的舊順序，只給對照評測用。
+    func legacyCandidates(for readings: [String], before context: String = "") -> [Candidate] {
         queryLock.lock()
         defer { queryLock.unlock() }
         guard !readings.isEmpty else { return [] }
@@ -388,7 +453,7 @@ final class ZhuyinEngine {
         var out: [Candidate] = []
         var seen = Set<String>()
         if readings.count > 1 {
-            let sentence = bestSegments(readings).map { $0.text }.joined()
+            let sentence = segmentation(of: readings, contextual: true).map { $0.text }.joined()
             out.append(Candidate(text: sentence, span: readings.count, kind: .sentence))
             seen.insert(sentence)
         }
@@ -403,7 +468,6 @@ final class ZhuyinEngine {
         if !hasSingle {
             out.append(Candidate(text: Self.display(readings[0]), span: 1, kind: .literal))
         }
-        // 單獨一個 ㄨㄢ 也可能是簡拼的兩個字（晚安）：拆開最好的詞放第二個，學過、分數比單字高就放第一個
         if readings.count == 1, let parts = Self.splitAbbreviation(readings[0] + "~"),
            let best = phrases(parts[...]).first, !seen.contains(best.text) {
             let top = fuzzyPhrases(readings[...]).first?.score ?? -.infinity
@@ -413,7 +477,6 @@ final class ZhuyinEngine {
             }
         }
         let related = completions(after: context)
-        // 同音單字結合字頻、使用者選字與前文詞彙；加分有限，不蓋過反覆選過的偏好。
         if readings.count == 1, !related.isEmpty {
             let scores = Dictionary(fuzzyPhrases(readings[...]).filter { $0.corrections == 0 }.map { ($0.text, $0.score) },
                                     uniquingKeysWith: max)
@@ -426,12 +489,10 @@ final class ZhuyinEngine {
                     }.map { max(0, min(1.8, 5 + $0.score)) }.max() ?? 0
                     return (index, (scores[candidate.text] ?? Self.userPhraseBase) + support)
                 }.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0 < $1.0 }
-            // 簡拼拆出的兩字詞仍維持原本排序，不被單字搶走。
             if out.first?.text.count == 1, let winner = ranked.first, winner.0 != 0 {
                 out.insert(out.remove(at: winner.0), at: 0)
             }
         }
-        // 預測詞最多三個；保留第一個直接候選，也讓其他常用單字仍容易選到。
         let pattern = readings.map { Substring(Self.displayQuery($0)) }
         let contextual = related.filter {
             let full = $0.reading.split(separator: "-")
@@ -440,11 +501,10 @@ final class ZhuyinEngine {
         }
         var ordinary = predictions(for: readings)
         if readings.contains(where: { $0.contains("*") }), let leading = out.first, leading.kind != .literal {
-            // 注音尚未打完時，先補目前最可能的字，避免別的同音字詞佔滿前排。
             ordinary = ordinary.filter { $0.text.hasPrefix(leading.text) } +
                 ordinary.filter { !$0.text.hasPrefix(leading.text) }
         }
-        let predicted = contextual.map { (text: $0.text, reading: $0.reading) } + ordinary
+        let predicted = contextual.map { (text: $0.text, reading: $0.reading) } + ordinary.map { (text: $0.text, reading: $0.reading) }
         var extras: [Candidate] = []
         for p in predicted where seen.insert(p.text).inserted {
             extras.append(Candidate(text: p.text, span: readings.count, kind: .phrase, reading: p.reading))
@@ -454,12 +514,183 @@ final class ZhuyinEngine {
         return out.filter { !$0.text.isEmpty && !PhoneticText.containsPhonetic($0.text) }
     }
 
+    private func rankedCandidates(for readings: [String], before context: String) -> [Candidate] {
+        guard !readings.isEmpty else { return [] }
+        let readings = Self.settleSplits(readings)
+        let n = readings.count
+        let initials = Self.isInitialsQuery(readings)
+        var exact: [Ranked] = []
+        var shorter: [Ranked] = []
+        var seen = Set<String>()
+        var order = 0
+        for k in 1...min(Self.maxPhraseLength, n) {
+            for p in fuzzyPhrases(readings[0..<k]) {
+                guard !p.text.isEmpty, !PhoneticText.containsPhonetic(p.text), seen.insert(p.text).inserted else { continue }
+                let item = Ranked(text: p.text, span: k, score: p.score, corrections: p.corrections, order: order)
+                order += 1
+                if k == n { exact.append(item) } else { shorter.append(item) }
+            }
+        }
+        exact = sorted(exact, readings: readings, initials: initials)
+        shorter = sorted(shorter, readings: readings, initials: initials)
+        if n == 1 { exact = promoteContext(exact, readings: readings, context: context) }
+
+        var sentence = ""
+        if let cover = exact.first(where: { $0.corrections == 0 && $0.text.count == n }) {
+            sentence = cover.text
+        } else if n > 1 {
+            sentence = composedSentence(readings)
+        }
+        var out: [Candidate] = []
+        var listed = Set<String>()
+        if n > 1, !sentence.isEmpty, !PhoneticText.containsPhonetic(sentence) {
+            out.append(Candidate(text: sentence, span: n, kind: .sentence))
+            listed.insert(sentence)
+        }
+        for item in exact where listed.insert(item.text).inserted {
+            out.append(Candidate(text: item.text, span: item.span, kind: .phrase))
+        }
+        for extra in longerSuggestions(readings: readings, context: context, initials: initials, leading: out.first?.text, seen: &listed) {
+            out.append(extra)
+        }
+        for item in shorter where listed.insert(item.text).inserted {
+            out.append(Candidate(text: item.text, span: item.span, kind: .phrase))
+        }
+        if readings.count == 1, let parts = Self.splitAbbreviation(readings[0] + "~"),
+           let best = phrases(parts[...]).first, !listed.contains(best.text) {
+            let top = fuzzyPhrases(readings[...]).first?.score ?? -.infinity
+            if best.score > top - Self.loneSplitRange {
+                listed.insert(best.text)
+                out.insert(Candidate(text: best.text, span: 1, kind: .phrase), at: best.score > top ? 0 : min(1, out.count))
+            }
+        }
+        if !out.contains(where: { $0.span == 1 && $0.kind == .phrase }) {
+            out.append(Candidate(text: Self.display(readings[0]), span: 1, kind: .literal))
+        }
+        return out.filter { !$0.text.isEmpty && !PhoneticText.containsPhonetic($0.text) }
+    }
+
+    private func sorted(_ items: [Ranked], readings: [String], initials: Bool) -> [Ranked] {
+        items.sorted { a, b in
+            let keyA = readings.prefix(a.span).joined(separator: "-")
+            let keyB = readings.prefix(b.span).joined(separator: "-")
+            let pa = userModel.preference(reading: keyA, phrase: a.text)
+            let pb = userModel.preference(reading: keyB, phrase: b.text)
+            // 帶 ~ 的音節本來就可能是兩個字（ㄎㄞ → 可愛），這種拆法要照分數排，不能當成「比較長的預測」。
+            if !readings.contains(where: { $0.contains("~") }) {
+                let fitA = a.text.count == a.span
+                let fitB = b.text.count == b.span
+                if fitA != fitB { return fitA }
+            }
+            if pa.count != pb.count { return pa.count > pb.count }
+            if pa.recency != pb.recency { return pa.recency > pb.recency }
+            if a.corrections != b.corrections { return a.corrections < b.corrections }
+            if initials {
+                let rareA = pa.count == 0 && a.score < Self.initialsRareScore
+                let rareB = pb.count == 0 && b.score < Self.initialsRareScore
+                if rareA != rareB { return rareB }
+            }
+            if a.score != b.score { return a.score > b.score }
+            return a.order < b.order
+        }
+    }
+
+    /// 前文只在沒學過的單字之間把最合適的那個移到前面，不蓋過已經選過的字。
+    private func promoteContext(_ items: [Ranked], readings: [String], context: String) -> [Ranked] {
+        guard readings.count == 1 else { return items }
+        let related = completions(after: context)
+        guard !related.isEmpty else { return items }
+        let scores = Dictionary(fuzzyPhrases(readings[...]).filter { $0.corrections == 0 }.map { ($0.text, $0.score) },
+                                uniquingKeysWith: max)
+        let key = readings.joined(separator: "-")
+        let learned = items.filter { userModel.preference(reading: key, phrase: $0.text).count > 0 }
+        var rest = items.filter { userModel.preference(reading: key, phrase: $0.text).count == 0 }
+        func support(_ text: String) -> Double {
+            guard text.count == 1 else { return 0 }
+            return related.filter {
+                $0.text.hasPrefix(text) &&
+                Self.matchPenalty([Substring(Self.displayQuery(readings[0]))],
+                                  Array($0.reading.split(separator: "-").prefix(1))) != nil
+            }.map { max(0, min(1.8, 5 + $0.score)) }.max() ?? 0
+        }
+        guard let best = rest.indices.max(by: { i, j in
+            let si = (scores[rest[i].text] ?? rest[i].score) + support(rest[i].text)
+            let sj = (scores[rest[j].text] ?? rest[j].score) + support(rest[j].text)
+            if si != sj { return si < sj }
+            return rest[i].order > rest[j].order
+        }), rest[best].text.count == 1, best != 0 else { return learned + rest }
+        let winner = rest.remove(at: best)
+        rest.insert(winner, at: 0)
+        return learned + rest
+    }
+
+    /// 字典詞蓋不住整段時，用斷詞。若多字詞後面又接了同一個字（就是＋是），改成下一個同音字。
+    private func composedSentence(_ readings: [String]) -> String {
+        let parts = segmentation(of: readings, contextual: true)
+        let joined = parts.map { $0.text }.joined()
+        var chars = Array(joined)
+        guard chars.count == readings.count else { return joined }
+        var singleton = Set<Int>()
+        var cursor = 0
+        for part in parts {
+            if part.text.count == 1 { singleton.insert(cursor) }
+            cursor += max(part.text.count, 1)
+        }
+        let n = readings.count
+        for k in stride(from: min(Self.maxPhraseLength, n - 1), through: 2, by: -1) {
+            guard let word = fuzzyPhrases(readings[0..<k]).first(where: { $0.corrections == 0 && $0.text.count == k }) else { continue }
+            let w = Array(word.text)
+            guard w.count == k, chars.starts(with: w), chars[k] == w[k - 1], singleton.contains(k) else { continue }
+            let banned = String(w[k - 1])
+            if let alt = phrases(readings[k...k]).first(where: { $0.text.count == 1 && $0.text != banned }) {
+                chars[k] = Array(alt.text)[0]
+                return String(chars)
+            }
+        }
+        return joined
+    }
+
+    private func longerSuggestions(readings: [String], context: String, initials: Bool, leading: String?, seen: inout Set<String>) -> [Candidate] {
+        let related = completions(after: context)
+        let pattern = readings.map { Substring(Self.displayQuery($0)) }
+        let contextual = related.filter {
+            let full = $0.reading.split(separator: "-")
+            return full.count > readings.count &&
+                Self.matchPenalty(pattern, Array(full.prefix(readings.count))) != nil
+        }.map { (text: $0.text, reading: $0.reading, score: $0.score) }
+        var ordinary = predictions(for: readings)
+        if readings.contains(where: { $0.contains("*") }), let leading, !leading.isEmpty {
+            ordinary = ordinary.filter { $0.text.hasPrefix(leading) } + ordinary.filter { !$0.text.hasPrefix(leading) }
+        }
+        var pool: [(text: String, reading: String, score: Double, order: Int)] = []
+        for (i, item) in (contextual + ordinary).enumerated() where item.text.count > readings.count {
+            pool.append((item.text, item.reading, item.score, i))
+        }
+        pool.sort { a, b in
+            let pa = userModel.preference(reading: a.reading, phrase: a.text)
+            let pb = userModel.preference(reading: b.reading, phrase: b.text)
+            if pa.count != pb.count { return pa.count > pb.count }
+            if pa.recency != pb.recency { return pa.recency > pb.recency }
+            if a.score != b.score { return a.score > b.score }
+            return a.order < b.order
+        }
+        var extras: [Candidate] = []
+        for item in pool {
+            let picked = userModel.preference(reading: item.reading, phrase: item.text).count
+            if initials && picked == 0 && item.score < Self.initialsRareScore { continue }
+            guard seen.insert(item.text).inserted else { continue }
+            extras.append(Candidate(text: item.text, span: readings.count, kind: .phrase, reading: item.reading))
+            if extras.count == 2 { break }
+        }
+        return extras
+    }
+
     private static func displayQuery(_ reading: String) -> String {
         reading.hasSuffix("~") ? String(reading.dropLast()) : reading
     }
 
     /// 沒打聲調也先預測詞；保留完整讀音，選取後才能正確學習。
-    func predictions(for readings: [String], limit: Int = 8) -> [(text: String, reading: String)] {
+    func predictions(for readings: [String], limit: Int = 8) -> [(text: String, reading: String, score: Double)] {
         guard column == "reading", !readings.isEmpty, readings.count < Self.maxPhraseLength, limit > 0 else { return [] }
         let input = readings.map { Self.displayQuery($0) }
         let pattern = input.map { Substring($0) }
@@ -499,7 +730,7 @@ final class ZhuyinEngine {
         }
         return best.values.sorted {
             $0.score != $1.score ? $0.score > $1.score : $0.text < $1.text
-        }.prefix(limit).map { (text: $0.text, reading: $0.reading) }
+        }.prefix(limit).map { (text: $0.text, reading: $0.reading, score: $0.score) }
     }
 
     /// 只取游標前連續中文的末三字；標點、空格、換行會中斷前文。
@@ -598,9 +829,25 @@ final class ZhuyinEngine {
 
 /// 記住使用者選過的字詞
 final class UserPhraseModel {
+    struct Preference {
+        var count: Int
+        var recency: Int
+    }
+
+    private struct Snapshot: Codable {
+        var counts: [String: [String: Int]]
+        var recency: [String: [String: Int]]
+        var clock: Int
+    }
+
+    /// 學習紀錄上限。超過就丟掉選得少、又比較久沒選的。
+    static let entryCap = 2000
+
     private var counts: [String: [String: Int]] = [:]
+    private var recency: [String: [String: Int]] = [:]
+    private var clock = 0
     private let fileURL: URL?
-    private var matchingCache: [String: [String: Int]] = [:]
+    private var prefCache: [String: [String: Preference]] = [:]
     private var readingBuckets: [String: Set<String>] = [:]
     private var wildcardBuckets: [String: Set<String>] = [:]
     private var readingParts: [String: [Substring]] = [:]
@@ -611,8 +858,14 @@ final class UserPhraseModel {
     init(fileURL: URL?, asynchronousWrites: Bool = false) {
         self.asynchronousWrites = asynchronousWrites
         self.fileURL = fileURL
-        if let url = fileURL, let saved = JSONFile.load([String: [String: Int]].self, from: url) {
-            counts = saved
+        if let url = fileURL, let data = try? Data(contentsOf: url) {
+            if let snap = try? JSONDecoder().decode(Snapshot.self, from: data) {
+                counts = snap.counts
+                recency = snap.recency
+                clock = snap.clock
+            } else if let saved = try? JSONDecoder().decode([String: [String: Int]].self, from: data) {
+                counts = saved
+            }
         }
         for reading in counts.keys where !reading.isEmpty { index(reading) }
     }
@@ -672,15 +925,38 @@ final class UserPhraseModel {
         return out.map { ($0.reading, $0.phrase) }
     }
 
+    /// 這個打法（含簡拼、省略聲調）選過幾次、最近一次是何時。沒選過是 (0, 0)。
+    func preference(reading: String, phrase: String) -> Preference {
+        preferences(for: reading)[phrase] ?? Preference(count: 0, recency: 0)
+    }
+
+    func pickCount(reading: String, phrase: String) -> Int {
+        preference(reading: reading, phrase: phrase).count
+    }
+
     // 完整讀音和省略聲調／只打開頭的讀音也共用已選字詞；不混用不同的聲調。
     private func matchingCounts(for reading: String) -> [String: Int] {
-        if let cached = matchingCache[reading] { return cached }
+        preferences(for: reading).mapValues { $0.count }
+    }
+
+    private func preferences(for reading: String) -> [String: Preference] {
+        if let cached = prefCache[reading] { return cached }
         let query = reading.split(separator: "-")
-        var result = counts[reading] ?? [:]
+        var result: [String: Preference] = [:]
+        func merge(_ phrases: [String: Int], _ times: [String: Int]) {
+            for (phrase, count) in phrases {
+                let when = times[phrase] ?? 0
+                if let old = result[phrase] {
+                    result[phrase] = Preference(count: max(old.count, count), recency: max(old.recency, when))
+                } else {
+                    result[phrase] = Preference(count: count, recency: when)
+                }
+            }
+        }
+        merge(counts[reading] ?? [:], recency[reading] ?? [:])
         let key = Self.bucket(query)
         let possible = reading.contains("*") ? readingBuckets[key] : wildcardBuckets[key]
         for saved in possible ?? [] where saved != reading {
-            let phrases = counts[saved] ?? [:]
             let parts = readingParts[saved]!
             guard parts.count == query.count else { continue }
             let matches = zip(query, parts).allSatisfy { want, have in
@@ -688,32 +964,81 @@ final class UserPhraseModel {
                 ZhuyinEngine.matchPenalty([want], [have]) != nil ||
                 ZhuyinEngine.matchPenalty([have], [want]) != nil
             }
-            if matches {
-                for (phrase, count) in phrases { result[phrase] = max(result[phrase] ?? 0, count) }
-            }
+            if matches { merge(counts[saved] ?? [:], recency[saved] ?? [:]) }
         }
-        if matchingCache.count >= 512 { matchingCache.removeAll() }
-        matchingCache[reading] = result
+        if prefCache.count >= 512 { prefCache.removeAll() }
+        prefCache[reading] = result
         return result
+    }
+
+    /// 每個音節只留第一個注音，讓「選過的完整讀音」在簡拼時也排前面。
+    private static func abbreviation(of reading: String) -> String? {
+        let parts = reading.split(separator: "-")
+        guard !parts.isEmpty else { return nil }
+        let abbr = parts.map { part -> String in
+            let body = part.filter { $0 != "*" && $0 != "~" && !Bopomofo.tones.contains($0) }
+            guard let first = body.first else { return String(part) }
+            return String(first) + "*"
+        }.joined(separator: "-")
+        return abbr == reading ? nil : abbr
     }
 
     func record(reading: String, phrase: String) {
         guard !reading.isEmpty, !phrase.isEmpty else { return }
-        matchingCache.removeAll()
+        prefCache.removeAll()
         learnedCache = nil
         index(reading)
+        clock += 1
         counts[reading, default: [:]][phrase, default: 0] += 1
+        recency[reading, default: [:]][phrase] = clock
         counts[Self.anyReading, default: [:]][phrase, default: 0] += 1
+        if let abbr = Self.abbreviation(of: reading) {
+            index(abbr)
+            let count = counts[reading]![phrase]!
+            counts[abbr, default: [:]][phrase] = max(counts[abbr]?[phrase] ?? 0, count)
+            recency[abbr, default: [:]][phrase] = clock
+        }
+        trim()
         save()
+    }
+
+    private func trim() {
+        var entries: [(reading: String, phrase: String, count: Int, when: Int)] = []
+        for (reading, phrases) in counts where !reading.isEmpty {
+            for (phrase, count) in phrases {
+                entries.append((reading, phrase, count, recency[reading]?[phrase] ?? 0))
+            }
+        }
+        guard entries.count > Self.entryCap else { return }
+        entries.sort { a, b in
+            if a.count != b.count { return a.count < b.count }
+            return a.when < b.when
+        }
+        for item in entries.prefix(entries.count - Self.entryCap) {
+            counts[item.reading]?[item.phrase] = nil
+            recency[item.reading]?[item.phrase] = nil
+            if counts[item.reading]?.isEmpty != false {
+                counts[item.reading] = nil
+                recency[item.reading] = nil
+            }
+        }
+        var live = Set<String>()
+        for (reading, phrases) in counts where !reading.isEmpty { live.formUnion(phrases.keys) }
+        if var any = counts[Self.anyReading] {
+            for phrase in Array(any.keys) where !live.contains(phrase) { any[phrase] = nil }
+            counts[Self.anyReading] = any.isEmpty ? nil : any
+        }
     }
 
     func reset() {
         counts = [:]
+        recency = [:]
+        clock = 0
         readingBuckets.removeAll()
         wildcardBuckets.removeAll()
         readingParts.removeAll()
         learnedCache = nil
-        matchingCache.removeAll()
+        prefCache.removeAll()
         save()
     }
 
@@ -723,7 +1048,7 @@ final class UserPhraseModel {
 
     private func save() {
         guard let url = fileURL else { return }
-        let snapshot = counts
+        let snapshot = Snapshot(counts: counts, recency: recency, clock: clock)
         if asynchronousWrites {
             // 串行寫入不可亂序；鍵盤收起前會等最後一筆落盤。
             saveQueue.async { JSONFile.save(snapshot, to: url) }
