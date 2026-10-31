@@ -171,7 +171,7 @@ final class TopBarView: UIView {
             isEditor = true
             editorSource.setTitle(source, for: .normal)
             hasSource = source != nil
-            editorLabel.text = prompt + text + "▏"
+            editorLabel.text = prompt + (text.contains("▏") ? text : text + "▏")
             editorExtra.setTitle(extra, for: .normal)
             editorSave.setTitle(confirm, for: .normal)
         }

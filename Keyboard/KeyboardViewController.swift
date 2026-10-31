@@ -17,9 +17,21 @@ final class KeyboardViewController: UIInputViewController {
     private enum EditorPurpose { case emoticon, translate, fancy, shortcutPhrase, shortcutCode, clipboardCategory, clipboardItem }
     private var renamingCategory: String?
     private var editingClipID: UUID?
+    /// 編輯框裡的游標位置（第幾個字後面）；nil = 永遠在最後面
+    private var editorCursor: Int?
     private var folderNameBox: FolderNameBox!
     private var namingFolder: Bool { editorText != nil && editorPurpose == .clipboardCategory }
     private var folderBoxHeight: CGFloat { namingFolder ? 84 : 0 }
+
+    /// 編輯框顯示的字：有游標時只顯示游標附近，中間放 ▏ 表示游標
+    private func editorDisplay(_ text: String) -> String {
+        guard let c = editorCursor else { return text }
+        let chars = Array(text)
+        let i = max(0, min(chars.count, c))
+        let before = chars[max(0, i - 14)..<i]
+        let after = chars[i..<min(chars.count, i + 10)]
+        return (i > 14 ? "…" : "") + String(before) + "▏" + String(after) + (chars.count - i > 10 ? "…" : "")
+    }
 
     private func editorLabel(_ p: EditorPurpose) -> String {
         switch p {
@@ -312,6 +324,12 @@ final class KeyboardViewController: UIInputViewController {
         grid.onGlide = { [weak self] path, centers, kw in self?.glideTyped(path: path, centers: centers, keyWidth: kw) }
         grid.onCursorMove = { [weak self] steps in
             guard let self = self, !self.isComposing else { return }
+            // 在編輯框裡（例如改剪貼簿）：移動編輯框自己的游標
+            if let c = self.editorCursor, let t = self.editorText {
+                self.editorCursor = max(0, min(t.count, c + steps))
+                self.refreshTopBar()
+                return
+            }
             self.finishHangul()
             self.textDocumentProxy.adjustTextPosition(byCharacterOffset: steps)
         }
@@ -700,7 +718,13 @@ final class KeyboardViewController: UIInputViewController {
     private func output(_ s: String) {
         guard !s.isEmpty else { return }
         if editorText != nil && editorResult == nil {
-            editorText! += s
+            if let c = editorCursor, let t = editorText {
+                let i = t.index(t.startIndex, offsetBy: min(c, t.count))
+                editorText!.insert(contentsOf: s, at: i)
+                editorCursor = min(c, t.count) + s.count
+            } else {
+                editorText! += s
+            }
             refreshTopBar()
             return
         }
@@ -709,7 +733,14 @@ final class KeyboardViewController: UIInputViewController {
 
     private func deleteOutput() {
         if var t = editorText, editorResult == nil {
-            if !t.isEmpty { t.removeLast() }
+            if let c = editorCursor {
+                if c > 0, c <= t.count {
+                    t.remove(at: t.index(t.startIndex, offsetBy: c - 1))
+                    editorCursor = c - 1
+                }
+            } else if !t.isEmpty {
+                t.removeLast()
+            }
             editorText = t
             refreshTopBar()
             return
@@ -845,6 +876,7 @@ final class KeyboardViewController: UIInputViewController {
             editorResult = nil
             if i < r.items.count {
                 editorText = nil
+                editorCursor = nil
                 textDocumentProxy.insertText(r.items[i])
                 rebuildKeys()
             }
@@ -1044,7 +1076,7 @@ final class KeyboardViewController: UIInputViewController {
             topBar.show(.candidates(composition: r.title, items: r.items + ["✏️ 修改"], trailing: .close))
         } else if isComposing {
             // 用編輯框時，前面也顯示已經打好的字
-            let prefix = editorText.map { editorLabel(editorPurpose) + $0 + " ｜ " } ?? ""
+            let prefix = editorText.map { editorLabel(editorPurpose) + editorDisplay($0) + " ｜ " } ?? ""
             topBar.show(.candidates(composition: prefix + compositionText, items: candidates.map { $0.text },
                                     trailing: .expand))
         } else if namingFolder && suggestions.isEmpty {
@@ -1059,7 +1091,7 @@ final class KeyboardViewController: UIInputViewController {
                 topBar.show(.editor(prompt: translating ? "翻譯中…" : "翻譯：", text: text, extra: "→\(name)",
                                     confirm: "翻譯", source: "從：\(from)"))
             default:
-                topBar.show(.editor(prompt: editorLabel(editorPurpose), text: text, extra: "", confirm: editorConfirmTitle(editorPurpose)))
+                topBar.show(.editor(prompt: editorLabel(editorPurpose), text: editorDisplay(text), extra: "", confirm: editorConfirmTitle(editorPurpose)))
             }
         } else if !suggestions.isEmpty {
             topBar.show(.candidates(composition: "", items: suggestions, trailing: .close))
@@ -1183,6 +1215,8 @@ final class KeyboardViewController: UIInputViewController {
                 self.editingClipID = item.id
                 self.beginEditor(.clipboardItem)
                 self.editorText = item.text
+                self.editorCursor = item.text.count   // 游標先放最後，按住空白鍵左右滑可以移動
+                self.toast("按住空白鍵左右滑，移到要改的地方")
                 self.refreshTopBar()
             }
             p.onAddCurrent = { [weak self] in self?.addCurrentClipboard() }
@@ -1406,6 +1440,7 @@ final class KeyboardViewController: UIInputViewController {
         candidates = []
         editingClipID = nil
         editorText = nil
+        editorCursor = nil
         editorReturnPanel = nil
         editorResult = nil
         translating = false
