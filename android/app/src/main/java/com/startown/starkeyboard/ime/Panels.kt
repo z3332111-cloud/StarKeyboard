@@ -483,23 +483,32 @@ class SettingsPanel(
             col.addView(shapes)
         }
 
+        header("按鍵質感")
+        choices(KeyFinish.values().map { it.title }, settings.keyFinish.ordinal) {
+            settings.keyFinish = KeyFinish.values()[it]; onChange()
+        }
+        note("胖胖：圓滾滾有立體感，按下去會壓扁。玻璃：半透明亮亮的，配背景照片最好看。")
+
         header("按鍵特效（按下去冒出小圖案）")
         choices(KeyEffect.values().map { it.title }, KeyEffect.values().indexOfFirst { it.id == settings.keyEffect }) {
             settings.keyEffect = KeyEffect.values()[it].id; onChange()
         }
 
         header("字體（按鍵和候選字）")
-        val fonts = LinearLayout(context).apply { orientation = HORIZONTAL }
-        for (font in KeyFont.values()) {
+        for (group in KeyFont.values().toList().chunked(4)) {
+            val fonts = LinearLayout(context).apply { orientation = HORIZONTAL }
+            for (font in group) {
             val selected = font.id == settings.fontId
             fonts.addView(Tap(context, font.title, 16f, if (selected) t.accentText else t.keyText, selected) {
                 settings.fontId = font.id; onChange()
             }.apply {
                 background = roundRect(if (selected) t.accent else t.key.withAlpha(0.6f), dp(12f))
                 KeyFonts.get(context, font.id)?.let { typeface = it }
-            }, LayoutParams(0, dpi(40f), 1f).apply { rightMargin = dpi(6f) })
+            }, LayoutParams(0, dpi(40f), 1f).apply { rightMargin = dpi(6f); bottomMargin = dpi(6f) })
+            }
+            repeat(4 - group.size) { fonts.addView(View(context), LayoutParams(0, dpi(40f), 1f)) }
+            col.addView(fonts)
         }
-        col.addView(fonts)
         note("字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。")
 
         header("大小（邊拖邊看）")

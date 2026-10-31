@@ -45,7 +45,7 @@ fun Int.withAlpha(a: Float): Int = Color.argb((Color.alpha(this) * a.coerceIn(0f
 
 /** 按鍵造型（和 iPhone 版 KeyShape 一樣的算法，單位是 dp 換成的像素） */
 enum class KeyShape(val title: String) {
-    ROUNDED("圓角"), JELLY("果凍"), CAT_EAR("貓耳"), CLOUD("雲朵"), BUNNY("兔兔"), PUPPY("狗狗"), PUDDING("布丁"), JELLYFISH("水母"), FLAME("火焰"), DROPLET("水滴"), DUCK("鴨鴨");
+    ROUNDED("圓角"), JELLY("果凍"), CAT_EAR("貓耳"), CLOUD("雲朵"), BUNNY("兔兔"), PUPPY("狗狗"), PUDDING("布丁"), JELLYFISH("水母"), FLAME("火焰"), DROPLET("水滴"), DUCK("鴨鴨"), MOCHI("麻糬"), BUBBLE("泡泡");
 
     val isSoftShape: Boolean get() = when (this) {
         BUNNY, PUPPY, PUDDING, JELLYFISH, FLAME, DROPLET, DUCK -> true
@@ -83,6 +83,13 @@ enum class KeyShape(val title: String) {
 
     fun detailPath(r: RectF, dp: Float): Path {
         if (isWide(r)) return path(badgeRect(r), dp)
+        if (this == BUBBLE) {
+            val b = bodyRect(r, dp)
+            val s = minOf(b.width(), b.height()) * 0.16f
+            val l = b.left + b.width() * 0.2f
+            val tp = b.top + b.height() * 0.16f
+            return Path().apply { addOval(RectF(l, tp, l + s, tp + s), Path.Direction.CW) }
+        }
         return Path().apply {
             when (this@KeyShape) {
             BUNNY -> {
@@ -177,6 +184,7 @@ enum class KeyShape(val title: String) {
         FLAME -> if (theme.dark) Color.rgb(255, 212, 107) else Color.rgb(237, 145, 74)
         DROPLET -> if (theme.dark) Color.rgb(184, 239, 255) else Color.rgb(74, 173, 213)
         DUCK -> if (theme.dark) Color.rgb(255, 210, 118) else Color.rgb(215, 138, 50)
+        BUBBLE -> Color.WHITE
         else -> theme.accent
     }
 
@@ -324,6 +332,18 @@ enum class KeyShape(val title: String) {
                 path.quadTo(x(0.23f), y(0.64f), x(0.32f), y(0.43f))
                 path.close()
             }
+            MOCHI -> {
+                // 圓滾滾、下面比較胖的麻糬
+                fun x(v: Float) = body.left + body.width() * v
+                fun y(v: Float) = body.top + body.height() * v
+                path.moveTo(x(0.5f), y(0.03f))
+                path.cubicTo(x(0.86f), y(0.02f), x(0.985f), y(0.2f), x(0.985f), y(0.52f))
+                path.cubicTo(x(0.99f), y(0.88f), x(0.84f), y(0.99f), x(0.5f), y(0.99f))
+                path.cubicTo(x(0.16f), y(0.99f), x(0.01f), y(0.88f), x(0.015f), y(0.52f))
+                path.cubicTo(x(0.015f), y(0.2f), x(0.14f), y(0.02f), x(0.5f), y(0.03f))
+                path.close()
+            }
+            BUBBLE -> path.addRoundRect(body, minSide / 2, minSide / 2, Path.Direction.CW)
         }
         return path
     }
@@ -337,7 +357,13 @@ data class KeyboardStyle(
     val gapScale: Float,
     val fontId: String = "system",
     val keyEffect: String = "none",
+    val finish: KeyFinish = KeyFinish.FLAT,
 )
+
+/** 按鍵質感：平面、胖胖（圓滾滾有立體感、按下去會壓扁）、玻璃（半透明、亮亮的邊） */
+enum class KeyFinish(val title: String) {
+    FLAT("平面"), PUFFY("胖胖"), GLASS("玻璃");
+}
 
 /** 按下按鍵時冒出來的小圖案 */
 enum class KeyEffect(val id: String, val title: String, val glyphs: List<String>) {
@@ -365,6 +391,7 @@ enum class KeySound(val id: String, val title: String) {
 /** 按鍵和候選字用的字體（App 裡附的免費字體，SIL OFL 1.1） */
 enum class KeyFont(val id: String, val title: String) {
     SYSTEM("system", "系統"), HUNINN("huninn", "粉圓"), IANSUI("iansui", "芫荽"), WENKAI("wenkai", "文楷"),
+    GENSEN("gensen", "源泉圓體"), NAIKAI("naikai", "內海"), CUBIC("cubic", "像素"),
 }
 
 object KeyFonts {
@@ -532,6 +559,9 @@ class KeyboardSettings(context: Context) {
     var keyEffect: String
         get() = p.getString("keyEffect", KeyEffect.NONE.id) ?: KeyEffect.NONE.id
         set(v) = p.edit().putString("keyEffect", v).apply()
+    var keyFinish: KeyFinish
+        get() = runCatching { KeyFinish.valueOf(p.getString("keyFinish", "FLAT")!!) }.getOrDefault(KeyFinish.FLAT)
+        set(v) = p.edit().putString("keyFinish", v.name).apply()
     var keySoundStyle: String
         get() = p.getString("keySoundStyle", KeySound.SYSTEM.id) ?: KeySound.SYSTEM.id
         set(v) = p.edit().putString("keySoundStyle", v).apply()
@@ -611,5 +641,5 @@ class KeyboardSettings(context: Context) {
         get() = p.getString("fontId", KeyFont.SYSTEM.id) ?: KeyFont.SYSTEM.id
         set(v) = p.edit().putString("fontId", v).apply()
 
-    val style get() = KeyboardStyle(KeyboardTheme.named(themeId), shape, keyAlpha, fontScale, gapScale, fontId, keyEffect)
+    val style get() = KeyboardStyle(KeyboardTheme.named(themeId), shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish)
 }
