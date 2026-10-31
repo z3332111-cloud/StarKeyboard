@@ -93,8 +93,14 @@ class MainActivity : Activity() {
                         setPadding(0, px(16f), 0, px(4f))
                     })
                     text(info.notes, updateBox)
-                    text("按下面的按鈕下載 APK。目前要先移除舊版（長按糯糯鍵盤圖示 › 解除安裝）再點開新的安裝檔安裝，裝好後要重新選一次鍵盤。", updateBox)
-                    button("下載新版", updateBox) {
+                    updateBox.addView(TextView(this).apply {
+                        text = "⚠️ 更新前請先匯出剪貼簿！移除舊版時，剪貼簿紀錄、分類和自訂表符會一起被刪掉。"
+                        textSize = 15f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.parseColor("#B5612A"))
+                        setPadding(0, px(6f), 0, px(4f))
+                    })
+                    button("① 先匯出剪貼簿（存成檔案）", updateBox) { startActivity(Intent(this, ClipboardTransferActivity::class.java)) }
+                    text("② 下載新版 APK。目前要先移除舊版（長按糯糯鍵盤圖示 › 解除安裝）再點開新的安裝檔安裝，裝好後重新選一次鍵盤。\n③ 打開「剪貼簿匯入／匯出」，把剛剛存的檔案匯入回來。", updateBox)
+                    button("② 下載新版", updateBox) {
                         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl ?: info.pageUrl)))
                     }
                 }

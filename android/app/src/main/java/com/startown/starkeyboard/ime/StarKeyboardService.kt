@@ -1657,6 +1657,6 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val latest = settings.latestBuild
         if (latest <= BuildInfo.current(this) || latest <= settings.notifiedBuild) return
         settings.notifiedBuild = latest
-        toast("有新版！打開糯糯鍵盤 App 更新")
+        toast("有新版！更新前記得先匯出剪貼簿")
     }
 }

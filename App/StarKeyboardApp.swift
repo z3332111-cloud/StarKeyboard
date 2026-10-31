@@ -62,7 +62,7 @@ struct ContentView: View {
                             Text(latest.notes)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
-                            Text("更新方法：在安裝網站下載新的 IPA，用 SideStore（或原本安裝用的工具、同一個 Apple ID）直接安裝。不要先刪掉舊 App，設定和資料會保留。")
+                            Text("更新方法（都在手機上）：\n1. 點下面「前往下載」，下載新的 .ipa\n2. 打開 LocalDevVPN，確認已連上\n3. 打開 SideStore，左上角 ＋，選剛下載的檔案，蓋過舊的糯糯鍵盤\n不要先刪掉舊 App，設定和資料會保留。")
                                 .font(.footnote)
                         }
                         .padding(.vertical, 4)
@@ -118,9 +118,9 @@ struct ContentView: View {
                     tip("翻譯", "工具列的「譯」：先打中文，按「→英文」換語言，再按「翻譯」，點結果就送出。")
                     tip("自製表符", "在 ⭐ 我的 按 ＋ 就能新增；長按可以刪除。")
                     tip("空白鍵", "按住空白鍵左右滑，可以移動游標。")
-                    tip("Wi-Fi 自動續簽", "免費 Apple ID 的簽章有效 7 天。首次插線配對並啟用 Wi-Fi 同步及 Sideloadly 自動續簽後，可由 Daemon 在快到期時無線續簽。電腦須開著且保持喚醒，Daemon 有執行，手機能在同一網路被找到。")
-                    tip("續簽與新版", "Daemon 續簽的是已登錄的版本，不會自動下載 GitHub 新版。更新時下載新 IPA，用原 Apple ID 安裝並保留自動續簽；不要先刪除舊 App。")
-                    Link("查看 Wi-Fi 續簽設定步驟", destination: URL(string: "https://z3332111-cloud.github.io/StarKeyboard/#wifi-refresh")!)
+                    tip("7 天續簽", "免費 Apple ID 的簽章 7 天到期。SideStore 會自己續，也可以在背景續；快到期時打開 LocalDevVPN，SideStore 的 My Apps 會看到剩幾天。不用再接電腦。")
+                    tip("怎麼更新", "1. 用 iPhone 打開安裝網站，下載新的 .ipa\n2. 打開 LocalDevVPN，確認已連上\n3. 打開 SideStore，左上角 ＋，選剛下載的檔案，蓋過舊的糯糯鍵盤（延伸功能選 Keep App Extensions）\n不要先刪掉舊 App，設定和資料會保留。")
+                    Link("查看更新步驟（安裝網站）", destination: URL(string: "https://z3332111-cloud.github.io/StarKeyboard/#wifi-refresh")!)
                 }
             }
             .navigationTitle("糯糯鍵盤")

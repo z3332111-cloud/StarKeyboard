@@ -619,7 +619,7 @@ class SettingsPanel(
         header("其他")
         button("清除選字學習紀錄") { onResetLearning() }
         if (settings.latestBuild > BuildInfo.current(context)) {
-            note("🎉 有新版：打開「糯糯鍵盤」App 更新")
+            note("🎉 有新版：打開「糯糯鍵盤」App 更新（更新前先匯出剪貼簿）")
         }
         note("糯糯鍵盤 Android v${BuildInfo.version(context)} ・ 注音字典來自小麥注音（MIT 授權）")
     }
