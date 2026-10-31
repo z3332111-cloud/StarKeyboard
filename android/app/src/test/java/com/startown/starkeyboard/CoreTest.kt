@@ -285,7 +285,7 @@ class CoreTest {
         for (group in listOf(SymbolData.emoji, SymbolData.kaomoji, SymbolData.symbols)) {
             for (cat in group) assertTrue(cat.title, cat.items.isNotEmpty() && "" !in cat.items)
         }
-        assertEquals(7, SymbolData.emoji.size)
+        assertEquals(8, SymbolData.emoji.size)
         assertTrue(SymbolData.symbols.first { it.title == "單位" }.items.contains("$"))
     }
 
