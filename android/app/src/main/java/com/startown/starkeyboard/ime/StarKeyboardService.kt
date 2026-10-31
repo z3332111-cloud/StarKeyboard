@@ -217,7 +217,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         content = FrameLayout(this).apply { clipChildren = false }
         keyboard = KeyboardView(this, style)
         content.addView(keyboard, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        folderNameBox = FolderNameBox(this, onSave = { confirmEditor() }, onCancel = { endEditor(); openPanel(PanelKind.CLIPBOARD) })
+        folderNameBox = FolderNameBox(this, onSave = { confirmEditor() }, onCancel = {
+            // 改剪貼簿的 endEditor 自己會打開剪貼簿
+            val wasClip = editorPurpose == EditorPurpose.CLIPBOARD_ITEM
+            endEditor()
+            if (!wasClip) openPanel(PanelKind.CLIPBOARD)
+        })
         folderNameBox.visibility = View.GONE
         column.addView(folderNameBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (84 * dp).toInt()))
         column.addView(topBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (settings.candidateBarHeight * dp).toInt()))
@@ -1016,19 +1021,23 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val tr = editorResult
         val ed = editorText
         val namingFolder = ed != null && editorPurpose == EditorPurpose.CLIPBOARD_CATEGORY
-        folderNameBox.visibility = if (namingFolder) View.VISIBLE else View.GONE
+        // 改剪貼簿：用和新增資料夾一樣的小對話框
+        val editingClip = ed != null && tr == null && editorPurpose == EditorPurpose.CLIPBOARD_ITEM
+        folderNameBox.visibility = if (namingFolder || editingClip) View.VISIBLE else View.GONE
         (toastView.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
-            val margin = ((if (namingFolder) 138 else 54) * dp).toInt()
+            val margin = ((if (namingFolder) 138 else if (editingClip) 190 else 54) * dp).toInt()
             if (params.topMargin != margin) { params.topMargin = margin; toastView.layoutParams = params }
         }
         if (namingFolder) folderNameBox.update(ed ?: "", renamingCategory != null, style)
+        if (editingClip) folderNameBox.updateClip(ed ?: "", editorCursor, if (isComposing) compositionText else "", style)
         when {
             tr != null -> topBar.showCandidates(tr.title, tr.items + "✏️ 修改", Trailing.CLOSE)
             isComposing -> {
-                val prefix = if (ed != null) editorLabel(editorPurpose) + editorDisplay(ed) + " ｜ " else ""
+                val prefix = if (ed != null && !editingClip) editorLabel(editorPurpose) + editorDisplay(ed) + " ｜ " else ""
                 topBar.showCandidates(if (ed != null) prefix + compositionText else "", candidates.map { it.text }, Trailing.EXPAND)
             }
             namingFolder && suggestions.isEmpty() -> topBar.showCandidates("用下方鍵盤輸入名稱，再按建立", emptyList(), Trailing.EXPAND)
+            editingClip && suggestions.isEmpty() -> topBar.showCandidates("用下方鍵盤修改，改好按上面的「儲存」", emptyList(), Trailing.EXPAND)
             ed != null && (suggestions.isEmpty() || suggestionSource == SuggestionSource.ASSOCIATION) -> {
                 val pending = if (hangulComposing) hangul.composing else ""
                 when (editorPurpose) {

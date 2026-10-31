@@ -21,7 +21,9 @@ final class KeyboardViewController: UIInputViewController {
     private var editorCursor: Int?
     private var folderNameBox: FolderNameBox!
     private var namingFolder: Bool { editorText != nil && editorPurpose == .clipboardCategory }
-    private var folderBoxHeight: CGFloat { namingFolder ? 84 : 0 }
+    /// 改剪貼簿：用和新增資料夾一樣的小對話框
+    private var editingClipBox: Bool { editorText != nil && editorPurpose == .clipboardItem && editorResult == nil }
+    private var folderBoxHeight: CGFloat { namingFolder ? 84 : (editingClipBox ? FolderNameBox.clipHeight : 0) }
 
     /// 編輯框顯示的字：有游標時只顯示游標附近，中間放 ▏ 表示游標
     private func editorDisplay(_ text: String) -> String {
@@ -180,7 +182,11 @@ final class KeyboardViewController: UIInputViewController {
         folderNameBox.isHidden = true
         folderNameBox.onSave = { [weak self] in self?.confirmEditor() }
         folderNameBox.onCancel = { [weak self] in
-            self?.endEditor(); self?.openPanel(.clipboard)
+            guard let self = self else { return }
+            // 改剪貼簿的 endEditor 自己會打開剪貼簿
+            let wasClip = self.editorPurpose == .clipboardItem
+            self.endEditor()
+            if !wasClip { self.openPanel(.clipboard) }
         }
         view.addSubview(folderNameBox)
         view.addSubview(contentView)
@@ -1075,20 +1081,25 @@ final class KeyboardViewController: UIInputViewController {
 
     private func refreshTopBar() {
         guard topBar != nil else { return }
-        folderNameBox.isHidden = !namingFolder
+        folderNameBox.isHidden = !(namingFolder || editingClipBox)
         if namingFolder {
             folderNameBox.update(name: editorText ?? "", renaming: renamingCategory != nil, style: style)
+        } else if editingClipBox {
+            folderNameBox.updateClip(text: editorText ?? "", cursor: editorCursor,
+                                     composing: isComposing ? compositionText : "", style: style)
         }
         topBar.scriptTitle = mode == .pinyin && editorResult == nil ? (settings.pinyinSimplified ? "簡" : "繁") : nil
         if let r = editorResult {
             topBar.show(.candidates(composition: r.title, items: r.items + ["✏️ 修改"], trailing: .close))
         } else if isComposing {
             // 用編輯框時，前面也顯示已經打好的字
-            let prefix = editorText.map { editorLabel(editorPurpose) + editorDisplay($0) + " ｜ " } ?? ""
+            let prefix = editingClipBox ? "" : (editorText.map { editorLabel(editorPurpose) + editorDisplay($0) + " ｜ " } ?? "")
             topBar.show(.candidates(composition: prefix + compositionText, items: candidates.map { $0.text },
                                     trailing: .expand))
         } else if namingFolder && suggestions.isEmpty {
             topBar.show(.candidates(composition: "用下方鍵盤輸入名稱，再按建立", items: [], trailing: .expand))
+        } else if editingClipBox && suggestions.isEmpty {
+            topBar.show(.candidates(composition: "用下方鍵盤修改，改好按上面的「儲存」", items: [], trailing: .expand))
         } else if let text = editorText, suggestions.isEmpty || suggestionSource == .association {
             switch editorPurpose {
             case .emoticon:

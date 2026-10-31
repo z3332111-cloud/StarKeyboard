@@ -34,6 +34,8 @@ class FolderNameBox(context: Context, onSave: () -> Unit, onCancel: () -> Unit) 
         addView(card, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
     fun update(text: String, renaming: Boolean, style: KeyboardStyle) {
+        setHeight(84)
+        name.maxLines = 1; name.textSize = 16f; name.gravity = Gravity.CENTER_VERTICAL
         title.text = (if (renaming) "重新命名資料夾" else "新增資料夾") + " · 最多 40 字"
         name.text = if (text.isEmpty()) "例如：工作、常用回覆 ▏" else "$text▏"
         name.contentDescription = "資料夾名稱，用下方鍵盤輸入：" + text.ifEmpty { "尚未輸入" }
@@ -44,4 +46,34 @@ class FolderNameBox(context: Context, onSave: () -> Unit, onCancel: () -> Unit) 
         cancel.setTextColor(style.theme.keyText)
         save.setTextColor(if (style.theme.dark) style.theme.accent else style.theme.specialText)
     }
+
+    /** 改剪貼簿：三行高的小對話框，整段文字和游標都看得到 */
+    fun updateClip(text: String, cursor: Int?, composing: String, style: KeyboardStyle) {
+        setHeight(CLIP_HEIGHT)
+        name.maxLines = 3; name.textSize = 15f; name.gravity = Gravity.TOP
+        title.text = "編輯剪貼簿 · 按住空白鍵左右滑移動游標"
+        val c = (cursor ?: text.length).coerceIn(0, text.length)
+        val before = text.substring(0, c).let { if (it.length > 80) "…" + it.takeLast(80) else it }
+        val after = text.substring(c).let { if (it.length > 40) it.take(40) + "…" else it }
+        name.text = before + (if (composing.isEmpty()) "▏" else "［$composing］") + after
+        name.contentDescription = "剪貼簿內容，用下方鍵盤修改：" + text.ifEmpty { "空白" }
+        save.text = "儲存"
+        card.background = roundRect(style.theme.key, px(14).toFloat())
+        title.setTextColor(style.theme.keyText.withAlpha(0.7f))
+        name.setTextColor(style.theme.keyText)
+        cancel.setTextColor(style.theme.keyText)
+        save.setTextColor(if (style.theme.dark) style.theme.accent else style.theme.specialText)
+    }
+
+    private fun setHeight(dp: Int) {
+        val lp = layoutParams ?: return
+        if (lp.height != px(dp)) { lp.height = px(dp); layoutParams = lp }
+        val row = name.parent as? LinearLayout ?: return
+        val nlp = name.layoutParams
+        val h = if (dp == CLIP_HEIGHT) px(dp - 42) else px(44)
+        if (nlp.height != h) { nlp.height = h; name.layoutParams = nlp }
+        row.gravity = if (dp == CLIP_HEIGHT) Gravity.TOP else Gravity.CENTER_VERTICAL
+    }
+
+    companion object { const val CLIP_HEIGHT = 136 }
 }
