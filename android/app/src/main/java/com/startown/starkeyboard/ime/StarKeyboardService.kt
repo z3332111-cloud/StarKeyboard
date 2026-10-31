@@ -33,6 +33,7 @@ import androidx.core.view.inputmethod.InputContentInfoCompat
 import com.startown.starkeyboard.MainActivity
 import com.startown.starkeyboard.CrashLog
 import com.startown.starkeyboard.core.Bopomofo
+import com.startown.starkeyboard.core.BopomofoKind
 import com.startown.starkeyboard.core.ChineseConverter
 import com.startown.starkeyboard.core.Candidate
 import com.startown.starkeyboard.core.ClipboardStore
@@ -50,6 +51,8 @@ import com.startown.starkeyboard.core.ZhuyinComposer
 import com.startown.starkeyboard.core.ZhuyinEngine
 import java.io.File
 import java.util.Locale
+
+private const val MAX_COMPOSITION_SYLLABLES = 48
 
 class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheckerSessionListener {
     private enum class SuggestionSource { ASSOCIATION, HANDWRITING, SPELLING, GLIDE }
@@ -370,11 +373,16 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun typeZhuyin(c: Char) {
         suggestions = emptyList()
         if (!composer.input(c)) {
+            if (Bopomofo.kind(c) == BopomofoKind.TONE) {
+                refreshTopBar()
+                return
+            }
             output(c.toString())
             refreshTopBar()
             return
         }
-        if (composer.syllables.size >= 20) {
+        if (composer.syllables.size >= MAX_COMPOSITION_SYLLABLES) {
+            updateCandidates()
             commitAll()
             return
         }
@@ -455,6 +463,10 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             updateCandidates()
             return
         }
+        if (composer.consumeStrayTone()) {
+            updateCandidates()
+            return
+        }
         if (hangulComposing && hangul.backspace()) {
             val c = hangul.composing
             if (editorText == null) currentInputConnection?.setComposingText(c, 1)
@@ -471,12 +483,23 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun space() {
         if (mode == InputMode.ZHUYIN && layer == KeyboardLayer.LETTERS && composer.hasPendingSyllable) {
-            // 空白鍵＝一聲；這個音沒有一聲的字（例如只打了 ㄋ）就直接送出預覽的字
-            val noFirstTone = engine?.phrases(listOf(composer.current.reading))?.isEmpty() ?: false
-            if (noFirstTone && candidates.isNotEmpty()) selectCandidate(0, false)
-            else if (composer.confirmSyllable()) updateCandidates()
+            // 空白鍵＝一聲。沒打完的音節留在組字區，不直接送出預選的字。
+            composer.confirmSyllable()
+            updateCandidates()
             return
         }
+        if (mode == InputMode.ZHUYIN && layer == KeyboardLayer.LETTERS && composer.isComposing) {
+            val unfinished = composer.syllables.any { it.open }
+            val top = candidates.firstOrNull()
+            val coversAll = top != null && top.span == composer.readings.size && top.kind != Candidate.Kind.LITERAL
+            if (unfinished || !coversAll) {
+                updateCandidates()
+                return
+            }
+            selectCandidate(0, false)
+            return
+        }
+        composer.consumeStrayTone()
         if (isComposing) {
             if (candidates.isEmpty()) commitAll() else selectCandidate(0, false)
             return

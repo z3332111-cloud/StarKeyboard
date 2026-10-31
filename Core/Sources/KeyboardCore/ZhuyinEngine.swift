@@ -27,7 +27,8 @@ final class ZhuyinEngine {
     /// 使用者自己學到、字典沒有的詞
     static let userPhraseBase: Double = -6
 
-    private let db: SQLiteDB
+    /// 整份字典。注音和拼音各有一個引擎，但可以共用同一個索引。
+    private let index: PhraseIndex
     /// 用哪一欄查：注音用 reading（有聲調），拼音用 plain（沒聲調）
     private let column: String
     private var cache: [String: [Scored]] = [:]
@@ -70,8 +71,9 @@ final class ZhuyinEngine {
     static let loneSplitRange: Double = 1.5
     let userModel: UserPhraseModel
 
-    init(db: SQLiteDB, userModel: UserPhraseModel, column: String = "reading") {
-        self.db = db
+    init(db: SQLiteDB, userModel: UserPhraseModel, column: String = "reading", sharedIndex: PhraseIndex? = nil) {
+        // 建索引只發生在鍵盤打開時（或測試建立引擎時），不發生在每個按鍵。
+        self.index = sharedIndex ?? PhraseIndex.load(from: db)
         self.userModel = userModel
         self.column = column
     }
@@ -150,8 +152,10 @@ final class ZhuyinEngine {
             lookupCache[key] = out
         }
         guard key.contains("*") else {
-            db.run("SELECT phrase, score FROM phrases WHERE \(column) = ?1 ORDER BY score DESC LIMIT 80", [.text(key)]) { stmt in
-                out.append((SQLiteDB.text(stmt, 0), SQLiteDB.double(stmt, 1)))
+            let ids = column == "plain" ? index.byPlain[key] : index.byReading[key]
+            for id in ids ?? [] {
+                let row = index.rows[id]
+                out.append((row.phrase, row.score))
             }
             return out
         }
@@ -159,13 +163,18 @@ final class ZhuyinEngine {
         let abbr = String(pattern.compactMap { $0.first })
         var best: [String: Double] = [:]
         let toneless = column == "plain"
-        // 先按完整的輸入條件過濾，再限制筆數，避免常見但不符合的字把要找的字擠掉。
-        db.run("SELECT reading, phrase, score FROM phrases WHERE abbr = ?1 AND \(column) GLOB ?2 ORDER BY score DESC LIMIT 400", [.text(abbr), .text(key)]) { stmt in
-            guard let penalty = Self.matchPenalty(pattern, SQLiteDB.text(stmt, 0).split(separator: "-"), ignoreTones: toneless) else { return }
-            let phrase = SQLiteDB.text(stmt, 1)
-            let s = SQLiteDB.double(stmt, 2) + penalty
-            if let old = best[phrase], old >= s { return }
-            best[phrase] = s
+        // 索引已按分數由高到低。罰分只會更低，所以後面的列不可能再擠進前 80 名時就可以停。
+        var floor = -Double.greatestFiniteMagnitude
+        for id in index.byAbbr[abbr] ?? [] {
+            let row = index.rows[id]
+            if best.count >= 80 && row.score <= floor { break }
+            guard let penalty = Self.matchPenalty(pattern, row.reading.split(separator: "-"), ignoreTones: toneless) else { continue }
+            let s = row.score + penalty
+            if let old = best[row.phrase], old >= s { continue }
+            best[row.phrase] = s
+            if best.count >= 80 {
+                floor = best.values.sorted(by: >)[79]
+            }
         }
         for (phrase, score) in best.sorted(by: { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }).prefix(80) {
             out.append((phrase, score))
@@ -439,12 +448,17 @@ final class ZhuyinEngine {
             rows = cached
         } else {
             var found: [Completion] = []
-            let abbreviation = String(input.compactMap { $0.first })
-            // abbr 範圍用索引縮小查詢；逐音節比對避免 * 跨過分隔符而誤配。
-            db.run("SELECT phrase, reading, score FROM phrases WHERE abbr > ?1 AND abbr < ?2 AND reading GLOB ?3 ORDER BY score DESC, phrase ASC LIMIT 160",
-                   [.text(abbreviation), .text(abbreviation + "\u{10FFFF}"), .text(key + "-*")]) { stmt in
-                found.append(Completion(text: SQLiteDB.text(stmt, 0), reading: SQLiteDB.text(stmt, 1),
-                                        score: SQLiteDB.double(stmt, 2)))
+            let first = input[0]
+            let ids: [Int]
+            if first.contains("*") {
+                let plain = String(first.filter { !Bopomofo.tones.contains($0) && $0 != "*" && $0 != "~" })
+                ids = index.longerByFirstPlain[plain] ?? []
+            } else {
+                ids = index.longerByFirst[String(first)] ?? []
+            }
+            for id in ids {
+                let row = index.rows[id]
+                found.append(Completion(text: row.phrase, reading: row.reading, score: row.score))
             }
             if predictionRows.count >= 64 { predictionRows.removeAll() }
             predictionRows[key] = found
@@ -485,10 +499,13 @@ final class ZhuyinEngine {
         for length in stride(from: tail.count, through: 1, by: -1) {
             let head = String(tail.suffix(length))
             var rows: [Completion] = []
-            db.run("SELECT phrase, reading, score FROM phrases WHERE phrase > ?1 AND phrase < ?2 ORDER BY score DESC, phrase ASC LIMIT 80",
-                   [.text(head), .text(head + "\u{10FFFF}")]) { stmt in
-                rows.append(Completion(text: SQLiteDB.text(stmt, 0), reading: SQLiteDB.text(stmt, 1),
-                                       score: SQLiteDB.double(stmt, 2)))
+            if let ch = head.first {
+                for id in index.byFirstChar[ch] ?? [] {
+                    let row = index.rows[id]
+                    guard row.phrase.hasPrefix(head) else { continue }
+                    rows.append(Completion(text: row.phrase, reading: row.reading, score: row.score))
+                    if rows.count == 80 { break }
+                }
             }
             rows += learned.filter { $0.phrase.hasPrefix(head) && $0.phrase.count > length }.map {
                 Completion(text: $0.phrase, reading: $0.reading, score: Self.userPhraseBase)
@@ -511,16 +528,7 @@ final class ZhuyinEngine {
 
     /// 所有音節（沒聲調）的開頭，例如 ㄋㄧㄠ → ㄋ、ㄋㄧ、ㄋㄧㄠ（給組字用，判斷注音能不能接在一起）
     func syllablePrefixes() -> Set<String> {
-        var out = Set<String>()
-        db.run("SELECT DISTINCT plain FROM phrases WHERE plain NOT LIKE '%-%'") { stmt in
-            let s = SQLiteDB.text(stmt, 0)
-            var prefix = ""
-            for c in s {
-                prefix.append(c)
-                out.insert(prefix)
-            }
-        }
-        return out
+        index.prefixes
     }
 
     /// 聯想整段前文的後續詞，較長的吻合與常用詞優先，也包含已學會的片語。

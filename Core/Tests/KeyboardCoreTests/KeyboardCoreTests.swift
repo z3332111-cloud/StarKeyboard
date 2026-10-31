@@ -13,7 +13,9 @@ final class ZhuyinComposerTests: XCTestCase {
         XCTAssertEqual(c.displayText, "ㄏ")
         c.clear()
         XCTAssertEqual(c.displayText, "")
-        XCTAssertFalse(c.input("ˇ"))
+        // 聲調比音節先到會先留著，但不會顯示，也不算正在組字。
+        XCTAssertTrue(c.input("ˇ"))
+        XCTAssertFalse(c.isComposing)
         XCTAssertEqual(c.displayText, "")
     }
 
@@ -106,8 +108,50 @@ final class ZhuyinComposerTests: XCTestCase {
 
     func testToneWithoutSoundIsNotUsed() {
         var c = ZhuyinComposer()
-        XCTAssertFalse(c.input("ˇ"))
+        // 聲調先到：先留著，不組成一個音節，也不會被當成要送出的文字。
+        XCTAssertTrue(c.input("ˇ"))
         XCTAssertFalse(c.isComposing)
+        XCTAssertEqual(c.displayText, "")
+        XCTAssertTrue(c.input("ㄨ"))
+        XCTAssertTrue(c.input("ㄛ"))
+        XCTAssertEqual(c.displayText, "ㄨㄛˇ")
+        XCTAssertEqual(c.readings, ["ㄨㄛˇ"])
+        XCTAssertTrue(c.input("ㄕ"))
+        XCTAssertEqual(c.readings, ["ㄨㄛˇ", "ㄕ*"])
+    }
+
+    func testLateToneReattachesToOpenSyllable() {
+        var c = ZhuyinComposer()
+        c.input("ㄕ")
+        c.input("ㄋ")
+        XCTAssertTrue(c.backspace())
+        XCTAssertTrue(c.input("ˋ"))
+        XCTAssertEqual(c.readings, ["ㄕˋ"])
+        XCTAssertEqual(c.displayText, "ㄕˋ")
+    }
+
+    func testBackspaceRemovesPendingToneBeforeSymbols() {
+        var c = ZhuyinComposer()
+        XCTAssertTrue(c.input("ˇ"))
+        c.input("ㄨ")
+        c.input("ㄛ")
+        XCTAssertTrue(c.backspace())
+        XCTAssertEqual(c.displayText, "ㄨㄛ")
+        XCTAssertEqual(c.readings, ["ㄨㄛ*"])
+    }
+
+    func testWholeBufferKeepsEverySyllable() {
+        var c = ZhuyinComposer()
+        for ch in "ㄨㄛˇㄕˋㄕˋㄎㄢˋ" { XCTAssertTrue(c.input(ch)) }
+        XCTAssertEqual(c.readings, ["ㄨㄛˇ", "ㄕˋ", "ㄕˋ", "ㄎㄢˋ"])
+        XCTAssertFalse(c.hasPendingSyllable)
+        XCTAssertTrue(c.isComposing)
+        // 空白是一聲，不會把已經打完的句子清掉。
+        c.input("ㄎ")
+        c.input("ㄚ")
+        XCTAssertTrue(c.confirmSyllable())
+        XCTAssertEqual(c.readings, ["ㄨㄛˇ", "ㄕˋ", "ㄕˋ", "ㄎㄢˋ", "ㄎㄚ"])
+        XCTAssertTrue(c.isComposing)
     }
 
     func testBackspace() {
@@ -134,6 +178,47 @@ final class ZhuyinEngineTests: XCTestCase {
         ]
         for r in rows + extra { ZhuyinEngine.insert(into: db, reading: r.0, phrase: r.1, score: r.2) }
         return ZhuyinEngine(db: db, userModel: UserPhraseModel(fileURL: nil))
+    }
+
+    func testAppleSentencesAreTheTopCandidate() {
+        // 是比試常見。整段一起斷詞時，「試試看」仍要贏過把前面音節丟掉之後的「是看」。
+        let e = makeEngine(extra: [
+            ("ㄨㄛˇ", "我", -2.2),
+            ("ㄕˋ", "是", -1.6),
+            ("ㄕˋ", "試", -3.4),
+            ("ㄎㄢˋ", "看", -2.5),
+            ("ㄕˋ-ㄎㄢˋ", "試看", -4.5),
+            ("ㄕˋ-ㄕˋ-ㄎㄢˋ", "試試看", -4.0),
+            ("ㄎㄚˇ", "卡", -3.0),
+            ("ㄉㄜ˙", "的", -1.2),
+            ("ㄒㄩㄢˇ", "選", -3.5),
+            ("ㄗˋ", "字", -2.8),
+            ("ㄒㄩㄢˇ-ㄗˋ", "選字", -3.2),
+            ("ㄉㄡ", "都", -2.0),
+            ("ㄇㄟˊ", "沒", -2.4),
+            ("ㄧㄡˇ", "有", -2.1),
+            ("ㄇㄟˊ-ㄧㄡˇ", "沒有", -2.6),
+            ("ㄉㄡ-ㄇㄟˊ", "都沒", -3.4),
+            ("ㄍㄟˇ", "給", -2.7),
+            ("ㄉㄧˋ", "第", -3.0),
+            ("ㄧ", "一", -1.8),
+            ("ㄍㄜ˙", "個", -2.2),
+            ("ㄉㄧˋ-ㄧ-ㄍㄜ˙", "第一個", -3.1),
+            ("ㄏㄨㄟˋ", "會", -2.3),
+            ("ㄏㄨㄟˋ-ㄕˋ", "會是", -3.0),
+            ("ㄉㄨㄟˋ", "對", -2.4),
+            ("ㄉㄨㄟˋ-ㄉㄜ˙", "對的", -3.0),
+        ])
+        let tryIt = ["ㄨㄛˇ", "ㄕˋ", "ㄕˋ", "ㄎㄢˋ"]
+        XCTAssertEqual(e.candidates(for: tryIt).first?.text, "我試試看")
+        XCTAssertEqual(e.candidates(for: tryIt).first?.span, tryIt.count)
+        XCTAssertEqual(e.bestSegments(tryIt).map { $0.text }.joined(), "我試試看")
+        let long = ["ㄎㄚˇ", "ㄎㄚˇ", "ㄉㄜ˙", "ㄒㄩㄢˇ", "ㄗˋ", "ㄉㄡ", "ㄇㄟˊ", "ㄧㄡˇ",
+                    "ㄍㄟˇ", "ㄉㄧˋ", "ㄧ", "ㄍㄜ˙", "ㄏㄨㄟˋ", "ㄕˋ", "ㄉㄨㄟˋ", "ㄉㄜ˙"]
+        XCTAssertEqual(e.candidates(for: long).first?.text, "卡卡的選字都沒有給第一個會是對的")
+        XCTAssertEqual(e.candidates(for: long).first?.span, long.count)
+        // 只剩最後兩個音節時，不該被當成整句已經選完。
+        XCTAssertNotEqual(e.candidates(for: ["ㄕˋ", "ㄎㄢˋ"]).first?.text, "我試試看")
     }
 
     func testPhraseBeatsSingles() {

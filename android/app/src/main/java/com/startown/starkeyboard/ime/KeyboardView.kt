@@ -16,7 +16,6 @@ import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
-import android.view.animation.OvershootInterpolator
 import kotlin.math.abs
 
 /** 一整片按鍵：自己畫、自己處理觸控（多指連打、滑動修正、刪除鍵連續刪、空白鍵拖曳移動游標） */
@@ -250,7 +249,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         val it = particles.iterator()
         while (it.hasNext()) {
             val p = it.next()
-            val t = (now - p.start) / 550f
+            val t = (now - p.start) / 240f
             if (t >= 1f) { it.remove(); continue }
             val ease = 1 - (1 - t) * (1 - t)
             val x = p.x + p.dx * ease
@@ -273,7 +272,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         val anim = if (pressed) {
             ValueAnimator.ofFloat(k.scale, 0.9f).setDuration(50)
         } else {
-            ValueAnimator.ofFloat(k.scale, 1f).setDuration(280).apply { interpolator = OvershootInterpolator(3f) }
+            ValueAnimator.ofFloat(k.scale, 1f).setDuration(80)
         }
         anim.addUpdateListener { k.scale = it.animatedValue as Float; invalidate() }
         anim.start()
@@ -372,10 +371,12 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 } else if (!t.fired && !t.cursorMode && t.action != KeyAction.Backspace && t.action != KeyAction.Shift) fire(t.key)
             }
             MotionEvent.ACTION_CANCEL -> {
+                val pending = tracks.values.filter { !it.fired && !it.cursorMode && !it.gliding && it.action.isCharacter }
                 for (t in tracks.values) setPressed(t.key, false)
                 tracks.clear()
                 stopRepeat()
                 longPressRunnable?.let { mainHandler.removeCallbacks(it) }
+                for (t in pending) fire(t.key)
             }
         }
         return true

@@ -53,7 +53,11 @@ class CoreTest {
         c.input('ㄇ'); c.input('ㄚ')
         assertTrue(c.confirmSyllable())
         assertEquals("ㄇㄚ", c.readings.last())
-        assertFalse(ZhuyinComposer().input('ˇ'))
+        val bare = ZhuyinComposer()
+        assertTrue(bare.input('ˇ'))
+        assertFalse(bare.isComposing)
+        bare.input('ㄨ'); bare.input('ㄛ')
+        assertEquals(listOf("ㄨㄛˇ"), bare.readings)
         // 沒打聲調就打下一個字：前一個字自動結束，正在打的字也算進去
         val d = ZhuyinComposer()
         "ㄅㄆㄚˋ".forEach { d.input(it) }
@@ -102,6 +106,45 @@ class CoreTest {
         assertEquals("你好世界", sentence(e, listOf("ㄋ*", "ㄏ*", "ㄕ*", "ㄐ*")))
         assertEquals(listOf("你", "妳"), e.candidates(listOf("ㄋㄧ*")).map { it.text })
         assertEquals("ㄅ", e.candidates(listOf("ㄅ*")).first().text)
+    }
+
+    @Test fun wholeSentenceIsTopCandidate() {
+        val e = engine(listOf(
+            Triple("ㄨㄛˇ", "我", -2.2),
+            Triple("ㄕˋ", "是", -1.6),
+            Triple("ㄕˋ", "試", -3.4),
+            Triple("ㄎㄢˋ", "看", -2.5),
+            Triple("ㄕˋ-ㄎㄢˋ", "試看", -4.5),
+            Triple("ㄕˋ-ㄕˋ-ㄎㄢˋ", "試試看", -4.0),
+            Triple("ㄎㄚˇ", "卡", -3.0),
+            Triple("ㄉㄜ˙", "的", -1.2),
+            Triple("ㄒㄩㄢˇ", "選", -3.5),
+            Triple("ㄗˋ", "字", -2.8),
+            Triple("ㄒㄩㄢˇ-ㄗˋ", "選字", -3.2),
+            Triple("ㄉㄡ", "都", -2.0),
+            Triple("ㄇㄟˊ", "沒", -2.4),
+            Triple("ㄧㄡˇ", "有", -2.1),
+            Triple("ㄇㄟˊ-ㄧㄡˇ", "沒有", -2.6),
+            Triple("ㄉㄡ-ㄇㄟˊ", "都沒", -3.4),
+            Triple("ㄍㄟˇ", "給", -2.7),
+            Triple("ㄉㄧˋ", "第", -3.0),
+            Triple("ㄧ", "一", -1.8),
+            Triple("ㄍㄜ˙", "個", -2.2),
+            Triple("ㄉㄧˋ-ㄧ-ㄍㄜ˙", "第一個", -3.1),
+            Triple("ㄏㄨㄟˋ", "會", -2.3),
+            Triple("ㄏㄨㄟˋ-ㄕˋ", "會是", -3.0),
+            Triple("ㄉㄨㄟˋ", "對", -2.4),
+            Triple("ㄉㄨㄟˋ-ㄉㄜ˙", "對的", -3.0),
+        ))
+        val tryIt = listOf("ㄨㄛˇ", "ㄕˋ", "ㄕˋ", "ㄎㄢˋ")
+        assertEquals("我試試看", e.candidates(tryIt).first().text)
+        assertEquals(tryIt.size, e.candidates(tryIt).first().span)
+        val long = listOf(
+            "ㄎㄚˇ", "ㄎㄚˇ", "ㄉㄜ˙", "ㄒㄩㄢˇ", "ㄗˋ", "ㄉㄡ", "ㄇㄟˊ", "ㄧㄡˇ",
+            "ㄍㄟˇ", "ㄉㄧˋ", "ㄧ", "ㄍㄜ˙", "ㄏㄨㄟˋ", "ㄕˋ", "ㄉㄨㄟˋ", "ㄉㄜ˙",
+        )
+        assertEquals("卡卡的選字都沒有給第一個會是對的", e.candidates(long).first().text)
+        assertEquals(long.size, e.candidates(long).first().span)
     }
 
     @Test fun sentences() {

@@ -6,7 +6,7 @@
 
 | 功能 | 說明 |
 |---|---|
-| 注音（大千） | 整句自動選字、點候選字一段一段選、聯想詞、會記住你常選的字。字典來自[小麥注音](https://github.com/openvanilla/McBopomofo)（MIT 授權） |
+| 注音（大千） | 整段注音一起選字（詞頻＋動態規劃，和麥注音同一類做法）、點候選字一段一段選、聯想詞、會記住你常選的字。字典來自[小麥注音](https://github.com/openvanilla/McBopomofo)（MIT 授權），鍵盤打開時讀進記憶體 |
 | 手寫 | 用 iPhone 內建的文字辨識（Vision），寫完停一下就辨識。**實驗功能** |
 | 拼音 | 漢語拼音（馬來西亞、中國用），自動斷音節（xi'an 用 ' 分開）、整句選字、簡拼（nh → 你好）、預設輸出繁體字（可切簡體）；要在設定打開 |
 | 韓文 | 兩排式，子音母音自動拼成字（要在設定打開） |
@@ -55,7 +55,7 @@ project.yml  XcodeGen 專案設定（雲端打包時產生 Xcode 專案）
 ## 授權
 
 - 程式：自己寫的。
-- 注音字典：小麥注音 McBopomofo，MIT 授權，打包時下載並附上授權文件。
+- 注音字典：小麥注音 McBopomofo，MIT 授權，打包時下載並附上授權文件。程式沒有另外內嵌一份字典；`tools/build_dict.py` 在打包時把 McBopomofo 的 `data.txt` 轉成 `zhuyin.sqlite`。鍵盤打開時整表建成記憶體索引，按鍵本身不再查資料庫。
 - 表情符號是系統字型顯示；顏文字是常見的文字組合。
 - 字體（打包時下載、只留常用字）：jf open 粉圓（justfont）、芫荽 Iansui（But Ko）、霞鶩文楷 TC（LXGW），都是 SIL Open Font License 1.1。
 - 繁簡對照：OpenCC，Apache 2.0。

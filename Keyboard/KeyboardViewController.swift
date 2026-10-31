@@ -47,26 +47,16 @@ final class KeyboardViewController: UIInputViewController {
     private lazy var clipStore = ClipboardStore(fileURL: Storage.url("clipboard.json"), limit: settings.clipLimit)
     private lazy var emoStore = EmoticonStore(directory: Storage.directory)
     private var learningModels: [UserPhraseModel] = []
-    private lazy var engine: ZhuyinEngine? = {
-        guard let path = Bundle.main.path(forResource: "zhuyin", ofType: "sqlite"),
-              let e = ZhuyinEngine(path: path, userModel: UserPhraseModel(fileURL: Storage.url("learned.json"), asynchronousWrites: true)) else { return nil }
-        e.fuzzy = self.fuzzyOptions
-        learningModels.append(e.userModel)
-        return e
-    }()
-    /// 拼音：另外開一個連線，用沒聲調的 plain 欄查；繁轉簡也用同一個字典檔
-    private lazy var pinyinEngine: PinyinEngine? = {
-        guard let path = Bundle.main.path(forResource: "zhuyin", ofType: "sqlite"),
-              let db = SQLiteDB(path: path),
-              let e = ZhuyinEngine(path: path, userModel: UserPhraseModel(fileURL: Storage.url("learned-pinyin.json"), asynchronousWrites: true), column: "plain")
-        else { return nil }
-        learningModels.append(e.userModel)
-        return PinyinEngine(engine: e, table: PinyinEngine.loadTable(from: db))
-    }()
-    private lazy var converter: ChineseConverter? = {
-        guard let path = Bundle.main.path(forResource: "zhuyin", ofType: "sqlite"), let db = SQLiteDB(path: path) else { return nil }
-        return ChineseConverter(db: db)
-    }()
+    /// 字典在背景讀進記憶體。按鍵當下不開 SQLite。
+    private var zhuyinEngineStore: ZhuyinEngine?
+    private var pinyinEngineStore: PinyinEngine?
+    private var converterStore: ChineseConverter?
+    private var engine: ZhuyinEngine? { zhuyinEngineStore }
+    private var pinyinEngine: PinyinEngine? { pinyinEngineStore }
+    private var converter: ChineseConverter? { converterStore }
+    /// 整句組字上限。以前 20 個音節就強制送出，長句會被切掉。
+    private static let maxCompositionSyllables = 48
+    private var candidateGeneration = 0
     private lazy var textChecker = UITextChecker()
     /// 剛剛自動修正的字：馬上按刪除就改回原本打的
     private var lastAutocorrect: (original: String, corrected: String)?
@@ -190,11 +180,40 @@ final class KeyboardViewController: UIInputViewController {
         toastLabel.numberOfLines = 2
         view.addSubview(toastLabel)
 
+        view.isMultipleTouchEnabled = true
+        contentView.isMultipleTouchEnabled = true
         wireCallbacks()
         loadBackground()
         applyStyle()
         rebuildKeys()
         refreshTopBar()
+        preloadDictionary()
+    }
+
+    /// 鍵盤一出現就在背景把字典索引建好。這一段不碰畫面。
+    private func preloadDictionary() {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let path = Bundle.main.path(forResource: "zhuyin", ofType: "sqlite"),
+                  let db = SQLiteDB(path: path) else { return }
+            let index = PhraseIndex.load(from: db)
+            let zhuyinUser = UserPhraseModel(fileURL: Storage.url("learned.json"), asynchronousWrites: true)
+            let zhuyin = ZhuyinEngine(db: db, userModel: zhuyinUser, sharedIndex: index)
+            let pinyinUser = UserPhraseModel(fileURL: Storage.url("learned-pinyin.json"), asynchronousWrites: true)
+            let pinyinCore = ZhuyinEngine(db: db, userModel: pinyinUser, column: "plain", sharedIndex: index)
+            let pinyin = PinyinEngine(engine: pinyinCore, table: PinyinEngine.loadTable(from: db))
+            let converter = ChineseConverter(db: db)
+            let prefixes = zhuyin.syllablePrefixes()
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                zhuyin.fuzzy = self.fuzzyOptions
+                self.zhuyinEngineStore = zhuyin
+                self.pinyinEngineStore = pinyin
+                self.converterStore = converter
+                self.learningModels = [zhuyinUser, pinyinUser]
+                if !prefixes.isEmpty { self.composer.validPrefixes = prefixes }
+                if self.isComposing { self.updateCandidatesNow() }
+            }
+        }
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -446,15 +465,23 @@ final class KeyboardViewController: UIInputViewController {
             composer.validPrefixes = prefixes
         }
         guard composer.input(c) else {
+            // 聲調永遠不單獨送進文章。組字器吃不下時也只是丟掉，不當成文字。
+            if Bopomofo.tones.contains(c) {
+                refreshTopBar()
+                return
+            }
             output(String(c))
             refreshTopBar()
             return
         }
-        if composer.syllables.count >= 20 {
+        if composer.syllables.count >= Self.maxCompositionSyllables {
+            updateCandidatesNow()
             commitAll()
             return
         }
-        updateCandidates()
+        // 注音立刻顯示；選字等這次觸控結束再算，手指不用等字典。
+        refreshTopBar()
+        scheduleCandidateRefresh()
     }
 
     private func typePinyin(_ c: Character) {
@@ -520,7 +547,11 @@ final class KeyboardViewController: UIInputViewController {
         if composer.isComposing {
             composer.backspace()
             if !composer.isComposing { composePicks = [] }
-            updateCandidates()
+            updateCandidatesNow()
+            return
+        }
+        if composer.consumeStrayTone() {
+            updateCandidatesNow()
             return
         }
         if !hangulShown.isEmpty && hangul.backspace() {
@@ -536,20 +567,26 @@ final class KeyboardViewController: UIInputViewController {
 
     private func space() {
         if mode == .zhuyin && layer == .letters && composer.hasPendingSyllable {
-            // 空白鍵＝一聲；這個音沒有一聲的字（例如只打了 ㄋ）就直接送出預覽的字
-            let noFirstTone = engine?.phrases([composer.current.reading][...]).isEmpty ?? false
-            // 前面的字都沒打聲調（簡拼 ㄏㄎㄞ、ㄋㄧㄏㄠ）：空白鍵是送出，不是把最後一個字當一聲（不然 ㄎㄞ 變成「開」）
-            let skippedTones = composer.syllables.contains { $0.open }
-            // 第一個候選字數比打的音節多（學過的 ㄨㄢ＝晚安）：也是簡拼，直接送出
-            let abbreviated = (candidates.first?.text.count ?? 0) > composer.readings.count
-            if (noFirstTone || skippedTones || abbreviated) && !candidates.isEmpty {
-                selectCandidate(at: 0, learn: false)
-            } else if composer.confirmSyllable() {
-                updateCandidates()
-            }
+            // 空白鍵＝一聲。組字區留著，不把還沒打完、或不確定的句子送出去。
+            composer.confirmSyllable()
+            updateCandidatesNow()
             return
         }
+        if mode == .zhuyin && layer == .letters && composer.isComposing {
+            updateCandidatesNow()
+            let unfinished = composer.syllables.contains { $0.open }
+            let top = candidates.first
+            let coversAll = top.map { $0.span == composer.readings.count && $0.kind != .literal } ?? false
+            // 還有沒標調的音節，或第一個候選蓋不住整段，都不送出。
+            if unfinished || !coversAll {
+                return
+            }
+            selectCandidate(at: 0, learn: false)
+            return
+        }
+        _ = composer.consumeStrayTone()
         if isComposing {
+            updateCandidatesNow()
             if candidates.isEmpty { commitAll() } else { selectCandidate(at: 0, learn: false) }
             return
         }
@@ -576,6 +613,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func returnKey() {
         if isComposing {
+            updateCandidatesNow()
             commitAll()
             return
         }
@@ -675,6 +713,22 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     // MARK: - 選字（注音、日文）
+
+    /// 觸控處理完再選字，這次按下不用等字典。後一次按鍵會蓋掉還沒跑的那次。
+    private func scheduleCandidateRefresh() {
+        candidateGeneration += 1
+        let generation = candidateGeneration
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, generation == self.candidateGeneration else { return }
+            self.updateCandidates()
+        }
+    }
+
+    /// 空白、退格、換行要馬上看見新的候選，不能用上一拍的結果。
+    private func updateCandidatesNow() {
+        candidateGeneration += 1
+        updateCandidates()
+    }
 
     private func updateCandidates() {
         candidateOriginals = []

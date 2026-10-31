@@ -115,6 +115,8 @@ struct Syllable: Equatable {
 struct ZhuyinComposer {
     private(set) var syllables: [Syllable] = []
     private(set) var current = Syllable()
+    /// 聲調比音節先到、或上一個音節已經被收進去時先留著。空白的聲調不會送進文章。
+    private var pendingTone: Character?
     /// 字典裡所有音節的開頭（例如 ㄋ、ㄋㄧ、ㄋㄧㄠ）；有的話，組不出存在的音就自動換下一個字
     var validPrefixes: Set<String>?
 
@@ -124,7 +126,10 @@ struct ZhuyinComposer {
         var all = syllables
         if current.hasSound {
             var pending = current
-            pending.open = true
+            if pending.tone == nil, let tone = pendingTone {
+                pending.tone = tone
+            }
+            pending.open = pending.tone == nil
             all.append(pending)
         }
         return all.indices.map { (i: Int) -> String in
@@ -138,7 +143,12 @@ struct ZhuyinComposer {
     }
     /// 給使用者核對實際輸入的注音；保留聲調與音節分隔，不顯示查詢用的 *／~。
     var displayText: String {
-        let sounds = syllables.map { $0.reading } + (current.hasSound ? [current.reading] : [])
+        var sounds = syllables.map { $0.reading }
+        if current.hasSound {
+            var shown = current.reading
+            if current.tone == nil, let tone = pendingTone { shown.append(tone) }
+            sounds.append(shown)
+        }
         return sounds.joined(separator: " ")
     }
 
@@ -150,13 +160,10 @@ struct ZhuyinComposer {
     mutating func input(_ c: Character) -> Bool {
         guard let kind = Bopomofo.kind(of: c) else { return false }
         if kind == .tone {
-            guard current.hasSound else { return false }
-            current.tone = c
-            finishSyllable()
-            return true
+            return putTone(c)
         }
         // 不打聲調直接打下一個字：前一個字自動結束（ㄋㄏ → 你好）
-        if current.hasSound && (current.startsNew(with: kind) || !fits(c)) { finishSyllable(open: true) }
+        if current.hasSound && (current.startsNew(with: kind) || !fits(c)) { closeCurrent() }
         if kind != .initial {
             current.maySplit = current.isSingleSymbol
             current.afterAbbreviation = current.maySplit && syllables.last.map { $0.open && $0.isSingleSymbol } == true
@@ -173,16 +180,66 @@ struct ZhuyinComposer {
         return set.contains(next.reading)
     }
 
-    /// 空白鍵＝一聲
+    /// 聲調一定吃掉：貼在正在打的音節、補回剛剛被拆開的音節，或先留著等下一個音節。
+    private mutating func putTone(_ c: Character) -> Bool {
+        if current.hasSound {
+            pendingTone = nil
+            current.tone = c
+            finishSyllable()
+            return true
+        }
+        // 下一個鍵先被處理、這個音節已經收成「還沒聲調」：聲調補回來，不要單獨送出。
+        if !syllables.isEmpty {
+            var last = syllables[syllables.count - 1]
+            if last.open && last.tone == nil {
+                last.tone = c
+                last.open = false
+                syllables[syllables.count - 1] = last
+                pendingTone = nil
+                return true
+            }
+        }
+        pendingTone = c
+        return true
+    }
+
+    /// 換成下一個字。若聲調先到，它屬於現在這個音節，不是下一個字。
+    private mutating func closeCurrent() {
+        if current.tone == nil, let tone = pendingTone {
+            current.tone = tone
+            pendingTone = nil
+            finishSyllable(open: false)
+        } else {
+            finishSyllable(open: current.tone == nil)
+        }
+    }
+
+    /// 空白鍵＝一聲。組字區保持開著，不在這裡送出文字。
     @discardableResult
     mutating func confirmSyllable() -> Bool {
         guard current.hasSound else { return false }
-        finishSyllable()
+        // 聲調先到、人又按了空白：那個聲調已經算在這個音上，空白不再把它改成一聲。
+        if current.tone == nil, let tone = pendingTone {
+            current.tone = tone
+        }
+        pendingTone = nil
+        finishSyllable(open: false)
+        return true
+    }
+
+    /// 還沒有音節時誤按的聲調。退格或真正的空白會把它清掉，避免黏到下一個字。
+    mutating func consumeStrayTone() -> Bool {
+        guard pendingTone != nil, current.isEmpty, syllables.isEmpty else { return false }
+        pendingTone = nil
         return true
     }
 
     @discardableResult
     mutating func backspace() -> Bool {
+        if current.hasSound && current.tone == nil && pendingTone != nil {
+            pendingTone = nil
+            return true
+        }
         if !current.isEmpty {
             current.removeLast()
             return true
@@ -203,13 +260,17 @@ struct ZhuyinComposer {
     /// 選了字之後拿掉前 n 個音節（包含正在打的那個）
     mutating func removeFirst(_ n: Int) {
         let count = max(n, 0)
-        if count > syllables.count { current = Syllable() }
+        if count > syllables.count {
+            current = Syllable()
+            pendingTone = nil
+        }
         syllables.removeFirst(min(count, syllables.count))
     }
 
     mutating func clear() {
         syllables = []
         current = Syllable()
+        pendingTone = nil
     }
 
     private mutating func finishSyllable(open: Bool = false) {

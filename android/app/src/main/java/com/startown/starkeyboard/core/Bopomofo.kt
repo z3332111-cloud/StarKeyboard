@@ -113,27 +113,61 @@ class ZhuyinComposer {
     var current = Syllable()
         private set
 
+    /** 聲調比音節先到時先留著，不要單獨送進文章。 */
+    private var pendingTone: Char? = null
+
     /** 查字典用的讀音：打完的音節＋正在打的音節（沒打聲調也算，先拿來預覽） */
     /** 字典裡所有音節的開頭（例如 ㄋ、ㄋㄧ、ㄋㄧㄠ）；有的話，組不出存在的音就自動換下一個字 */
     var validPrefixes: Set<String>? = null
 
-    val readings get() = syllables.map { it.key } + listOfNotNull(if (current.hasSound) current.reading + "*" else null)
+    val readings: List<String>
+        get() {
+            val head = syllables.map { it.key }
+            if (!current.hasSound) return head
+            val tone = current.tone ?: pendingTone
+            val body = if (current.tone == null && tone != null) current.reading + tone else current.reading
+            return head + listOf(if (tone == null) "$body*" else body)
+        }
     val isComposing get() = syllables.isNotEmpty() || !current.isEmpty
     val hasPendingSyllable get() = !current.isEmpty
 
-    /** 回傳 false 表示這個符號沒被組字用掉（例如還沒打音就先打聲調） */
+    /** 回傳 false 表示這個符號沒被組字用掉（不是注音）。聲調一定回傳 true。 */
     fun input(c: Char): Boolean {
         val kind = Bopomofo.kind(c) ?: return false
-        if (kind == BopomofoKind.TONE) {
-            if (!current.hasSound) return false
-            current.tone = c
-            finish()
-            return true
-        }
+        if (kind == BopomofoKind.TONE) return putTone(c)
         // 不打聲調直接打下一個字：前一個字自動結束（ㄋㄏ → 你好）
-        if (current.hasSound && (current.startsNewWith(kind) || !fits(c))) finish(open = true)
+        if (current.hasSound && (current.startsNewWith(kind) || !fits(c))) closeCurrent()
         current.put(c)
         return true
+    }
+
+    private fun putTone(c: Char): Boolean {
+        if (current.hasSound) {
+            pendingTone = null
+            current.tone = c
+            finish(open = false)
+            return true
+        }
+        val last = syllables.lastOrNull()
+        if (last != null && last.open && last.tone == null) {
+            last.tone = c
+            last.open = false
+            pendingTone = null
+            return true
+        }
+        pendingTone = c
+        return true
+    }
+
+    private fun closeCurrent() {
+        val tone = pendingTone
+        if (current.tone == null && tone != null) {
+            current.tone = tone
+            pendingTone = null
+            finish(open = false)
+        } else {
+            finish(open = current.tone == null)
+        }
     }
 
     /** 加上這個符號還是某個字的開頭嗎（例如 ㄘ＋ㄧ 不是，ㄘ 要自己算一個字） */
@@ -142,14 +176,31 @@ class ZhuyinComposer {
         return current.copy().also { it.put(c) }.reading in set
     }
 
-    /** 空白鍵＝一聲 */
+    /** 空白鍵＝一聲。組字區保持開著。 */
     fun confirmSyllable(): Boolean {
         if (!current.hasSound) return false
-        finish()
+        if (current.tone == null && pendingTone != null) current.tone = pendingTone
+        pendingTone = null
+        finish(open = false)
+        return true
+    }
+
+    /** 還沒有音節時誤按的聲調。退格或真正的空白會把它清掉，避免黏到下一個字。 */
+    fun consumeStrayTone(): Boolean {
+        if (pendingTone == null || !current.isEmpty || syllables.isNotEmpty()) return false
+        pendingTone = null
         return true
     }
 
     fun backspace(): Boolean {
+        if (current.hasSound && current.tone == null && pendingTone != null) {
+            pendingTone = null
+            return true
+        }
+        if (!current.hasSound && pendingTone != null && syllables.isEmpty()) {
+            pendingTone = null
+            return true
+        }
         if (!current.isEmpty) {
             current.removeLast()
             return true
@@ -170,13 +221,17 @@ class ZhuyinComposer {
     /** 選了字之後拿掉前 n 個音節（包含正在打的那個） */
     fun removeFirst(n: Int) {
         val count = maxOf(n, 0)
-        if (count > syllables.size) current = Syllable()
+        if (count > syllables.size) {
+            current = Syllable()
+            pendingTone = null
+        }
         repeat(minOf(count, syllables.size)) { syllables.removeAt(0) }
     }
 
     fun clear() {
         syllables.clear()
         current = Syllable()
+        pendingTone = null
     }
 
     private fun finish(open: Boolean = false) {

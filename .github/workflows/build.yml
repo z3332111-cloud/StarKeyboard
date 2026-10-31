@@ -6,6 +6,10 @@ on:
     paths-ignore:
       - "android/**"
       - ".github/workflows/android.yml"
+  pull_request:
+    paths-ignore:
+      - "android/**"
+      - ".github/workflows/android.yml"
   workflow_dispatch:
 
 permissions:
@@ -97,8 +101,10 @@ jobs:
           } > release_notes.md
           cat release_notes.md
 
-      # develop 發成「預發佈」的 dev-數字，不會變成 latest，App 的新版提醒只看 main 的 build-數字
+      # develop 發成「預發佈」的 dev-數字，不會變成 latest，App 的新版提醒只看 main 的 build-數字。
+      # 拉取請求只上傳 IPA 成品，不發佈，避免蓋掉正式版。
       - name: 發佈到 Releases（方便下載）
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name == 'main' && 'build' || 'dev' }}-${{ github.run_number }}
