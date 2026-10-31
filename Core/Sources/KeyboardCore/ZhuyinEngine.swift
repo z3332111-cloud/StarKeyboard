@@ -827,6 +827,7 @@ final class ZhuyinEngine {
     func trimCaches() {
         queryLock.lock()
         defer { queryLock.unlock() }
+        index.trimCaches()
         contextCache.removeAll()
         cache.removeAll()
         fuzzyCache.removeAll()

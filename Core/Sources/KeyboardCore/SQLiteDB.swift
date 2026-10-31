@@ -13,6 +13,8 @@ final class SQLiteDB {
 
     private var db: OpaquePointer?
     private var statements: [String: OpaquePointer] = [:]
+    /// 同一個連線不能兩個執行緒同時用（選字在背景、繁簡轉換在畫面上）：一次只讓一個查
+    private let lock = NSRecursiveLock()
 
     init?(path: String, readOnly: Bool = true) {
         let flags = readOnly ? SQLITE_OPEN_READONLY : (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE)
@@ -20,6 +22,8 @@ final class SQLiteDB {
             sqlite3_close(db)
             return nil
         }
+        // SQLite 自己的暫存最多 1MB（預設會更大，鍵盤記憶體很少）
+        sqlite3_exec(db, "PRAGMA cache_size = -1024", nil, nil, nil)
     }
 
     static func inMemory() -> SQLiteDB? {
@@ -33,10 +37,14 @@ final class SQLiteDB {
 
     @discardableResult
     func execute(_ sql: String) -> Bool {
-        sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK
+        lock.lock()
+        defer { lock.unlock() }
+        return sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK
     }
 
     func run(_ sql: String, _ args: [Value] = [], row: ((OpaquePointer) -> Void)? = nil) {
+        lock.lock()
+        defer { lock.unlock() }
         guard let stmt = prepare(sql) else { return }
         defer {
             sqlite3_reset(stmt)
