@@ -54,13 +54,14 @@ import java.util.Locale
 
 class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheckerSessionListener {
     private enum class SuggestionSource { ASSOCIATION, HANDWRITING, SPELLING, GLIDE }
-    private enum class EditorPurpose { EMOTICON, TRANSLATE, FANCY, SHORTCUT_PHRASE, SHORTCUT_CODE, CLIPBOARD_CATEGORY, CLIPBOARD_ITEM }
+    private enum class EditorPurpose { EMOTICON, SYMBOL, TRANSLATE, FANCY, SHORTCUT_PHRASE, SHORTCUT_CODE, CLIPBOARD_CATEGORY, CLIPBOARD_ITEM }
     private var renamingCategory: String? = null
     private var editingClipId: String? = null
     private lateinit var folderNameBox: FolderNameBox
 
     private fun editorLabel(p: EditorPurpose) = when (p) {
         EditorPurpose.EMOTICON -> "表符："
+        EditorPurpose.SYMBOL -> "新增符號："
         EditorPurpose.TRANSLATE -> "翻譯："
         EditorPurpose.FANCY -> "花式文字："
         EditorPurpose.SHORTCUT_PHRASE -> "片語內容："
@@ -1032,6 +1033,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 val pending = if (hangulComposing) hangul.composing else ""
                 when (editorPurpose) {
                     EditorPurpose.EMOTICON -> topBar.showEditor("新增表符：", ed + pending, "(•ᴗ•)", "儲存")
+                    EditorPurpose.SYMBOL -> topBar.showEditor("新增符號：", ed + pending, "※", "儲存")
                     EditorPurpose.TRANSLATE -> {
                         val name = Translator.targets.firstOrNull { it.code == settings.translateTarget }?.name ?: "英文"
                         val from = Translator.targets.firstOrNull { it.code == settings.translateSource }?.name ?: "自動"
@@ -1350,7 +1352,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         commitAll()
         finishHangul()
         suggestions = emptyList()
-        editorReturnPanel = if (purpose == EditorPurpose.EMOTICON || purpose == EditorPurpose.SHORTCUT_PHRASE || purpose == EditorPurpose.CLIPBOARD_CATEGORY) panel else null
+        editorReturnPanel = if (purpose == EditorPurpose.EMOTICON || purpose == EditorPurpose.SYMBOL || purpose == EditorPurpose.SHORTCUT_PHRASE || purpose == EditorPurpose.CLIPBOARD_CATEGORY) panel else null
         closePanel()
         if (purpose != EditorPurpose.TRANSLATE && mode == InputMode.HANDWRITING) {
             mode = settings.enabledModes.firstOrNull { it != InputMode.HANDWRITING } ?: InputMode.ZHUYIN
@@ -1364,6 +1366,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         if (purpose == EditorPurpose.CLIPBOARD_CATEGORY) return
         toast(when (purpose) {
             EditorPurpose.EMOTICON -> "用鍵盤打字，或按 (•ᴗ•) 挑顏文字零件"
+            EditorPurpose.SYMBOL -> "打想加的符號，空白隔開可以一次加好幾個"
             EditorPurpose.TRANSLATE -> "先打要翻譯的話，按「→語言」換目標語言"
             EditorPurpose.FANCY -> "打想變花樣的字（英文樣式最多），再按「變花樣」"
             EditorPurpose.SHORTCUT_PHRASE -> "先打常用的整段話，例如地址、自我介紹"
@@ -1376,6 +1379,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun editorExtraTapped() {
         if (editorPurpose == EditorPurpose.EMOTICON) {
             togglePanel(PanelKind.KAOMOJI)
+        } else if (editorPurpose == EditorPurpose.SYMBOL) {
+            togglePanel(PanelKind.SYMBOLS)
         } else if (editorPurpose == EditorPurpose.TRANSLATE) {
             val targets = Translator.targets
             val i = maxOf(0, targets.indexOfFirst { it.code == settings.translateTarget })
@@ -1388,6 +1393,14 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         commitAll()
         finishHangul()
         val text = editorText?.trim() ?: return
+        if (editorPurpose == EditorPurpose.SYMBOL) {
+            val n = emoStore.addSymbols(text)
+            if (n > 0) toast("已加入 $n 個符號到「我的」")
+            val back = editorReturnPanel
+            endEditor()
+            back?.let { openPanel(it) }
+            return
+        }
         if (editorPurpose == EditorPurpose.EMOTICON) {
             if (text.isNotEmpty()) {
                 emoStore.addCustom(text)
@@ -1483,7 +1496,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun addEmoticon(option: EmojiPanel.AddOption) {
         when (option) {
-            EmojiPanel.AddOption.TYPE -> beginEditor(EditorPurpose.EMOTICON)
+            EmojiPanel.AddOption.TYPE -> beginEditor(if ((panelView as? EmojiPanel)?.kind == PanelKind.SYMBOLS) EditorPurpose.SYMBOL else EditorPurpose.EMOTICON)
             EmojiPanel.AddOption.CLIPBOARD_TEXT -> {
                 val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 val clip = cm.primaryClip
@@ -1494,6 +1507,12 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()
                 if (text.isNullOrBlank()) {
                     toast("剪貼簿裡沒有文字")
+                    return
+                }
+                if ((panelView as? EmojiPanel)?.kind == PanelKind.SYMBOLS) {
+                    val n = emoStore.addSymbols(text)
+                    (panelView as? EmojiPanel)?.reload()
+                    toast("已加入 $n 個符號到「我的」")
                     return
                 }
                 emoStore.addCustom(text)

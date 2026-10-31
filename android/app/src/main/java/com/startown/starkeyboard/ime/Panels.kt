@@ -27,7 +27,7 @@ import com.startown.starkeyboard.core.SymbolData
 @SuppressLint("ViewConstructor")
 class EmojiPanel(
     context: Context,
-    private val kind: PanelKind,
+    val kind: PanelKind,
     private val store: EmoticonStore,
     private val style: KeyboardStyle,
     private val onInsert: (String) -> Unit,
@@ -72,11 +72,11 @@ class EmojiPanel(
                 SymbolData.kaomoji.forEach { tabs.add(Tab.Items(it.title, it.items)) }
             }
             else -> {
-                tabs.add(Tab.Recent("最近"))
+                tabs.add(Tab.Recent("最近")); tabs.add(Tab.Mine("我的"))
                 SymbolData.symbols.forEach { tabs.add(Tab.Items(it.title, it.items)) }
             }
         }
-        val start = if (store.recents(key).isNotEmpty()) 0 else if (kind == PanelKind.SYMBOLS) 1 else 2
+        val start = if (store.recents(key).isNotEmpty()) 0 else 2
         val frame = FrameLayout(context)
         frame.addView(grid, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         frame.addView(overlay, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
@@ -102,7 +102,8 @@ class EmojiPanel(
         val tab = tabs[i]
         refs = when (tab) {
             is Tab.Recent -> store.recents(key).map { Ref.Text(it) }
-            is Tab.Mine -> listOf(Ref.Add) + store.custom.map { Ref.Custom(it) } + store.stickers.map { Ref.Sticker(it) }
+            is Tab.Mine -> if (kind == PanelKind.SYMBOLS) listOf(Ref.Add) + store.symbols.map { Ref.Custom(it) }
+                else listOf(Ref.Add) + store.custom.map { Ref.Custom(it) } + store.stickers.map { Ref.Sticker(it) }
             is Tab.Items -> tab.items.map { Ref.Text(it) }
         }.filter { it !is Ref.Sticker || bitmap(it.name) != null }
         val items = refs.map {
@@ -113,7 +114,7 @@ class EmojiPanel(
                 Ref.Add -> ChipGrid.Item.Add
             }
         }
-        val square = kind != PanelKind.KAOMOJI && tab !is Tab.Mine
+        val square = kind != PanelKind.KAOMOJI && (tab !is Tab.Mine || kind == PanelKind.SYMBOLS)
         grid.setItems(items, square)
     }
 
@@ -125,7 +126,7 @@ class EmojiPanel(
         val ref = refs.getOrNull(i) ?: return
         if (grid.editing) {
             when (ref) {
-                is Ref.Custom -> store.removeCustom(ref.s)
+                is Ref.Custom -> if (kind == PanelKind.SYMBOLS) store.removeSymbol(ref.s) else store.removeCustom(ref.s)
                 is Ref.Sticker -> { store.removeSticker(ref.name); bitmaps.remove(ref.name) }
                 else -> return
             }
@@ -145,7 +146,11 @@ class EmojiPanel(
         val t = style.theme
         overlay.setBackgroundColor(t.top.withAlpha(0.94f))
         val col = LinearLayout(context).apply { orientation = VERTICAL; setPadding(dpi(24f), dpi(10f), dpi(24f), dpi(10f)) }
-        val options = listOf(
+        val options = if (kind == PanelKind.SYMBOLS) listOf(
+            "⌨️  用鍵盤打新的符號（空白隔開可以加好幾個）" to AddOption.TYPE,
+            "📋  把剪貼簿的文字加進來" to AddOption.CLIPBOARD_TEXT,
+            "取消" to null,
+        ) else listOf(
             "⌨️  用鍵盤打一個新的表符" to AddOption.TYPE,
             "📋  把剪貼簿的文字加進來" to AddOption.CLIPBOARD_TEXT,
             "🖼  挑一張照片做成貼圖" to AddOption.PICK_IMAGE,

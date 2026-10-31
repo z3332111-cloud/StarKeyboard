@@ -14,7 +14,7 @@ final class KeyboardViewController: UIInputViewController {
     private enum SuggestionSource { case association, handwriting, spelling, glide }
 
     /// 上面那條編輯框的用途：新增表符，或是先打中文再翻譯
-    private enum EditorPurpose { case emoticon, translate, fancy, shortcutPhrase, shortcutCode, clipboardCategory, clipboardItem }
+    private enum EditorPurpose { case emoticon, symbol, translate, fancy, shortcutPhrase, shortcutCode, clipboardCategory, clipboardItem }
     private var renamingCategory: String?
     private var editingClipID: UUID?
     /// 編輯框裡的游標位置（第幾個字後面）；nil = 永遠在最後面
@@ -36,6 +36,7 @@ final class KeyboardViewController: UIInputViewController {
     private func editorLabel(_ p: EditorPurpose) -> String {
         switch p {
         case .emoticon: return "表符："
+        case .symbol: return "新增符號："
         case .translate: return "翻譯："
         case .fancy: return "花式文字："
         case .shortcutPhrase: return "片語內容："
@@ -1092,6 +1093,8 @@ final class KeyboardViewController: UIInputViewController {
             switch editorPurpose {
             case .emoticon:
                 topBar.show(.editor(prompt: "新增表符：", text: text, extra: "(•ᴗ•)", confirm: "儲存"))
+            case .symbol:
+                topBar.show(.editor(prompt: "新增符號：", text: text, extra: "※", confirm: "儲存"))
             case .translate:
                 let name = Translator.targets.first { $0.code == settings.translateTarget }?.name ?? "英文"
                 let from = Translator.targets.first { $0.code == settings.translateSource }?.name ?? "自動"
@@ -1324,7 +1327,7 @@ final class KeyboardViewController: UIInputViewController {
         commitAll()
         finishHangul()
         clearSuggestions(refresh: false)
-        editorReturnPanel = purpose == .emoticon || purpose == .shortcutPhrase || purpose == .clipboardCategory ? panel : nil
+        editorReturnPanel = purpose == .emoticon || purpose == .symbol || purpose == .shortcutPhrase || purpose == .clipboardCategory ? panel : nil
         closePanel()
         if purpose != .translate && mode == .handwriting {
             mode = settings.enabledModes.first { $0 != .handwriting } ?? .zhuyin
@@ -1337,6 +1340,7 @@ final class KeyboardViewController: UIInputViewController {
         refreshTopBar()
         switch purpose {
         case .emoticon: toast("用鍵盤打字，或按 (•ᴗ•) 挑顏文字零件")
+        case .symbol: toast("打想加的符號，空白隔開可以一次加好幾個")
         case .translate: toast("先打要翻譯的話，按「→語言」換目標語言")
         case .fancy: toast("打想變花樣的字（英文樣式最多），再按「變花樣」")
         case .shortcutPhrase: toast("先打常用的整段話，例如地址、自我介紹")
@@ -1350,6 +1354,8 @@ final class KeyboardViewController: UIInputViewController {
         switch editorPurpose {
         case .emoticon:
             togglePanel(.kaomoji)
+        case .symbol:
+            togglePanel(.symbols)
         case .translate:
             let targets = Translator.targets
             let i = targets.firstIndex { $0.code == settings.translateTarget } ?? 0
@@ -1382,6 +1388,12 @@ final class KeyboardViewController: UIInputViewController {
                 emoStore.addCustom(trimmed)
                 toast("已加入我的表符")
             }
+            let back = editorReturnPanel
+            endEditor()
+            if let p = back { openPanel(p) }
+        case .symbol:
+            let n = emoStore.addSymbols(trimmed)
+            if n > 0 { toast("已加入 \(n) 個符號到「我的」") }
             let back = editorReturnPanel
             endEditor()
             if let p = back { openPanel(p) }
@@ -1459,9 +1471,10 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - 我的表符、貼圖
 
     private func addEmoticon(_ option: EmojiPanelView.AddOption) {
+        let forSymbols = (panelView as? EmojiPanelView)?.kind == .symbols
         switch option {
         case .type:
-            beginEditor(.emoticon)
+            beginEditor(forSymbols ? .symbol : .emoticon)
         case .clipboardText:
             guard hasFullAccess else {
                 toast("要先開啟「允許完整取用」")
@@ -1469,6 +1482,12 @@ final class KeyboardViewController: UIInputViewController {
             }
             guard let s = UIPasteboard.general.string, !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 toast("剪貼簿裡沒有文字")
+                return
+            }
+            if forSymbols {
+                let n = emoStore.addSymbols(s)
+                (panelView as? EmojiPanelView)?.reload()
+                toast("已加入 \(n) 個符號到「我的」")
                 return
             }
             emoStore.addCustom(s)

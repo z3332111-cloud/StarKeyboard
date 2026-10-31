@@ -199,6 +199,8 @@ final class EmoticonStore {
         var custom: [String]
         var stickers: [StickerRef]
         var recents: [String: [String]]
+        /// 「※ 符號」裡自己加的符號（舊版存檔沒有這一項）
+        var symbols: [String]?
     }
 
     static let defaultCustom = ["(๑•̀ㅂ•́)و✧", "ʕ•ᴥ•ʔ", "✿♡✿", "(｡･ω･｡)ﾉ♡"]
@@ -217,6 +219,7 @@ final class EmoticonStore {
     }
 
     var custom: [String] { contents.custom }
+    var customSymbols: [String] { contents.symbols ?? [] }
     var stickers: [StickerRef] { contents.stickers }
     var stickerDirectory: URL? { directory?.appendingPathComponent("stickers", isDirectory: true) }
 
@@ -230,6 +233,26 @@ final class EmoticonStore {
 
     func removeCustom(_ text: String) {
         contents.custom.removeAll { $0 == text }
+        save()
+    }
+
+    /// 加自己的符號；用空白隔開可以一次加好幾個。回傳加了幾個
+    @discardableResult
+    func addSymbols(_ text: String) -> Int {
+        let parts = text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        guard !parts.isEmpty else { return 0 }
+        var list = customSymbols
+        for p in parts.reversed() {
+            list.removeAll { $0 == p }
+            list.insert(p, at: 0)
+        }
+        contents.symbols = list
+        save()
+        return parts.count
+    }
+
+    func removeSymbol(_ text: String) {
+        contents.symbols = customSymbols.filter { $0 != text }
         save()
     }
 

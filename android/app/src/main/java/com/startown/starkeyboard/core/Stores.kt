@@ -177,6 +177,8 @@ class EmoticonStore(private val directory: File?) {
 
     val custom = ArrayList<String>()
     val stickers = ArrayList<String>()   // stickers 資料夾裡的檔名
+    /** 「※ 符號」裡自己加的符號 */
+    val symbols = ArrayList<String>()
     private val recents = HashMap<String, MutableList<String>>()
     private val file get() = directory?.let { File(it, "emoticons.json") }
     val stickerDirectory get() = directory?.let { File(it, "stickers") }
@@ -186,7 +188,7 @@ class EmoticonStore(private val directory: File?) {
     }
 
     fun load() {
-        custom.clear(); stickers.clear(); recents.clear()
+        custom.clear(); stickers.clear(); symbols.clear(); recents.clear()
         val f = file?.takeIf { it.exists() }
         if (f == null) {
             custom.addAll(DEFAULT_CUSTOM)
@@ -196,6 +198,7 @@ class EmoticonStore(private val directory: File?) {
             val o = JSONObject(f.readText())
             o.optJSONArray("custom")?.let { a -> for (i in 0 until a.length()) custom.add(a.getString(i)) }
             o.optJSONArray("stickers")?.let { a -> for (i in 0 until a.length()) stickers.add(a.getString(i)) }
+            o.optJSONArray("symbols")?.let { a -> for (i in 0 until a.length()) symbols.add(a.getString(i)) }
             o.optJSONObject("recents")?.let { r ->
                 for (key in r.keys()) {
                     val a = r.getJSONArray(key)
@@ -215,6 +218,22 @@ class EmoticonStore(private val directory: File?) {
 
     fun removeCustom(text: String) {
         custom.remove(text)
+        save()
+    }
+
+    /** 加自己的符號；用空白隔開可以一次加好幾個。回傳加了幾個 */
+    fun addSymbols(text: String): Int {
+        val parts = text.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        for (p in parts.reversed()) {
+            symbols.remove(p)
+            symbols.add(0, p)
+        }
+        if (parts.isNotEmpty()) save()
+        return parts.size
+    }
+
+    fun removeSymbol(text: String) {
+        symbols.remove(text)
         save()
     }
 
@@ -251,7 +270,7 @@ class EmoticonStore(private val directory: File?) {
         val f = file ?: return
         val r = JSONObject()
         for ((k, v) in recents) r.put(k, JSONArray(v))
-        f.writeText(JSONObject().put("custom", JSONArray(custom)).put("stickers", JSONArray(stickers)).put("recents", r).toString())
+        f.writeText(JSONObject().put("custom", JSONArray(custom)).put("stickers", JSONArray(stickers)).put("symbols", JSONArray(symbols)).put("recents", r).toString())
     }
 }
 

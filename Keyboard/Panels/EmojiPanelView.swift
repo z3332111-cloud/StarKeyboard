@@ -62,7 +62,7 @@ final class EmojiPanelView: UIView {
             tabs = [(title: "最近", content: TabContent.recent), (title: "我的", content: TabContent.mine)]
             categories = SymbolData.kaomoji
         case .symbols:
-            tabs = [(title: "最近", content: TabContent.recent)]
+            tabs = [(title: "最近", content: TabContent.recent), (title: "我的", content: TabContent.mine)]
             categories = SymbolData.symbols
         }
         for cat in categories {
@@ -92,7 +92,7 @@ final class EmojiPanelView: UIView {
 
         buildAddMenu()
         let hasRecent = !store.recents(kind.rawValue).isEmpty
-        select(tab: hasRecent ? 0 : (kind == .symbols ? 1 : 2))
+        select(tab: hasRecent ? 0 : 2)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -119,8 +119,13 @@ final class EmojiPanelView: UIView {
             refs = store.recents(kind.rawValue).map { .text($0) }
             grid.cellStyle = kind == .kaomoji ? .chip : .square
         case .mine:
-            refs = [.add] + store.custom.map { .custom($0) } + store.stickers.map { .sticker($0) }
-            grid.cellStyle = .chip
+            if kind == .symbols {
+                refs = [.add] + store.customSymbols.map { .custom($0) }
+                grid.cellStyle = .square
+            } else {
+                refs = [.add] + store.custom.map { .custom($0) } + store.stickers.map { .sticker($0) }
+                grid.cellStyle = .chip
+            }
         case .list(let items):
             refs = items.map { .text($0) }
             grid.cellStyle = kind == .kaomoji ? .chip : .square
@@ -170,7 +175,7 @@ final class EmojiPanelView: UIView {
     private func delete(_ i: Int) {
         guard i < refs.count else { return }
         switch refs[i] {
-        case .custom(let s): store.removeCustom(s)
+        case .custom(let s): if kind == .symbols { store.removeSymbol(s) } else { store.removeCustom(s) }
         case .sticker(let r):
             store.removeSticker(r)
             imageCache[r.id] = nil
@@ -188,7 +193,11 @@ final class EmojiPanelView: UIView {
         addStack.axis = .vertical
         addStack.spacing = 6
         addStack.distribution = .fillEqually
-        let options: [(String, AddOption?)] = [
+        let options: [(String, AddOption?)] = kind == .symbols ? [
+            ("⌨️  用鍵盤打新的符號（空白隔開可以加好幾個）", .type),
+            ("📋  把剪貼簿的文字加進來", .clipboardText),
+            ("取消", nil),
+        ] : [
             ("⌨️  用鍵盤打一個新的表符", .type),
             ("📋  把剪貼簿的文字加進來", .clipboardText),
             ("🖼  把剪貼簿的圖片做成貼圖", .clipboardImage),
