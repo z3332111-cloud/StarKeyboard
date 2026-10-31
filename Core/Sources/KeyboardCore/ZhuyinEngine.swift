@@ -342,7 +342,7 @@ final class ZhuyinEngine {
     func bestSegments(_ readings: [String], contextual: Bool = true) -> [Scored] {
         queryLock.lock()
         defer { queryLock.unlock() }
-        segmentation(of: Self.settleSplits(readings), contextual: contextual).map {
+        return segmentation(of: Self.settleSplits(readings), contextual: contextual).map {
             Scored(text: $0.text, score: $0.score)
         }
     }
