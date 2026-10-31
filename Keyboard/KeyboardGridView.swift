@@ -62,17 +62,28 @@ final class KeyButton: UIView {
         let outer = bounds.insetBy(dx: 3 * style.gapScale, dy: 4.5 * style.gapScale)
         guard outer.width > 4, outer.height > 4 else { return }
         let path = style.shape.path(in: outer)
-        var shift = CGAffineTransform(translationX: 0, y: 1.5)
+        let finish = style.finish
+        var shift = CGAffineTransform(translationX: 0, y: finish == .puffy ? 3 : 1.5)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         bodyLayer.path = path
         cushionLayer.frame = bounds
         cushionMask.path = path
-        cushionLayer.isHidden = !style.shape.isSoftShape
+        cushionLayer.isHidden = !style.shape.isSoftShape && finish == .flat
         detailLayer.path = style.shape.detailPath(in: outer)
         shadowLayer.path = path.copy(using: &shift)
-        if style.shape == .jelly {
-            let body = style.shape.bodyRect(in: outer)
+        let body = style.shape.bodyRect(in: outer)
+        if finish == .puffy {
+            // 左上角一顆圓圓的反光，看起來鼓鼓的
+            let gloss = CGRect(x: body.minX + body.width * 0.14, y: body.minY + body.height * 0.1,
+                               width: body.width * 0.32, height: body.height * 0.2)
+            glossLayer.path = UIBezierPath(ovalIn: gloss).cgPath
+        } else if finish == .glass {
+            // 上半部一條亮亮的反光
+            let gloss = CGRect(x: body.minX + body.width * 0.1, y: body.minY + body.height * 0.07,
+                               width: body.width * 0.8, height: body.height * 0.34)
+            glossLayer.path = UIBezierPath(roundedRect: gloss, cornerRadius: gloss.height / 2).cgPath
+        } else if style.shape == .jelly {
             let gloss = CGRect(x: body.minX + body.width * 0.2, y: body.minY + 2.5,
                                width: body.width * 0.6, height: max(2.5, body.height * 0.16))
             glossLayer.path = UIBezierPath(roundedRect: gloss, cornerRadius: gloss.height / 2).cgPath
@@ -80,7 +91,7 @@ final class KeyButton: UIView {
             glossLayer.path = nil
         }
         CATransaction.commit()
-        let textRect = style.shape.bodyRect(in: outer)
+        let textRect = body
         if style.shape.isSoftShape {
             // Keep the glyph inside the smaller body when keyboard height is reduced.
             label.font = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, textRect.height * 0.85),
@@ -128,12 +139,31 @@ final class KeyButton: UIView {
         }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        bodyLayer.fillColor = fill.withAlphaComponent(style.keyAlpha).cgColor
-        shadowLayer.fillColor = t.shadow.withAlphaComponent(style.shape.isSoftShape ? style.keyAlpha * 0.32 : min(1, style.keyAlpha + 0.1)).cgColor
-        cushionLayer.colors = [UIColor.white.withAlphaComponent(style.keyAlpha * 0.30).cgColor,
-                               UIColor.clear.cgColor, UIColor.black.withAlphaComponent(style.keyAlpha * 0.04).cgColor]
+        let a = style.keyAlpha
+        switch style.finish {
+        case .flat:
+            bodyLayer.fillColor = fill.withAlphaComponent(a).cgColor
+            bodyLayer.strokeColor = nil
+            shadowLayer.fillColor = t.shadow.withAlphaComponent(style.shape.isSoftShape ? a * 0.32 : min(1, a + 0.1)).cgColor
+            cushionLayer.colors = [UIColor.white.withAlphaComponent(a * 0.30).cgColor,
+                                   UIColor.clear.cgColor, UIColor.black.withAlphaComponent(a * 0.04).cgColor]
+        case .puffy:
+            bodyLayer.fillColor = fill.withAlphaComponent(a).cgColor
+            bodyLayer.strokeColor = nil
+            shadowLayer.fillColor = t.shadow.withAlphaComponent(min(1, a * 0.75)).cgColor
+            cushionLayer.colors = [UIColor.white.withAlphaComponent(a * 0.5).cgColor,
+                                   UIColor.clear.cgColor, UIColor.black.withAlphaComponent(a * (t.isDark ? 0.22 : 0.10)).cgColor]
+        case .glass:
+            // 半透明＋白色細邊，背景照片會透出來
+            bodyLayer.fillColor = fill.withAlphaComponent(a * (spec.kind == .accent ? 0.78 : 0.42)).cgColor
+            bodyLayer.strokeColor = UIColor.white.withAlphaComponent(t.isDark ? 0.35 : 0.85).cgColor
+            bodyLayer.lineWidth = 1
+            shadowLayer.fillColor = t.shadow.withAlphaComponent(a * 0.18).cgColor
+            cushionLayer.colors = [UIColor.white.withAlphaComponent(t.isDark ? 0.22 : 0.45).cgColor,
+                                   UIColor.white.withAlphaComponent(0.04).cgColor, UIColor.white.withAlphaComponent(t.isDark ? 0.08 : 0.2).cgColor]
+        }
         detailLayer.fillColor = style.shape.detailColor(theme: t).withAlphaComponent(style.keyAlpha * (style.shape == .pudding || style.shape == .duck ? 0.85 : 0.4)).cgColor
-        glossLayer.fillColor = UIColor.white.withAlphaComponent(t.isDark ? 0.18 : 0.55).cgColor
+        glossLayer.fillColor = UIColor.white.withAlphaComponent(style.finish == .puffy ? (t.isDark ? 0.3 : 0.75) : (t.isDark ? 0.18 : 0.55)).cgColor
         CATransaction.commit()
         label.textColor = text
         icon.tintColor = text
@@ -143,7 +173,9 @@ final class KeyButton: UIView {
         applyColors()
         if isPressed {
             UIView.animate(withDuration: 0.05, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
-                self.content.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+                // 胖胖的鍵按下去會被壓扁
+                self.content.transform = self.style.finish == .puffy
+                    ? CGAffineTransform(scaleX: 1.06, y: 0.86) : CGAffineTransform(scaleX: 0.9, y: 0.9)
             }
         } else {
             // 放開後很快回到原狀。0.3 秒的彈簧會讓按鍵浮起的樣子留在畫面上。

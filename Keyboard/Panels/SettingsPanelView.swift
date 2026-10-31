@@ -77,6 +77,14 @@ final class SettingsPanelView: UIView {
         stack.addArrangedSubview(header("按鍵造型"))
         stack.addArrangedSubview(shapeRow())
 
+        stack.addArrangedSubview(header("按鍵質感"))
+        stack.addArrangedSubview(choiceRow(KeyFinish.allCases.map { $0.title },
+                                           selected: KeyFinish.allCases.firstIndex(of: settings.keyFinish) ?? 0) { [weak self] i in
+            self?.settings.keyFinish = KeyFinish.allCases[i]
+            self?.onChange?()
+        })
+        stack.addArrangedSubview(note("胖胖：圓滾滾有立體感，按下去會壓扁。玻璃：半透明亮亮的，配背景照片最好看。"))
+
         stack.addArrangedSubview(header("按鍵特效（按下去冒出小圖案）"))
         stack.addArrangedSubview(choiceRow(KeyEffect.allCases.map { $0.title },
                                            selected: KeyEffect.allCases.firstIndex { $0.rawValue == settings.keyEffect } ?? 0) { [weak self] i in
@@ -467,12 +475,19 @@ final class SettingsPanelView: UIView {
     }
 
     private func fontRow() -> UIView {
-        let row = UIStackView()
-        row.axis = .horizontal
-        row.distribution = .fillEqually
-        row.spacing = 8
-        row.heightAnchor.constraint(equalToConstant: 40).isActive = true
-        for font in KeyFont.allCases {
+        let column = UIStackView()
+        column.axis = .vertical
+        column.spacing = 8
+        var row = UIStackView()
+        for (index, font) in KeyFont.allCases.enumerated() {
+            if index % 4 == 0 {
+                row = UIStackView()
+                row.axis = .horizontal
+                row.distribution = .fillEqually
+                row.spacing = 8
+                row.heightAnchor.constraint(equalToConstant: 40).isActive = true
+                column.addArrangedSubview(row)
+            }
             let selected = font.rawValue == settings.fontID
             let b = UIButton(type: .custom)
             b.layer.cornerRadius = 12
@@ -486,7 +501,8 @@ final class SettingsPanelView: UIView {
             }, for: .touchUpInside)
             row.addArrangedSubview(b)
         }
-        return row
+        while row.arrangedSubviews.count < 4 { row.addArrangedSubview(UIView()) }
+        return column
     }
 
     private func shapeRow() -> UIView {

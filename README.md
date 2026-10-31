@@ -57,7 +57,7 @@ project.yml  XcodeGen 專案設定（雲端打包時產生 Xcode 專案）
 - 程式：自己寫的。
 - 注音字典：小麥注音 McBopomofo，MIT 授權，打包時下載並附上授權文件。程式沒有另外內嵌一份字典；`tools/build_dict.py` 在打包時把 McBopomofo 的 `data.txt` 轉成 `zhuyin.sqlite`。鍵盤打開時整表建成記憶體索引，按鍵本身不再查資料庫。
 - 表情符號是系統字型顯示；顏文字是常見的文字組合。
-- 字體（打包時下載、只留常用字）：jf open 粉圓（justfont）、芫荽 Iansui（But Ko）、霞鶩文楷 TC（LXGW），都是 SIL Open Font License 1.1。
+- 字體（打包時下載、只留常用字）：jf open 粉圓（justfont）、芫荽 Iansui（But Ko）、霞鶩文楷 TC（LXGW）、源泉圓體 TW（ButTaiwan）、內海字體（max32002）、俐方體11號 Cubic 11（ACh-K），都是 SIL Open Font License 1.1。
 - 繁簡對照：OpenCC，Apache 2.0。
 - 按鍵音：tools/make_sounds.js 用程式合成，原創。
 - 英文滑行輸入的字表：hermitdave/FrequencyWords（OpenSubtitles 2018），CC BY-SA 4.0，打包時下載。

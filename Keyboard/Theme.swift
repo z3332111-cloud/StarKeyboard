@@ -93,7 +93,7 @@ struct KeyboardTheme {
 
 /// 按鍵造型
 enum KeyShape: String, CaseIterable {
-    case rounded, jelly, catEar, cloud, bunny, puppy, pudding, jellyfish, flame, droplet, duck
+    case rounded, jelly, catEar, cloud, bunny, puppy, pudding, jellyfish, flame, droplet, duck, mochi, bubble
 
     var title: String {
         switch self {
@@ -108,6 +108,8 @@ enum KeyShape: String, CaseIterable {
         case .flame: return "火焰"
         case .droplet: return "水滴"
         case .duck: return "鴨鴨"
+        case .mochi: return "麻糬"
+        case .bubble: return "泡泡"
         }
     }
 
@@ -164,6 +166,11 @@ enum KeyShape: String, CaseIterable {
 
     func detailPath(in r: CGRect) -> CGPath? {
         if isWide(r) { return path(in: badgeRect(in: r)) }
+        if self == .bubble {
+            let body = bodyRect(in: r)
+            let s = min(body.width, body.height) * 0.16
+            return UIBezierPath(ovalIn: CGRect(x: body.minX + body.width * 0.2, y: body.minY + body.height * 0.16, width: s, height: s)).cgPath
+        }
         let p = UIBezierPath()
         switch self {
         case .bunny:
@@ -259,6 +266,7 @@ enum KeyShape: String, CaseIterable {
         case .flame: return UIColor(hex: theme.isDark ? 0xFFD46B : 0xED914A)
         case .droplet: return UIColor(hex: theme.isDark ? 0xB8EFFF : 0x4AADD5)
         case .duck: return UIColor(hex: theme.isDark ? 0xFFD276 : 0xD78A32)
+        case .bubble: return .white
         default: return theme.accent
         }
     }
@@ -300,6 +308,20 @@ enum KeyShape: String, CaseIterable {
                 let circle = UIBezierPath(arcCenter: c, radius: b * 1.5, startAngle: 0, endAngle: .pi * 2, clockwise: true)
                 path.append(circle)
             }
+            return path.cgPath
+        case .mochi:
+            // 圓滾滾、下面比較胖的麻糬
+            func m(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: body.minX + body.width * x, y: body.minY + body.height * y) }
+            let p = UIBezierPath()
+            p.move(to: m(0.5, 0.03))
+            p.addCurve(to: m(0.985, 0.52), controlPoint1: m(0.86, 0.02), controlPoint2: m(0.985, 0.2))
+            p.addCurve(to: m(0.5, 0.99), controlPoint1: m(0.99, 0.88), controlPoint2: m(0.84, 0.99))
+            p.addCurve(to: m(0.015, 0.52), controlPoint1: m(0.16, 0.99), controlPoint2: m(0.01, 0.88))
+            p.addCurve(to: m(0.5, 0.03), controlPoint1: m(0.015, 0.2), controlPoint2: m(0.14, 0.02))
+            p.close()
+            return p.cgPath
+        case .bubble:
+            return UIBezierPath(roundedRect: body, cornerRadius: min(body.width, body.height) / 2).cgPath
             return path.cgPath
         case .bunny:
             func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
@@ -432,6 +454,20 @@ struct KeyboardStyle {
     var gapScale: CGFloat = 1    // 按鍵之間的空隙（越小按鍵越大）
     var fontID = KeyFont.system.rawValue
     var keyEffect = KeyEffect.none.rawValue
+    var finish = KeyFinish.flat
+}
+
+/// 按鍵質感：平面、胖胖（圓滾滾有立體感、按下去會壓扁）、玻璃（半透明、亮亮的邊）
+enum KeyFinish: String, CaseIterable {
+    case flat, puffy, glass
+
+    var title: String {
+        switch self {
+        case .flat: return "平面"
+        case .puffy: return "胖胖"
+        case .glass: return "玻璃"
+        }
+    }
 }
 
 /// 按下按鍵時冒出來的小圖案
@@ -475,7 +511,7 @@ enum KeySound: String, CaseIterable {
 
 /// 按鍵和候選字用的字體（App 裡附的免費字體，SIL OFL 1.1）
 enum KeyFont: String, CaseIterable {
-    case system, huninn, iansui, wenkai
+    case system, huninn, iansui, wenkai, gensen, naikai, cubic
 
     var title: String {
         switch self {
@@ -483,6 +519,9 @@ enum KeyFont: String, CaseIterable {
         case .huninn: return "粉圓"
         case .iansui: return "芫荽"
         case .wenkai: return "文楷"
+        case .gensen: return "源泉圓體"
+        case .naikai: return "內海"
+        case .cubic: return "像素"
         }
     }
 }
@@ -673,6 +712,10 @@ final class KeyboardSettings {
     var keyEffect: String {
         get { d.string(forKey: "keyEffect") ?? KeyEffect.none.rawValue }
         set { d.set(newValue, forKey: "keyEffect") }
+    }
+    var keyFinish: KeyFinish {
+        get { KeyFinish(rawValue: d.string(forKey: "keyFinish") ?? "") ?? .flat }
+        set { d.set(newValue.rawValue, forKey: "keyFinish") }
     }
     var keySoundStyle: String {
         get { d.string(forKey: "keySoundStyle") ?? KeySound.system.rawValue }

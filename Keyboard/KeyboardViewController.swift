@@ -134,7 +134,7 @@ final class KeyboardViewController: UIInputViewController {
     private var style: KeyboardStyle {
         KeyboardStyle(theme: KeyboardTheme.named(settings.themeID), shape: settings.keyShape, keyAlpha: settings.keyAlpha,
                       fontScale: settings.fontScale, gapScale: settings.gapScale, fontID: settings.fontID,
-                      keyEffect: settings.keyEffect)
+                      keyEffect: settings.keyEffect, finish: settings.keyFinish)
     }
 
     /// 注音或日文正在組字

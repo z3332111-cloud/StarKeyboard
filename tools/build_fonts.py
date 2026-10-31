@@ -7,6 +7,9 @@
 - huninn：jf open 粉圓（justfont）
 - iansui：芫荽（But Ko）
 - wenkai：霞鶩文楷 TC（LXGW）
+- gensen：源泉圓體 TW（ButTaiwan）
+- naikai：內海字體 Lite（max32002）
+- cubic：俐方體11號（ACh-K，像素風）
 
 完整的中文字體每個 4～14 MB。鍵盤只用來顯示按鍵和候選字，所以只留字典裡最常用的字，
 少見的字手機會自動用內建字體補上。
@@ -52,6 +55,9 @@ def main(dict_path, out_dir, fonts):
     text = charset(dict_path)
     for item in fonts:
         name, path = item.split("=", 1)
+        if not path or not os.path.exists(path):
+            print("%s：找不到字體檔，跳過（鍵盤會改用內建圓體）" % name)
+            continue
         out = os.path.join(out_dir, name + ".ttf")
         options = subset.Options()
         options.layout_features = ["*"]

@@ -41,7 +41,7 @@ jobs:
           python3 tools/build_dict.py "$RUNNER_TEMP/McBopomofo/Source/Data/data.txt" Keyboard/Resources/zhuyin.sqlite "$RUNNER_TEMP/TSCharacters.txt" "$RUNNER_TEMP/TSPhrases.txt"
           cp "$RUNNER_TEMP/McBopomofo/LICENSE.txt" Keyboard/Resources/McBopomofo-LICENSE.txt
 
-      - name: 下載可愛字體並縮小（粉圓、芫荽、霞鶩文楷，都是 SIL OFL 1.1）
+      - name: 下載可愛字體並縮小（粉圓、芫荽、霞鶩文楷、源泉圓體、內海、俐方體11號，都是 SIL OFL 1.1）
         run: |
           python3 -m venv "$RUNNER_TEMP/venv"
           "$RUNNER_TEMP/venv/bin/pip" install -q fonttools
@@ -50,7 +50,14 @@ jobs:
           unzip -q -o "$RUNNER_TEMP/iansui.zip" -d "$RUNNER_TEMP/iansui"
           IANSUI=$(find "$RUNNER_TEMP/iansui" \( -iname "*.ttf" -o -iname "*.otf" \) | head -1)
           curl -sSfL -o "$RUNNER_TEMP/wenkai.ttf" https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.530/LXGWWenKaiTC-Regular.ttf
-          "$RUNNER_TEMP/venv/bin/python" tools/build_fonts.py Keyboard/Resources/zhuyin.sqlite Keyboard/Resources/Fonts huninn="$RUNNER_TEMP/huninn.ttf" iansui="$IANSUI" wenkai="$RUNNER_TEMP/wenkai.ttf"
+          curl -sSfL -o "$RUNNER_TEMP/gensen.zip" https://github.com/ButTaiwan/gensen-font/releases/download/v2.100/GenSenRounded2TW-otf.zip
+          unzip -q -o "$RUNNER_TEMP/gensen.zip" -d "$RUNNER_TEMP/gensen"
+          GENSEN=$(find "$RUNNER_TEMP/gensen" -iname "*.otf" | grep -iE "(-M|Medium).otf$" | head -1)
+          [ -n "$GENSEN" ] || GENSEN=$(find "$RUNNER_TEMP/gensen" -iname "*.otf" | grep -iE "(-R|Regular).otf$" | head -1)
+          echo "源泉圓體：$GENSEN"
+          curl -sSfL -o "$RUNNER_TEMP/naikai.ttf" https://raw.githubusercontent.com/max32002/naikaifont/master/tw/NaikaiFont-Regular-Lite.ttf
+          curl -sSfL -o "$RUNNER_TEMP/cubic.ttf" https://raw.githubusercontent.com/ACh-K/Cubic-11/main/fonts/ttf/Cubic_11.ttf
+          "$RUNNER_TEMP/venv/bin/python" tools/build_fonts.py Keyboard/Resources/zhuyin.sqlite Keyboard/Resources/Fonts huninn="$RUNNER_TEMP/huninn.ttf" iansui="$IANSUI" wenkai="$RUNNER_TEMP/wenkai.ttf" gensen="$GENSEN" naikai="$RUNNER_TEMP/naikai.ttf" cubic="$RUNNER_TEMP/cubic.ttf"
 
       - name: 下載英文常用字表（滑行輸入用；FrequencyWords，CC BY-SA 4.0）
         run: |
