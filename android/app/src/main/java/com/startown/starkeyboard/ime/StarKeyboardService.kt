@@ -107,6 +107,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private var suggestionSource = SuggestionSource.ASSOCIATION
     private var panel: PanelKind? = null
     private var editorText: String? = null
+    // 編輯框裡的游標位置（字串索引）；null = 永遠在最後面
+    private var editorCursor: Int? = null
     private var editorPurpose = EditorPurpose.EMOTICON
     private var editorReturnPanel: PanelKind? = null
     /** 編輯框打完後的結果（翻譯、花式文字）：點一個送出，最後一個「✏️ 修改」回去改 */
@@ -284,7 +286,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun wire() {
         keyboard.onKey = { handle(it) }
         keyboard.onLongPress = { showImePicker() }
-        keyboard.onCursorMove = { steps -> if (!isComposing) moveCursor(steps) }
+        keyboard.onCursorMove = { steps -> if (!isComposing) moveCursor(steps) }   // 編輯框的游標在 moveCursor 裡處理
         keyboard.onGlide = { path, centers, kw -> glideTyped(path, centers, kw) }
         topBar.onScriptToggle = {
             if (mode == InputMode.PINYIN) {
@@ -322,6 +324,19 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     private fun moveCursor(steps: Int) {
+        // 在編輯框裡（例如改剪貼簿）：移動編輯框自己的游標
+        val ec = editorCursor
+        val et = editorText
+        if (ec != null && et != null) {
+            var i = ec.coerceIn(0, et.length)
+            repeat(kotlin.math.abs(steps)) {
+                if (steps < 0 && i > 0) i = et.offsetByCodePoints(i, -1)
+                if (steps > 0 && i < et.length) i = et.offsetByCodePoints(i, 1)
+            }
+            editorCursor = i
+            refreshTopBar()
+            return
+        }
         val ic = currentInputConnection ?: return
         finishHangul()
         val code = if (steps > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
@@ -444,7 +459,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val out = hangul.input(c)
         if (editorText != null) {
             // 編輯框裡：只把拼完的字放進去，正在拼的顯示在後面
-            editorText = (editorText ?: "") + out.commit
+            editorInsert(out.commit)
             refreshTopBar()
         } else {
             val ic = currentInputConnection
@@ -461,7 +476,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun finishHangul() {
         if (!hangulComposing) return
         if (editorText != null) {
-            editorText = (editorText ?: "") + hangul.composing
+            editorInsert(hangul.composing)
             refreshTopBar()
         } else {
             currentInputConnection?.finishComposingText()
@@ -625,17 +640,45 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun output(s: String) {
         if (s.isEmpty()) return
         if (editorText != null && editorResult == null) {
-            editorText = editorText + s
+            editorInsert(s)
             refreshTopBar()
             return
         }
         currentInputConnection?.commitText(s, 1)
     }
 
+    /// 把字放進編輯框（有游標就插在游標的位置）
+    private fun editorInsert(s: String) {
+        val t = editorText ?: ""
+        val c = editorCursor
+        if (c == null) { editorText = t + s; return }
+        val i = c.coerceIn(0, t.length)
+        editorText = t.substring(0, i) + s + t.substring(i)
+        editorCursor = i + s.length
+    }
+
+    /// 編輯框顯示的字：有游標時只顯示游標附近，正在拼的字和 ▏ 放在游標的位置
+    private fun editorDisplay(t: String, pending: String = ""): String {
+        val c = editorCursor ?: return t + pending
+        val i = c.coerceIn(0, t.length)
+        val before = t.substring(0, i)
+        val after = t.substring(i)
+        val b = if (before.codePointCount(0, before.length) > 14) "…" + before.substring(before.offsetByCodePoints(before.length, -14)) else before
+        val a = if (after.codePointCount(0, after.length) > 10) after.substring(0, after.offsetByCodePoints(0, 10)) + "…" else after
+        return b + pending + "▏" + a
+    }
+
     private fun deleteOutput() {
         val t = editorText
         if (t != null && editorResult == null) {
-            if (t.isNotEmpty()) editorText = t.substring(0, t.offsetByCodePoints(t.length, -1))
+            val c = editorCursor
+            if (c != null) {
+                if (c > 0 && c <= t.length) {
+                    val start = t.offsetByCodePoints(c, -1)
+                    editorText = t.removeRange(start, c)
+                    editorCursor = start
+                }
+            } else if (t.isNotEmpty()) editorText = t.substring(0, t.offsetByCodePoints(t.length, -1))
             refreshTopBar()
             return
         }
@@ -770,6 +813,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             editorResult = null
             if (chosen != null) {
                 editorText = null
+                editorCursor = null
                 currentInputConnection?.commitText(chosen, 1)
                 rebuildKeys()
             }
@@ -925,7 +969,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         when {
             tr != null -> topBar.showCandidates(tr.title, tr.items + "✏️ 修改", Trailing.CLOSE)
             isComposing -> {
-                val prefix = if (ed != null) editorLabel(editorPurpose) + ed + " ｜ " else ""
+                val prefix = if (ed != null) editorLabel(editorPurpose) + editorDisplay(ed) + " ｜ " else ""
                 topBar.showCandidates(if (ed != null) prefix + compositionText else "", candidates.map { it.text }, Trailing.EXPAND)
             }
             namingFolder && suggestions.isEmpty() -> topBar.showCandidates("用下方鍵盤輸入名稱，再按建立", emptyList(), Trailing.EXPAND)
@@ -938,7 +982,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                         val from = Translator.targets.firstOrNull { it.code == settings.translateSource }?.name ?: "自動"
                         topBar.showEditor(if (translating) "翻譯中…" else "翻譯：", ed + pending, "→$name", "翻譯", "從：$from")
                     }
-                    else -> topBar.showEditor(editorLabel(editorPurpose), ed + pending, "", editorConfirmTitle(editorPurpose))
+                    else -> topBar.showEditor(editorLabel(editorPurpose), editorDisplay(ed, pending), "", editorConfirmTitle(editorPurpose))
                 }
             }
             suggestions.isNotEmpty() -> topBar.showCandidates("", suggestions, Trailing.CLOSE)
@@ -1112,6 +1156,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                         editingClipId = item.id
                         beginEditor(EditorPurpose.CLIPBOARD_ITEM)
                         editorText = item.text
+                        editorCursor = item.text.length   // 游標先放最後，按住空白鍵左右滑可以移動
+                        toast("按住空白鍵左右滑，移到要改的地方")
                         refreshTopBar()
                     },
                     onEditCategory = { name ->
@@ -1361,6 +1407,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun endEditor() {
         val reopenClipboard = editorPurpose == EditorPurpose.CLIPBOARD_ITEM
         editingClipId = null
+        editorCursor = null
         composer.clear()
         kanaBuffer = ""
         pinyinBuffer = ""

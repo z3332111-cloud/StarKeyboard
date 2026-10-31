@@ -284,7 +284,7 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
             is Content.Editor -> {
                 val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
                 row.addView(TextView(context).apply {
-                    text = c.prompt + c.text + "▏"
+                    text = c.prompt + (if (c.text.contains("▏")) c.text else c.text + "▏")
                     textSize = 16f
                     setTextColor(t.keyText)
                     maxLines = 1
