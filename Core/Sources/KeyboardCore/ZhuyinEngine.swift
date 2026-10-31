@@ -823,6 +823,16 @@ final class ZhuyinEngine {
         alternativeCache.removeAll()
     }
 
+    /// 記憶體快不夠時：丟掉查過的暫存（之後要用再重查，不會壞）
+    func trimCaches() {
+        queryLock.lock()
+        defer { queryLock.unlock() }
+        contextCache.removeAll()
+        cache.removeAll()
+        fuzzyCache.removeAll()
+        alternativeCache.removeAll()
+    }
+
     func resetLearning() {
         queryLock.lock()
         defer { queryLock.unlock() }

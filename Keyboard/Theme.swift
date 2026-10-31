@@ -1,5 +1,6 @@
 import UIKit
 import CoreText
+import ImageIO
 
 extension UIColor {
     convenience init(hex: UInt32, alpha: CGFloat = 1) {
@@ -658,8 +659,16 @@ final class KeyboardSettings {
 
     /// 照片的小縮圖（設定面板用）
     func thumbnail(_ p: BgPhoto) -> UIImage? {
-        UIImage(contentsOfFile: Self.photoDirectory.appendingPathComponent(p.file).path)?
-            .preparingThumbnail(of: CGSize(width: 120, height: 120))
+        // 直接讀小圖，不先把整張照片解開（省記憶體）
+        let url = Self.photoDirectory.appendingPathComponent(p.file)
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: 240,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
+        return UIImage(cgImage: cg)
     }
     var keyEffect: String {
         get { d.string(forKey: "keyEffect") ?? KeyEffect.none.rawValue }

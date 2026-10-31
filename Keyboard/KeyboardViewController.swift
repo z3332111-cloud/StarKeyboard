@@ -245,6 +245,15 @@ final class KeyboardViewController: UIInputViewController {
         updateHeight()
     }
 
+    /// iOS 說記憶體快不夠了：先把可以重新讀的東西丟掉，免得鍵盤被系統強制關掉（閃退）
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        engine?.trimCaches()
+        pinyinEngineStore?.engine.trimCaches()
+        glide = nil   // 滑行輸入的字表，下次打開鍵盤再讀
+        if panelView != nil && panel != .settings { closePanel() }   // 表符面板的圖片
+    }
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         clipboardTimer?.invalidate()
