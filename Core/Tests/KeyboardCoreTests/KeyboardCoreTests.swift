@@ -359,7 +359,7 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertFalse(e.userModel.phrases(for: "ㄋㄧ*-ㄏ*").contains("你好可愛"))
     }
 
-    func testPredictions() {
+    func testPredictions() throws {
         let e = makeEngine()
         // 打完 ㄋㄧˇ：同長度的字先排完，接著才是預測詞，選了要記成完整讀音
         let c = e.candidates(for: ["ㄋㄧˇ"])
@@ -376,7 +376,7 @@ final class ZhuyinEngineTests: XCTestCase {
         XCTAssertEqual(e.candidates(for: ["ㄋㄧˇ"]).first { $0.reading != nil }?.text, "你們")
     }
 
-    func testPartialPredictionsRespectTonesAndConsumption() {
+    func testPartialPredictionsRespectTonesAndConsumption() throws {
         let e = makeEngine(extra: [("ㄋㄧˋ-ㄌㄧㄡˊ", "逆流", -2.0)])
         let partial = e.candidates(for: ["ㄋㄧ*"])
         XCTAssertEqual(partial.first?.text, "你")
