@@ -1,0 +1,198 @@
+/* 網頁試玩鍵盤（docs/sim.js）。顏色、造型、質感和 App 裡的 Theme.swift 一樣。 */
+.sim-section { scroll-margin-top: 20px; }
+.sim-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+.sim-heading h2 { font-size: clamp(24px, 5vw, 32px); letter-spacing: -.035em; }
+.sim-heading > a { font-size: 13px; flex: none; text-underline-offset: 4px; }
+.sim-eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); margin-bottom: 7px; }
+.sim-section button { font: inherit; cursor: pointer; touch-action: manipulation; }
+.sim-section button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.sim-tours { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
+.sim-tours button { border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 999px; padding: 7px 13px; min-height: 38px; font-size: 14px; }
+.sim-tours button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.sim-tip { display: flex; gap: 10px; align-items: baseline; background: var(--soft); border-radius: 14px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px; line-height: 1.6; }
+.sim-tip b { flex: none; color: var(--accent); }
+.sim-layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(220px, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 760px) { .sim-layout { grid-template-columns: 1fr; } }
+
+/* ===== 手機 ===== */
+.sim-phone {
+  --key: #fff; --key-text: #5b4b8a; --special: #c7b8f5; --special-text: #4a3b78; --key-accent: #8d74e8; --accent-text: #fff;
+  --key-shadow: #b9a9ec; --top: #ece4ff; --bottom: #dcd0ff; --detail: #8d74e8;
+  --row-h: 46px; --fs: 1; --gap: 1; --kfont: system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+  position: relative; width: 100%; max-width: 400px; margin: 0 auto; border: 6px solid #2d2738; border-radius: 40px; overflow: hidden;
+  background: #fbf9fd; color: #3f3549; box-sizing: border-box; box-shadow: 0 18px 36px -22px #34204499;
+  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.sim-status { display: flex; justify-content: space-between; align-items: center; padding: 10px 24px 4px; font: 600 14px system-ui, sans-serif; }
+.sim-island { width: 86px; height: 24px; background: #111; border-radius: 14px; }
+.sim-chat-head { display: flex; gap: 10px; align-items: center; padding: 6px 14px 8px; border-bottom: 1px solid #eee6f3; }
+.sim-chat-head b { display: block; font-size: 15px; line-height: 1.2; }
+.sim-chat-head small { font-size: 11px; color: #8a7d96; }
+.sim-avatar { width: 34px; height: 34px; border-radius: 50%; background: #ffe7ef; display: grid; place-items: center; font-size: 19px; }
+.sim-chat { height: 150px; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; scroll-behavior: smooth; }
+.sim-msg { max-width: 78%; padding: 7px 12px; border-radius: 17px; font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; animation: sim-pop .22s ease-out; }
+.sim-msg.them { align-self: flex-start; background: #efe9f5; border-bottom-left-radius: 5px; }
+.sim-msg.me { align-self: flex-end; background: var(--key-accent); color: var(--accent-text); border-bottom-right-radius: 5px; }
+@keyframes sim-pop { from { transform: scale(.85); opacity: 0; } }
+.sim-input-row { padding: 6px 10px 8px; }
+.sim-input { min-height: 36px; max-height: 66px; overflow-y: auto; border: 1px solid #e3d9ec; border-radius: 19px; padding: 7px 14px; font-size: 16px; line-height: 1.4; background: #fff; overflow-wrap: anywhere; white-space: pre-wrap; }
+.sim-input .ph { color: #b3a6be; }
+.sim-caret { display: inline-block; width: 2px; height: 1.15em; margin: 0 -1px; vertical-align: -.2em; background: var(--key-accent); animation: sim-blink 1s steps(1) infinite; }
+.sim-input .comp { text-decoration: underline; text-decoration-color: var(--key-accent); text-underline-offset: 3px; }
+@keyframes sim-blink { 50% { opacity: 0; } }
+
+/* ===== 鍵盤 ===== */
+.sim-keyboard { position: relative; background: linear-gradient(var(--top), var(--bottom)); color: var(--key-text); font-family: var(--kfont); overflow: hidden; }
+.sim-bg { position: absolute; inset: 0; background-size: cover; background-position: center 30%; pointer-events: none; }
+.sim-bg.has-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(var(--top), var(--bottom)); opacity: .25; }
+.sim-topbar, .sim-main { position: relative; }
+.sim-topbar { height: 56px; display: flex; align-items: stretch; }
+.sim-main { padding: 0 3px 4px; }
+
+/* 工具列 */
+.sim-tools { box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0 6px; overflow-x: auto; scrollbar-width: none; }
+.sim-tools::-webkit-scrollbar, .sim-cands::-webkit-scrollbar, .sim-tabs::-webkit-scrollbar { display: none; }
+.sim-tools button { flex: none; border: 0; background: transparent; color: var(--key-text); width: 34px; height: 38px; border-radius: 12px; font-size: 18px; padding: 0; display: grid; place-items: center; }
+.sim-tools button.small { font-size: 12px; width: 44px; }
+.sim-tools button[aria-pressed="true"] { background: color-mix(in srgb, var(--key) 70%, transparent); }
+.sim-tools svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 候選列 */
+.sim-candbar { box-sizing: border-box; display: flex; flex-direction: column; width: 100%; min-width: 0; padding: 2px 4px 0 8px; }
+.sim-reading { font: 600 13px/18px system-ui, sans-serif; min-height: 18px; padding-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .85; }
+.sim-candrow { display: flex; align-items: center; min-width: 0; flex: 1; }
+.sim-cands { display: flex; gap: 2px; overflow-x: auto; flex: 1; align-items: center; scrollbar-width: none; }
+.sim-cands button { flex: none; border: 0; background: transparent; color: var(--key-text); padding: 1px 9px; border-radius: 11px; font-size: calc(20px * var(--fs)); font-family: var(--kfont); line-height: 1.45; white-space: nowrap; }
+.sim-cands button.first { background: var(--key-accent); color: var(--accent-text); font-weight: 700; }
+.sim-cands button.punct { min-width: 34px; }
+.sim-cands .tag { font-size: 10px; opacity: .7; margin-left: 2px; vertical-align: 2px; }
+.sim-candbar .more { flex: none; border: 0; background: transparent; color: var(--key-text); font-size: 15px; width: 34px; height: 32px; }
+.sim-script { flex: none; border: 1px solid currentColor; border-radius: 8px; background: transparent; color: var(--key-text); font-size: 12px; padding: 0 6px; margin-right: 4px; height: 24px; }
+
+/* 編輯框（剪貼簿、翻譯、花式文字、新增表符） */
+.sim-editor { box-sizing: border-box; display: flex; align-items: center; gap: 6px; width: 100%; padding: 0 6px 0 10px; }
+.sim-editor .text { flex: 1; min-width: 0; font-size: 15px; white-space: nowrap; overflow: hidden; direction: ltr; }
+.sim-editor .text b { font-weight: 700; opacity: .75; }
+.sim-editor .text .sim-caret { animation-duration: .9s; }
+.sim-editor button { flex: none; border: 0; border-radius: 12px; padding: 5px 11px; font-size: 13px; background: color-mix(in srgb, var(--key) 75%, transparent); color: var(--key-text); }
+.sim-editor button.ok { background: var(--key-accent); color: var(--accent-text); font-weight: 700; }
+.sim-editor button.chip { padding: 4px 8px; font-size: 12px; }
+
+/* 按鍵 */
+.sim-keys { display: flex; flex-direction: column; }
+.sim-row { display: flex; height: var(--row-h); }
+.sim-key { position: relative; flex: 1 1 0; min-width: 0; border: 0; padding: 0; background: transparent; color: var(--key-text); touch-action: none; }
+.sim-key > .face { position: absolute; inset: calc(4.5px * var(--gap)) calc(3px * var(--gap)); transition: transform .08s ease-out; }
+.sim-key svg.shape { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 1.5px 0 color-mix(in srgb, var(--key-shadow) 60%, transparent)); }
+.sim-key .lbl { position: absolute; left: 0; right: 0; top: var(--label-y, 50%); transform: translateY(-50%); text-align: center; font-size: calc(var(--kfs, 20px) * var(--fs)); line-height: 1; white-space: nowrap; pointer-events: none; }
+.sim-key.special { --key: var(--special); color: var(--special-text); }
+.sim-key.special .lbl, .sim-key.accent .lbl { font-weight: 600; }
+.sim-key.accent { --key: var(--key-accent); color: var(--accent-text); }
+.sim-key.down > .face { transform: scale(.9); }
+.sim-key.down { --key: var(--special); }
+.sim-key.special.down, .sim-key.accent.down { --key: var(--key-face, #fff); }
+.sim-key .gloss { position: absolute; pointer-events: none; display: none; }
+.sim-key .badge { --key: var(--special); }
+.sim-key .badge { position: absolute; left: 6%; top: 50%; transform: translateY(-50%); height: 62%; aspect-ratio: 1; }
+.sim-key.wide svg.shape { inset: 8% 0; height: 84%; }
+.sim-key.wide .lbl { top: 50%; }
+/* 按下去冒出來的小圖案 */
+.sim-fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.sim-fx span { position: absolute; font-size: 15px; animation: sim-float .75s ease-out forwards; }
+@keyframes sim-float { to { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(.6); opacity: 0; } }
+/* 按下去時上面的大字泡泡 */
+.sim-popup { position: absolute; pointer-events: none; background: var(--key); color: var(--key-text); border-radius: 12px; font-size: 28px; padding: 4px 10px; transform: translate(-50%, -100%); box-shadow: 0 4px 10px #0002; z-index: 3; font-family: var(--kfont); }
+
+/* 質感：胖胖 */
+.sim-phone[data-finish="puffy"] .sim-key svg.shape { filter: drop-shadow(0 3px 0 color-mix(in srgb, var(--key-shadow) 85%, transparent)) drop-shadow(0 4px 5px #0001); }
+.sim-phone[data-finish="puffy"] .sim-key .gloss { display: block; left: 18%; top: calc(var(--label-y, 50%) - 30%); width: 34%; height: 22%; border-radius: 50%; background: #ffffffe6; filter: blur(.4px); }
+.sim-phone[data-finish="puffy"] .sim-key .shade { display: block; }
+.sim-phone[data-finish="puffy"] .sim-key.down > .face { transform: scale(1.06, .86); transition-timing-function: cubic-bezier(.3,1.6,.6,1); }
+.sim-phone[data-finish="puffy"] .sim-key.wide .gloss { left: 12%; top: 18%; width: 22%; height: 22%; }
+/* 質感：玻璃 */
+.sim-phone[data-finish="glass"] .sim-key svg.shape use { fill-opacity: .42; stroke: #ffffffd9; stroke-width: 1.4px; vector-effect: non-scaling-stroke; }
+.sim-phone[data-finish="glass"] .sim-key.accent svg.shape use { fill-opacity: .8; }
+.sim-phone[data-finish="glass"] .sim-key svg.shape { filter: drop-shadow(0 2px 3px color-mix(in srgb, var(--key-shadow) 35%, transparent)); }
+.sim-phone[data-finish="glass"] .sim-key .gloss { display: block; left: 12%; right: 12%; top: calc(var(--label-y, 50%) - 32%); height: 30%; border-radius: 999px; background: linear-gradient(#ffffffb0, #ffffff10); }
+.sim-phone[data-finish="glass"] .sim-key.wide .gloss { top: 14%; }
+.sim-phone[data-finish="glass"] .sim-keyboard { -webkit-backdrop-filter: saturate(1.2); }
+.sim-key .shade { display: none; position: absolute; inset: 0; pointer-events: none; }
+
+/* 面板 */
+.sim-panel { display: flex; flex-direction: column; height: calc(var(--row-h) * 4 + 4px); }
+.sim-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 0 4px 4px; flex: none; scrollbar-width: none; }
+.sim-tabs button { flex: none; border: 0; border-radius: 12px; padding: 4px 10px; font-size: 13px; background: transparent; color: var(--key-text); }
+.sim-tabs button[aria-pressed="true"] { background: var(--key-accent); color: var(--accent-text); font-weight: 700; }
+.sim-grid { flex: 1; overflow-y: auto; display: grid; gap: 4px; padding: 0 4px; align-content: start; scrollbar-width: thin; }
+.sim-grid.emoji { grid-template-columns: repeat(8, 1fr); }
+.sim-grid.emoji button { font-size: 25px; }
+.sim-grid.sym { grid-template-columns: repeat(8, 1fr); }
+.sim-grid.kao { grid-template-columns: repeat(2, 1fr); }
+.sim-grid.list { grid-template-columns: 1fr; }
+.sim-grid button { border: 0; background: color-mix(in srgb, var(--key) 75%, transparent); color: var(--key-text); border-radius: 12px; min-height: 38px; font-size: 18px; padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-grid.emoji button { background: transparent; }
+.sim-grid.kao button { font-size: 15px; }
+.sim-panel-foot { display: flex; gap: 4px; padding: 4px 4px 0; flex: none; }
+.sim-panel-foot button { border: 0; border-radius: 12px; background: var(--special); color: var(--special-text); height: 38px; padding: 0 14px; font-size: 14px; font-weight: 600; }
+.sim-panel-foot .grow { flex: 1; background: transparent; font-weight: 400; font-size: 12px; text-align: left; opacity: .75; }
+.sim-clip { display: flex; align-items: center; gap: 6px; background: color-mix(in srgb, var(--key) 80%, transparent); border-radius: 14px; padding: 6px 8px 6px 12px; }
+.sim-clip .t { flex: 1; min-width: 0; font-size: 14px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; background: transparent; color: var(--key-text); padding: 4px 0; }
+.sim-clip .i { flex: none; border: 0; width: 32px; height: 32px; border-radius: 10px; background: transparent; color: var(--key-text); font-size: 16px; }
+.sim-clip .pin { color: var(--key-accent); }
+.sim-fancy { display: flex; align-items: center; gap: 8px; background: color-mix(in srgb, var(--key) 80%, transparent); border-radius: 12px; padding: 6px 10px; border: 0; color: var(--key-text); text-align: left; font-size: 16px; }
+.sim-fancy small { flex: none; width: 56px; font-size: 11px; opacity: .7; }
+.sim-fancy span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-note { font-size: 13px; line-height: 1.6; padding: 6px 12px; }
+.sim-note b { color: var(--key-accent); }
+
+/* 手寫 */
+.sim-hw { display: flex; gap: 4px; height: calc(var(--row-h) * 4 + 4px); }
+.sim-hw canvas { flex: 1; min-width: 0; background: color-mix(in srgb, var(--key) 85%, transparent); border-radius: 16px; margin: 4px 0 4px 4px; touch-action: none; }
+.sim-hw .side { width: 64px; display: flex; flex-direction: column; }
+.sim-hw .side .sim-row { height: auto; flex: 1; }
+
+/* 鍵盤裡的設定面板 */
+.sim-set { flex: 1; overflow-y: auto; padding: 0 10px 6px; font-size: 13px; }
+.sim-set h4 { font-size: 12px; margin: 8px 0 4px; opacity: .8; }
+.sim-set .row { display: flex; flex-wrap: wrap; gap: 5px; }
+.sim-set .row button { border: 0; border-radius: 10px; padding: 4px 9px; background: color-mix(in srgb, var(--key) 75%, transparent); color: var(--key-text); font-size: 12px; }
+.sim-set .row button[aria-pressed="true"] { background: var(--key-accent); color: var(--accent-text); font-weight: 700; }
+
+.sim-toast { position: absolute; left: 50%; top: 54px; transform: translateX(-50%); background: #000000b8; color: #fff; font-size: 12px; padding: 5px 12px; border-radius: 999px; white-space: nowrap; z-index: 4; pointer-events: none; }
+.sim-home { display: flex; align-items: center; justify-content: space-between; padding: 4px 22px 10px; background: linear-gradient(var(--bottom), var(--bottom)); color: var(--key-text); }
+.sim-home i { width: 120px; height: 5px; border-radius: 3px; background: #1d1724; opacity: .85; }
+.sim-home-btn { font-size: 20px; cursor: pointer; padding: 2px 6px; }
+.sim-keyboard.hidden .sim-topbar, .sim-keyboard.hidden .sim-main { display: none; }
+.sim-wake { display: block; width: 100%; border: 0; background: transparent; color: var(--key-text); padding: 18px; font-size: 14px; }
+
+/* ===== 右邊的選項 ===== */
+.sim-options { display: flex; flex-direction: column; gap: 10px; }
+.sim-options fieldset { border: 1px solid var(--line); border-radius: 18px; padding: 10px 12px 12px; margin: 0; background: var(--card); min-width: 0; }
+.sim-options legend { font-weight: 700; font-size: 14px; padding: 0 6px; }
+.sim-options legend small { font-weight: 400; color: var(--muted); margin-left: 6px; }
+.sim-shapes { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 6px; }
+.sim-shapes button { border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 14px; padding: 6px 2px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; --key: #f1eafb; --detail: #8d74e8; }
+.sim-shapes svg { width: 36px; height: 30px; overflow: visible; }
+.sim-shapes button[aria-pressed="true"], .sim-chips button[aria-pressed="true"] { border-color: var(--accent); background: var(--soft); font-weight: 700; box-shadow: inset 0 0 0 1px var(--accent); }
+.sim-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sim-chips button { border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 999px; padding: 5px 12px; font-size: 14px; min-height: 36px; }
+.sim-colors { display: flex; flex-wrap: wrap; gap: 8px; }
+.sim-colors button { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--line); padding: 3px; background: var(--card); }
+.sim-colors button span { display: block; width: 100%; height: 100%; border-radius: 50%; background: var(--swatch); }
+.sim-colors button[aria-pressed="true"] { border-color: var(--accent); border-width: 3px; }
+.sim-hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; line-height: 1.5; }
+.sim-photo { display: inline-block; cursor: pointer; }
+.sim-photo input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.sim-photo span { display: inline-block; border: 1px dashed var(--accent); color: var(--accent); border-radius: 999px; padding: 6px 14px; font-size: 14px; }
+.sim-photo input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
+.sim-link { border: 0; background: transparent; color: var(--muted); text-decoration: underline; margin-left: 8px; font-size: 13px; }
+.sim-slider { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; margin: 4px 0; }
+.sim-slider input { flex: 1; max-width: 60%; accent-color: var(--accent); }
+.sim-check { display: flex; gap: 6px; align-items: center; font-size: 13px; margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) { .sim-fx span, .sim-msg { animation: none; } .sim-key > .face { transition: none; } }
+/* 漸層：平面只有軟萌造型有，胖胖、玻璃每個造型都有 */
+.sim-key svg.shape use.shade { --key: url(#sim-shade-flat); --detail: transparent; display: none; fill-opacity: 1 !important; stroke: none !important; }
+.sim-phone[data-soft="1"] .sim-key svg.shape use.shade { display: inline; }
+.sim-phone[data-finish="puffy"] .sim-key svg.shape use.shade { --key: url(#sim-shade-puffy); display: inline; }
+.sim-phone[data-finish="glass"] .sim-key svg.shape use.shade { --key: url(#sim-shade-glass); display: inline; }
+@media (max-width: 480px) { .sim-chat { height: 112px; } }
