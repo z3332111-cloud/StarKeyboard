@@ -267,6 +267,38 @@ struct ZhuyinComposer {
         syllables.removeFirst(min(count, syllables.count))
     }
 
+    // MARK: 游標在注音中間修改（像 iPhone 內建注音：打錯一個不用整串刪掉）
+
+    /// 空白鍵打的一聲，在按鍵清單裡用這個記號
+    static let firstTone: Character = "ˉ"
+
+    /// 照順序列出按過的注音鍵；重新照這個順序打一次，會得到一樣的組字區
+    var keys: [Character] {
+        var out: [Character] = []
+        for s in syllables {
+            out += Array(s.reading)
+            if !s.open && s.tone == nil { out.append(Self.firstTone) }
+        }
+        out += Array(current.reading)
+        if let tone = pendingTone { out.append(tone) }
+        return out
+    }
+
+    /// 給人看的按鍵清單：一聲顯示成空格
+    static func display(_ keys: ArraySlice<Character>) -> String {
+        String(keys.map { $0 == firstTone ? " " : $0 })
+    }
+
+    /// 改過按鍵清單之後，從頭重新打一次
+    mutating func replay(_ keys: [Character]) {
+        let prefixes = validPrefixes
+        self = ZhuyinComposer()
+        validPrefixes = prefixes
+        for k in keys {
+            if k == Self.firstTone { confirmSyllable() } else { input(k) }
+        }
+    }
+
     mutating func clear() {
         syllables = []
         current = Syllable()

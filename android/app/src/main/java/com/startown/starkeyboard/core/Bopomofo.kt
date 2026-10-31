@@ -228,10 +228,36 @@ class ZhuyinComposer {
         repeat(minOf(count, syllables.size)) { syllables.removeAt(0) }
     }
 
+    // ===== 游標在注音中間修改（像 iPhone 內建注音：打錯一個不用整串刪掉） =====
+
+    /** 照順序列出按過的注音鍵；重新照這個順序打一次，會得到一樣的組字區（空白鍵的一聲記成 ˉ） */
+    val keys: List<Char>
+        get() {
+            val out = ArrayList<Char>()
+            for (s in syllables) {
+                out.addAll(s.reading.toList())
+                if (!s.open && s.tone == null) out.add(FIRST_TONE)
+            }
+            out.addAll(current.reading.toList())
+            pendingTone?.let { out.add(it) }
+            return out
+        }
+
+    /** 改過按鍵清單之後，從頭重新打一次 */
+    fun replay(keys: List<Char>) {
+        clear()
+        for (k in keys) if (k == FIRST_TONE) confirmSyllable() else input(k)
+    }
+
     fun clear() {
         syllables.clear()
         current = Syllable()
         pendingTone = null
+    }
+
+    companion object {
+        const val FIRST_TONE = 'ˉ'
+        fun display(keys: List<Char>) = keys.joinToString("") { if (it == FIRST_TONE) " " else it.toString() }
     }
 
     private fun finish(open: Boolean = false) {

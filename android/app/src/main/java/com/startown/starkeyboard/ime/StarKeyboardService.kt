@@ -109,6 +109,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private var editorText: String? = null
     // 編輯框裡的游標位置（字串索引）；null = 永遠在最後面
     private var editorCursor: Int? = null
+    // 打注音打到一半，游標在注音中間時是第幾個鍵的前面；null = 在最後面（平常的打法）
+    private var zyCursor: Int? = null
     private var editorPurpose = EditorPurpose.EMOTICON
     private var editorReturnPanel: PanelKind? = null
     /** 編輯框打完後的結果（翻譯、花式文字）：點一個送出，最後一個「✏️ 修改」回去改 */
@@ -274,6 +276,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun resetComposition() {
         composer.clear()
+        zyCursor = null
         kanaBuffer = ""
         pinyinBuffer = ""
         hangul.reset()
@@ -286,7 +289,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun wire() {
         keyboard.onKey = { handle(it) }
         keyboard.onLongPress = { showImePicker() }
-        keyboard.onCursorMove = { steps -> if (!isComposing) moveCursor(steps) }   // 編輯框的游標在 moveCursor 裡處理
+        keyboard.onCursorMove = { steps -> moveCursor(steps) }   // 注音中間、編輯框的游標都在 moveCursor 裡處理
         keyboard.onGlide = { path, centers, kw -> glideTyped(path, centers, kw) }
         topBar.onScriptToggle = {
             if (mode == InputMode.PINYIN) {
@@ -323,7 +326,21 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker()
     }
 
+    private fun placeZyCursor(c: Int) {
+        val n = composer.keys.size
+        zyCursor = if (c >= n) null else maxOf(0, c)
+    }
+
     private fun moveCursor(steps: Int) {
+        // 打注音打到一半：游標在注音裡移動，可以只改打錯的那一個（像 iPhone 內建注音）
+        if (mode == InputMode.ZHUYIN && pinyinBuffer.isEmpty() && kanaBuffer.isEmpty() && composer.isComposing) {
+            val n = composer.keys.size
+            val c = ((zyCursor ?: n) + steps).coerceIn(0, n)
+            zyCursor = if (c == n) null else c
+            refreshTopBar()
+            return
+        }
+        if (isComposing) return
         // 在編輯框裡（例如改剪貼簿）：移動編輯框自己的游標
         val ec = editorCursor
         val et = editorText
@@ -395,11 +412,22 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             refreshTopBar()
             return
         }
+        zyCursor?.let { i ->
+            val keys = composer.keys.toMutableList()
+            val at = minOf(i, keys.size)
+            keys.add(at, c)
+            composer.replay(keys)
+            placeZyCursor(at + 1)
+            refreshTopBar()
+            scheduleCandidates()
+            return
+        }
         composer.input(c)
         if (composer.syllables.size > 180) {
             val count = composer.syllables.size - 8
             val text = ZhuyinEngine.commit(synchronized(dictLock) { engine?.bestSegments(composer.readings.take(count)) }?.joinToString("") { it.text } ?: "")
             composer.removeFirst(count)
+            zyCursor = null
             if (text.isNotEmpty()) output(text)
         }
         refreshTopBar()
@@ -497,6 +525,16 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             return
         }
         if (composer.isComposing) {
+            zyCursor?.let { i ->
+                if (i > 0) {
+                    val keys = composer.keys.toMutableList()
+                    keys.removeAt(i - 1)
+                    composer.replay(keys)
+                    placeZyCursor(i - 1)
+                }
+                updateCandidates()
+                return
+            }
             composer.backspace()
             updateCandidates()
             return
@@ -520,6 +558,16 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     private fun space() {
+        if (mode == InputMode.ZHUYIN && layer == KeyboardLayer.LETTERS && composer.isComposing && zyCursor != null) {
+            // 游標在注音中間：空白鍵打一聲
+            val i = zyCursor!!
+            val keys = composer.keys.toMutableList()
+            keys.add(minOf(i, keys.size), ZhuyinComposer.FIRST_TONE)
+            composer.replay(keys)
+            placeZyCursor(i + 1)
+            updateCandidates()
+            return
+        }
         if (mode == InputMode.ZHUYIN && layer == KeyboardLayer.LETTERS && composer.hasPendingSyllable) {
             // 空白鍵＝一聲。沒打完的音節留在組字區，不直接送出預選的字。
             composer.confirmSyllable()
@@ -802,6 +850,11 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 val (kana, rest) = Romaji.convert(kanaBuffer)
                 return kana + rest
             }
+            // 游標在注音中間：改顯示注音，用 ▏ 標出游標
+            zyCursor?.let { c ->
+                val k = composer.keys
+                if (c < k.size) return ZhuyinComposer.display(k.subList(0, c)) + "▏" + ZhuyinComposer.display(k.subList(c, k.size))
+            }
             // 正在打的字也先預覽成中文（還沒打聲調、只打開頭都可以）
             if (composer.readings.isEmpty()) return ""
             return ZhuyinEngine.commit(candidates.firstOrNull()?.text ?: "")
@@ -866,6 +919,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             }
             if (text.isNotEmpty()) output(text)
             composer.removeFirst(c.span)
+            zyCursor = null
             if (composer.isComposing) {
                 updateCandidates()
             } else {
@@ -929,6 +983,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             }
             if (text.isNotEmpty()) synchronized(dictLock) { engine?.learnCommitted(readings, text) }
             composer.clear()
+            zyCursor = null
         }
         candidates = emptyList()
         closeCandidatePanel()
@@ -1409,6 +1464,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         editingClipId = null
         editorCursor = null
         composer.clear()
+        zyCursor = null
         kanaBuffer = ""
         pinyinBuffer = ""
         hangul.reset()

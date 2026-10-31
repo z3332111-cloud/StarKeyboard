@@ -18,7 +18,11 @@ enum PhoneticText {
 
 /// 注音組字到送出的規則。鍵盤與測試走同一條，避免聲調從某條捷徑漏進文章。
 final class ZhuyinSession {
-    var composer = ZhuyinComposer()
+    var composer = ZhuyinComposer() {
+        didSet { if let c = cursor, c >= composer.keys.count { cursor = nil } }
+    }
+    /// 游標在注音中間時是第幾個鍵的前面；nil = 在最後面（平常的打法）
+    private(set) var cursor: Int?
     var candidates: [Candidate] = []
     var engine: ZhuyinEngine?
     private var picks: [(readings: [String], text: String)] = []
@@ -46,6 +50,7 @@ final class ZhuyinSession {
     /// 注音鍵。回傳這次要送進文章的字（通常是空的；緩衝區太長時是前面那段中文）。
     func type(_ c: Character) -> String {
         guard Bopomofo.kind(of: c) != nil else { return "" }
+        if let i = cursor { editKeys(insert: c, at: i); return "" }
         if !composer.isComposing { picks = [] }
         _ = composer.input(c)
         if composer.syllables.count > Self.overflowSyllables {
@@ -56,6 +61,10 @@ final class ZhuyinSession {
 
     /// 組字區或還沒用到的聲調處理掉了就回傳 true。
     func backspace() -> Bool {
+        if let i = cursor {
+            if i > 0 { editKeys(removeAt: i - 1) }
+            return true
+        }
         if composer.isComposing {
             composer.backspace()
             if !composer.isComposing { picks = [] }
@@ -73,6 +82,7 @@ final class ZhuyinSession {
     }
 
     func space() -> Space {
+        if let i = cursor { editKeys(insert: ZhuyinComposer.firstTone, at: i); return .stay }
         if composer.hasPendingSyllable {
             composer.confirmSyllable()
             return .stay
@@ -105,6 +115,47 @@ final class ZhuyinSession {
         return text
     }
 
+    // MARK: 游標在注音中間
+
+    /// 按住空白鍵左右滑：在注音裡移動游標。沒有在打注音就回傳 false
+    @discardableResult
+    func moveCursor(_ steps: Int) -> Bool {
+        guard composer.isComposing else { return false }
+        let n = composer.keys.count
+        let c = max(0, min(n, (cursor ?? n) + steps))
+        cursor = c == n ? nil : c
+        return true
+    }
+
+    /// 上排顯示的注音；游標在中間時用 ▏ 標出位置
+    var displayText: String {
+        guard let c = cursor else { return composer.displayText }
+        let keys = composer.keys
+        return ZhuyinComposer.display(keys[..<c]) + "▏" + ZhuyinComposer.display(keys[c...])
+    }
+
+    private func editKeys(insert c: Character, at i: Int) {
+        var keys = composer.keys
+        let at = min(i, keys.count)
+        keys.insert(c, at: at)
+        composer.replay(keys)
+        placeCursor(at + 1)
+    }
+
+    private func editKeys(removeAt i: Int) {
+        var keys = composer.keys
+        guard i < keys.count else { return }
+        keys.remove(at: i)
+        composer.replay(keys)
+        if !composer.isComposing { picks = [] }
+        placeCursor(i)
+    }
+
+    private func placeCursor(_ c: Int) {
+        let n = composer.keys.count
+        cursor = c >= n ? nil : max(0, c)
+    }
+
     func pick(_ index: Int, learn: Bool) -> String {
         guard composer.isComposing, index >= 0, index < candidates.count else { return "" }
         let c = candidates[index]
@@ -117,6 +168,7 @@ final class ZhuyinSession {
         } else {
             picks = []
         }
+        cursor = nil
         composer.removeFirst(c.span)
         if !composer.isComposing {
             if picks.count > 1 {

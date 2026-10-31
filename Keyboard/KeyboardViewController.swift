@@ -323,7 +323,14 @@ final class KeyboardViewController: UIInputViewController {
         }
         grid.onGlide = { [weak self] path, centers, kw in self?.glideTyped(path: path, centers: centers, keyWidth: kw) }
         grid.onCursorMove = { [weak self] steps in
-            guard let self = self, !self.isComposing else { return }
+            guard let self = self else { return }
+            // 打注音打到一半：游標在注音裡移動，可以只改打錯的那一個（像 iPhone 內建注音）
+            if self.mode == .zhuyin, self.pinyinBuffer.isEmpty, self.kanaBuffer.isEmpty, self.composer.isComposing {
+                self.zhuyin.moveCursor(steps)
+                self.refreshTopBar()
+                return
+            }
+            guard !self.isComposing else { return }
             // 在編輯框裡（例如改剪貼簿）：移動編輯框自己的游標
             if let c = self.editorCursor, let t = self.editorText {
                 self.editorCursor = max(0, min(t.count, c + steps))
@@ -597,7 +604,7 @@ final class KeyboardViewController: UIInputViewController {
             case .passthrough:
                 break
             case .stay:
-                refreshTopBar()
+                if zhuyin.cursor != nil { updateCandidatesNow() } else { refreshTopBar() }
                 return
             case .commit(let text):
                 if !text.isEmpty { output(text) }
@@ -868,7 +875,7 @@ final class KeyboardViewController: UIInputViewController {
             return r.kana + r.rest
         }
         // 上排顯示真正按過的注音，中文預覽留在下排候選字，方便找出按錯的音。
-        return composer.displayText
+        return zhuyin.displayText
     }
 
     private func selectCandidate(at i: Int, learn: Bool) {
