@@ -148,9 +148,6 @@ final class PhraseIndex {
                 }
             }
         }
-        if phrase.count >= 2, let count = ngrams[phrase], count > 0 {
-            best = max(best, 0.42 * log10(Double(count) + 1))
-        }
         return min(best, 1.8)
     }
 }

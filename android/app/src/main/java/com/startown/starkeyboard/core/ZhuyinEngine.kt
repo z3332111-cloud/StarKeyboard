@@ -44,10 +44,6 @@ class ContextModel(private val ngrams: Map<String, Int>) {
                 }
             }
         }
-        if (phrase.length >= 2) {
-            val count = ngrams[phrase]
-            if (count != null && count > 0) best = maxOf(best, 0.42 * kotlin.math.log10(count + 1.0))
-        }
         return minOf(best, 1.8)
     }
 
@@ -271,14 +267,16 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
                 val pool = fuzzyPhrases(readings.subList(start, i)).filter { commit(it.text) == it.text && it.text.isNotEmpty() }
                 if (pool.isNotEmpty()) {
                     val options = if (contextual) pool.take(6) else pool.take(1)
+                    val leaderBonus = if (contextual) context.bonus(tail[start], options[0].text) else 0.0
                     for (opt in options) {
-                        val bonus = context.bonus(tail[start], opt.text)
-                        val s = best[start] + opt.score + bonus
+                        val raw = if (contextual) context.bonus(tail[start], opt.text) else 0.0
+                        val extra = minOf(0.55, maxOf(0.0, raw - leaderBonus))
+                        val s = best[start] + opt.score + extra
                         if (s > best[i]) {
                             best[i] = s
                             backStart[i] = start
                             backText[i] = opt.text
-                            backScore[i] = opt.score + bonus
+                            backScore[i] = opt.score + extra
                             tail[i] = (tail[start] + opt.text).takeLast(2)
                         }
                     }

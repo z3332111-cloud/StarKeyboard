@@ -339,16 +339,20 @@ final class ZhuyinEngine {
                 let pool = fuzzyPhrases(readings[start..<i]).filter { !PhoneticText.containsPhonetic($0.text) }
                 if let floor = pool.first?.corrections {
                     let options = contextual
-                        ? pool.prefix(6).filter { $0.corrections == floor }
-                        : pool.prefix(1)
+                        ? Array(pool.prefix(6).filter { $0.corrections == floor })
+                        : Array(pool.prefix(1))
+                    // 詞頻最高的那個維持原分。前後文只幫忙分很接近的同音詞，避免把本來對的句子改錯。
+                    let leaderBonus = contextual && !options.isEmpty
+                        ? index.contextBonus(tail: tail[start], phrase: options[0].text) : 0
                     for opt in options {
-                        let bonus = contextual ? index.contextBonus(tail: tail[start], phrase: opt.text) : 0
-                        let s = best[start] + opt.score + bonus
+                        let raw = contextual ? index.contextBonus(tail: tail[start], phrase: opt.text) : 0
+                        let extra = min(0.55, max(0, raw - leaderBonus))
+                        let s = best[start] + opt.score + extra
                         let count = errors[start] + opt.corrections
                         if count < errors[i] || (count == errors[i] && s > best[i]) {
                             errors[i] = count
                             best[i] = s
-                            back[i] = (start, opt.text, opt.score + bonus)
+                            back[i] = (start, opt.text, opt.score + extra)
                             tail[i] = String((tail[start] + opt.text).suffix(2))
                         }
                     }
