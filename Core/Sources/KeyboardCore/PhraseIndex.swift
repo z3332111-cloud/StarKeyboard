@@ -155,8 +155,8 @@ final class PhraseIndex {
         db.run("SELECT rowid, reading, phrase, score FROM phrases " + whereClause, args) { stmt in
             let id = Int(SQLiteDB.double(stmt, 0))
             ids.append(id)
-            if rowCache[id] == nil {
-                rowCache[id] = Row(reading: SQLiteDB.text(stmt, 1), phrase: SQLiteDB.text(stmt, 2),
+            if self.rowCache[id] == nil {
+                self.rowCache[id] = Row(reading: SQLiteDB.text(stmt, 1), phrase: SQLiteDB.text(stmt, 2),
                                    score: SQLiteDB.double(stmt, 3))
             }
         }
