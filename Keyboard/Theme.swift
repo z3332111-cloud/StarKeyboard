@@ -746,9 +746,9 @@ final class KeyboardSettings {
         get { bool("pinyinSimplified", false) }
         set { d.set(newValue, forKey: "pinyinSimplified") }
     }
-    /// 中文符號頁用全形（＃＊）還是半形（# *）；預設半形，Discord 語法才能用
+    /// 中文 #+= 頁預設全形（和 iPhone 注音一樣）。要 Discord 語法再切成半形。
     var fullWidthSymbols: Bool {
-        get { bool("fullWidthSymbols", false) }
+        get { bool("fullWidthSymbols", true) }
         set { d.set(newValue, forKey: "fullWidthSymbols") }
     }
     /// 翻譯的原文語言："auto" 是自己猜

@@ -585,9 +585,9 @@ class KeyboardSettings(context: Context) {
     var pinyinSimplified: Boolean
         get() = p.getBoolean("pinyinSimplified", false)
         set(v) = p.edit().putBoolean("pinyinSimplified", v).apply()
-    /** 中文符號頁用全形（＃＊）還是半形（# *）；預設半形，Discord 語法才能用 */
+    /** 中文 #+= 頁預設全形（和 iPhone 注音一樣）。要 Discord 語法再切成半形。 */
     var fullWidthSymbols: Boolean
-        get() = p.getBoolean("fullWidthSymbols", false)
+        get() = p.getBoolean("fullWidthSymbols", true)
         set(v) = p.edit().putBoolean("fullWidthSymbols", v).apply()
     /** 翻譯的原文語言："auto" 是自己猜 */
     var translateSource: String

@@ -153,17 +153,22 @@ object KeyLayouts {
         return KeyboardLayout(listOf(keys("[]{}#%^*+="), keys("_\\|~<>€£¥•"), row3, bottomRow(c, 10f)), 10f)
     }
 
+    /** 注音的 123 頁，和 iPhone 注音鍵盤同一排列。標點用全形，減號、斜線、錢號、小老鼠和句點用半形。 */
     private fun chineseNumbers(c: Context): KeyboardLayout {
-        val row3 = listOf(KeySpec("#+=", KeyAction.Layer(KeyboardLayer.SYMBOLS), 1.4f, KeyKind.SPECIAL, 16f)) + keys("～—『』（）", 20f, 1.2f) + backspace()
-        return KeyboardLayout(listOf(keys("1234567890"), keys("，。、？！：；「」…", 20f), row3, bottomRow(c, 10f)), 10f)
+        val row3 = listOf(KeySpec("#+=", KeyAction.Layer(KeyboardLayer.SYMBOLS), 1.4f, KeyKind.SPECIAL, 16f)) + keys("。，、？！.", 20f, 1.2f) + backspace()
+        return KeyboardLayout(listOf(keys("1234567890"), keys("-/：；（）\$@「」", 20f), row3, bottomRow(c, 10f)), 10f)
     }
 
+    /** 注音的 #+= 頁，對齊 iPhone 的第二頁；123 頁放不下的 ～ — 『』 … ♡ 等仍留在這裡。 */
     private fun chineseSymbols(c: Context): KeyboardLayout {
-        // 全形／半形切換：鍵上寫的是現在用的那一種
-        val toggle = KeySpec(if (c.fullWidthSymbols) "全形" else "半形", KeyAction.ToggleWidth, 1.2f, KeyKind.SPECIAL, 14f)
-        val row3 = listOf(KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.4f, KeyKind.SPECIAL, 16f)) + keys("♡☆‧→※", 20f, 1.2f) + toggle + backspace()
-        // 半形：Discord、LINE 等的標題、粗體、刪除線、劇透、@提及、/指令只認半形；全形：中文排版用
-        val rows = if (c.fullWidthSymbols) listOf("【】《》〈〉＃＠－＋", "＊＿～｀｜／＼＞％＆") else listOf("【】《》〈〉#@-+", "*_~`|/\\>%&")
-        return KeyboardLayout(listOf(keys(rows[0], 20f), keys(rows[1], 20f), row3, bottomRow(c, 10f)), 10f)
+        val toggle = KeySpec(if (c.fullWidthSymbols) "全形" else "半形", KeyAction.ToggleWidth, 1.1f, KeyKind.SPECIAL, 14f)
+        val row3 = listOf(KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.25f, KeyKind.SPECIAL, 16f)) +
+            keys("『』♡☆‧→※", 18f, 0.9f) + toggle + backspace(1.35f)
+        val rows = if (c.fullWidthSymbols) {
+            listOf("【】｛｝＃％＾＊＋＝", "＿＼｜～〈〉《》…—")
+        } else {
+            listOf("[]{}#%^*+=", "_\\|~<>«»…—")
+        }
+        return KeyboardLayout(listOf(keys(rows[0], 18f), keys(rows[1], 18f), row3, bottomRow(c, 10f)), 10f)
     }
 }
