@@ -16,6 +16,8 @@ struct ContentView: View {
     @State private var showingPhotoPicker = false
     @State private var message: String?
     @State private var latest: ReleaseInfo?
+    /// 檢查新版：checking 檢查中、done 檢查完、failed 連不上
+    @State private var updateState = "checking"
 
     private let pink = Color(red: 1.0, green: 0.5, blue: 0.65)
 
@@ -31,7 +33,7 @@ struct ContentView: View {
                         Text("注音、手寫、英文、表符、顏文字、剪貼簿，還有可愛的主題。")
                             .font(.system(.subheadline, design: .rounded))
                             .foregroundStyle(.secondary)
-                        Text("目前版本 v\(ReleaseChecker.currentVersion)")
+                        Text(ReleaseChecker.currentVersionText)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -46,15 +48,21 @@ struct ContentView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 }
 
+                Section("版本") {
+                    updateStatus
+                    Button(updateState == "checking" ? "檢查中…" : "再檢查一次") { checkUpdate() }
+                        .disabled(updateState == "checking")
+                }
+
                 if let latest = latest, latest.build > ReleaseChecker.currentBuild {
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("🎉 有新版：\(latest.title)")
+                            Text("🎉 有新版：\(latest.title)（第 \(latest.build) 版）")
                                 .font(.system(.headline, design: .rounded))
                             Text(latest.notes)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
-                            Text("更新方法：在電腦下載新的 StarKeyboard.ipa，用原 Apple ID 和 Sideloadly 直接安裝；完成 Wi-Fi 配對後可免插線。保留自動續簽設定，讓 Daemon 改用新版。不要先刪掉舊 App，以保留設定與資料。")
+                            Text("更新方法：在安裝網站下載新的 IPA，用 SideStore（或原本安裝用的工具、同一個 Apple ID）直接安裝。不要先刪掉舊 App，設定和資料會保留。")
                                 .font(.footnote)
                         }
                         .padding(.vertical, 4)
@@ -118,9 +126,7 @@ struct ContentView: View {
             .navigationTitle("糯糯鍵盤")
             .navigationBarTitleDisplayMode(.inline)
             .tint(pink)
-            .task {
-                ReleaseChecker.fetchLatest { info in latest = info }
-            }
+            .task { checkUpdate() }
             .sheet(isPresented: $showingPhotoPicker) {
                 KeyboardPhotoPicker { image in
                     showingPhotoPicker = false
@@ -131,6 +137,32 @@ struct ContentView: View {
             .alert(message ?? "", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
                 Button("好") {}
             }
+        }
+    }
+
+    /// 版本那一格：檢查中／已經是最新版／有新版／連不上
+    @ViewBuilder private var updateStatus: some View {
+        if updateState == "checking" {
+            HStack(spacing: 8) { ProgressView(); Text("正在檢查有沒有新版…").font(.subheadline) }
+        } else if updateState == "failed" || latest == nil {
+            Text("⚠️ 沒辦法檢查新版（可能沒有網路），等一下再試一次。").font(.subheadline)
+        } else if let latest = latest, latest.build > ReleaseChecker.currentBuild {
+            Text("🎉 有新版可以更新：\(latest.title)（第 \(latest.build) 版）").font(.subheadline.bold()).foregroundStyle(pink)
+        } else if ReleaseChecker.currentBuild == 0 {
+            Text("這是自己在電腦上編的測試版，沒辦法比對版本。").font(.subheadline)
+        } else {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("✅ 已經是最新版").font(.subheadline.bold()).foregroundStyle(.green)
+                Text(ReleaseChecker.currentVersionText).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func checkUpdate() {
+        updateState = "checking"
+        ReleaseChecker.fetchLatest { info in
+            latest = info
+            updateState = info == nil ? "failed" : "done"
         }
     }
 

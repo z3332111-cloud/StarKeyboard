@@ -77,32 +77,50 @@ class MainActivity : Activity() {
         setOnClickListener { action() }
     }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, px(48f)).apply { topMargin = px(8f) })
 
+    /** 版本那一格：檢查中／已經是最新版／有新版／連不上，都可以再檢查一次 */
+    private fun checkUpdate() {
+        updateBox.removeAllViews()
+        text("正在檢查有沒有新版…", updateBox)
+        UpdateFetcher.fetch { info ->
+            updateBox.removeAllViews()
+            val current = BuildInfo.current(this)
+            when {
+                info == null -> text("⚠️ 沒辦法檢查新版（可能沒有網路），等一下再試一次。", updateBox)
+                info.build > current -> {
+                    KeyboardSettings(this).latestBuild = info.build
+                    updateBox.addView(TextView(this).apply {
+                        text = "🎉 有新版：${info.title}（第 ${info.build} 版）"; textSize = 18f; typeface = Typeface.DEFAULT_BOLD; setTextColor(pink)
+                        setPadding(0, px(16f), 0, px(4f))
+                    })
+                    text(info.notes, updateBox)
+                    text("按下面的按鈕下載 APK。目前要先移除舊版（長按糯糯鍵盤圖示 › 解除安裝）再點開新的安裝檔安裝，裝好後要重新選一次鍵盤。", updateBox)
+                    button("下載新版", updateBox) {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl ?: info.pageUrl)))
+                    }
+                }
+                current == 0 -> text("這是自己在電腦上編的測試版，沒辦法比對版本。", updateBox)
+                else -> updateBox.addView(TextView(this).apply {
+                    text = "✅ 已經是最新版"; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.parseColor("#2F8F6B"))
+                    setPadding(0, px(8f), 0, px(2f))
+                })
+            }
+            button("再檢查一次", updateBox) { checkUpdate() }
+        }
+    }
+
     private fun build() {
         col.addView(TextView(this).apply {
             text = "糯糯鍵盤"; textSize = 30f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.parseColor("#43262F"))
         })
         text("注音、手寫、英文、韓文、日文、表符、顏文字、剪貼簿、翻譯，還有可愛的主題。")
-        text("目前版本 v${BuildInfo.version(this)}")
+        val current = BuildInfo.current(this)
+        text(if (current > 0) "目前版本 v${BuildInfo.version(this)}（第 $current 版）" else "目前版本 v${BuildInfo.version(this)}")
 
         button("語音轉文字") { startActivity(Intent(this, VoiceInputActivity::class.java)) }
         button("剪貼簿匯入／匯出") { startActivity(Intent(this, ClipboardTransferActivity::class.java)) }
-        updateBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        updateBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         col.addView(updateBox)
-        UpdateFetcher.fetch { info ->
-            if (info == null || info.build <= BuildInfo.current(this)) return@fetch
-            KeyboardSettings(this).latestBuild = info.build
-            updateBox.visibility = View.VISIBLE
-            updateBox.removeAllViews()
-            updateBox.addView(TextView(this).apply {
-                text = "🎉 有新版：${info.title}"; textSize = 18f; typeface = Typeface.DEFAULT_BOLD; setTextColor(pink)
-                setPadding(0, px(16f), 0, px(4f))
-            })
-            text(info.notes, updateBox)
-            text("按下面的按鈕下載 APK。目前要先移除舊版（長按糯糯鍵盤圖示 › 解除安裝）再點開新的安裝檔安裝，裝好後要重新選一次鍵盤。", updateBox)
-            button("下載新版", updateBox) {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl ?: info.pageUrl)))
-            }
-        }
+        checkUpdate()
 
         button("隱私與安全") { PrivacySafety.show(this) }
         text("剪貼簿與外部翻譯預設關閉。使用前請了解保存內容與連網風險。")

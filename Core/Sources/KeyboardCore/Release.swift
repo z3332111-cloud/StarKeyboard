@@ -20,6 +20,11 @@ enum ReleaseChecker {
         Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0
     }
 
+    /// 給人看的版本：v0.5.0（第 60 版）
+    static var currentVersionText: String {
+        currentBuild > 0 ? "目前版本 v\(currentVersion)（第 \(currentBuild) 版）" : "目前版本 v\(currentVersion)"
+    }
+
     /// 版本標籤長這樣：build-12
     static func buildNumber(fromTag tag: String) -> Int? {
         guard tag.hasPrefix("build-") else { return nil }
