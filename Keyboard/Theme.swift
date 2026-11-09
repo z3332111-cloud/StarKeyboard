@@ -195,7 +195,7 @@ struct KeyboardTheme {
 enum KeyShape: String, CaseIterable {
     case rounded, jelly, catEar, cloud, bunny, puppy, pudding, jellyfish, flame, droplet, duck
     // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.swift）
-    case catFace, bear, paw, cloudPuff, pixel, pixelHeart, puzzle, book, butterfly, strawberry, flower, moon, star, heart, latte, catLine, circle, chamfer
+    case catFace, bear, paw, cloudPuff, pixel, pixelHeart, puzzle, book, butterfly, strawberry, flower, moon, star, heart, latte, catLine, circle
 
     var art: KeyShapeArt? { KeyShapeArt.shapes[rawValue] }
 

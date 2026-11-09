@@ -40,9 +40,6 @@ struct ThemeLook {
              accent: 0x8FC1E3, accentText: 0x0C3352, shadow: 0x061F33, dark: true, ink: 0xFFFFFF),
         make("cat-outline", "貓咪描邊", emoji: "🐈", subtitle: "線稿＋你的照片", bed: 0x2A2622, bedBottom: 0x1D1A17, bar: 0x2A2622, text: 0xFFFFFF,
              accent: 0xFFD48A, accentText: 0x2A2622, shadow: 0x000000, dark: true, art: false, shape: .catLine, finish: .outline, ink: 0xFFFFFF),
-        make("scope", "磷光示波器", emoji: "📟", subtitle: "電子儀器", bed: 0x101E1B, bar: 0x142B25, text: 0xCCF7D8,
-             accent: 0x86EBAC, accentText: 0x101E1B, shadow: 0x0A1513, dark: true, art: false, shape: .chamfer, finish: .flat,
-             key: 0x132C27, specialText: 0xF0C36D, ink: 0xCCF7D8),
     ]
 
     static func named(_ id: String) -> ThemeLook? { all.first { $0.theme.id == id } }

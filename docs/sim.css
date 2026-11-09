@@ -212,7 +212,7 @@
 .sim-phone[data-art="1"] .sim-key svg.shape, .sim-phone[data-art="1"] .sim-key .gloss, .sim-phone[data-art="1"] .sim-key .shade, .sim-phone[data-art="1"] .sim-key .badge { display: none !important; }
 .sim-phone[data-art="1"] .sim-key .lbl { font-weight: 700; top: 48%; }
 .sim-phone[data-art="1"] .sim-key.down > .face { transform: scale(.96); opacity: .82; }
-.sim-key .fox-art { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: calc((100% + 4px) * var(--ss, 1.15) / 1.15); aspect-ratio: 4 / 5; pointer-events: none; background: url(sim-fox/keycaps.png) no-repeat; background-size: 300% 300%; }
+.sim-key .fox-art { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: calc((100% + 4px) * var(--ss, 1.15) / 1.15); aspect-ratio: 1; pointer-events: none; background: url(sim-fox/keycaps.png) no-repeat; background-size: 300% 300%; }
 .sim-key .fox-art.chip { left: 0; top: 0; right: 0; bottom: 0; width: auto; aspect-ratio: auto; transform: none; background: var(--special); border-radius: 8px; }
 .sim-key .fox-art.wide { left: -2px; top: -3px; right: -2px; bottom: -3px; width: auto; aspect-ratio: auto; transform: none; background-image: url(sim-fox/wide.png); background-size: 104.17% 250%; }
 

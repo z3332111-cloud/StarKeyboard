@@ -39,8 +39,6 @@ object ThemeLooks {
         make("fern", "蕨影暗房", "🌿", "植物藍曬", "#0C3553", "#0C3352", "#E6F2FA", "#8FC1E3", "#0C3352", "#061F33", true, "#FFFFFF"),
         make("cat-outline", "貓咪描邊", "🐈", "線稿＋你的照片", "#2A2622", "#2A2622", "#FFFFFF", "#FFD48A", "#2A2622", "#000000", true, "#FFFFFF",
             art = false, shape = KeyShape.CAT_LINE, finish = KeyFinish.OUTLINE, bedBottom = "#1D1A17"),
-        make("scope", "磷光示波器", "📟", "電子儀器", "#101E1B", "#142B25", "#CCF7D8", "#86EBAC", "#101E1B", "#0A1513", true, "#CCF7D8",
-            art = false, shape = KeyShape.CHAMFER, key = "#132C27", specialText = "#F0C36D"),
     )
 
     fun named(id: String) = all.firstOrNull { it.theme.id == id }
@@ -153,7 +151,7 @@ object FoxLetter {
         else -> max(0, index) % palettes.size
     }]
 
-    /** 插畫放在按鍵的哪裡（gap、scale 是使用者調的間距和造型大小）。大小照 FOX_LETTER_THEME_PLAN 的截圖 */
+    /** 插畫放在按鍵的哪裡（gap、scale 是使用者調的間距和造型大小） */
     fun frame(key: RectF, gapScale: Float, shapeScale: Float, dp: Float, compact: Boolean = false): RectF {
         val w = key.width() / dp
         val h = key.height() / dp
@@ -169,10 +167,10 @@ object FoxLetter {
             width = min(w - 1.4f, baseW * factor)
             height = min(h - 1.4f, baseH * factor)
         } else {
-            // 一般的鍵：預設填滿按鍵（和截圖一樣，高最多是寬的 1.25 倍），「造型大小」整顆等比放大縮小，可以超出按鍵一點
+            // 一般的鍵：照原圖的比例（圓的就是圓的），按鍵再瘦也不拉高；「造型大小」整顆等比放大縮小，可以超出按鍵一點
             val part = if (compact) 0.78f else 1f
             width = baseW
-            height = min(baseH, width * 1.25f * part)
+            height = min(baseH, width * part)
             if (width > height / part) width = height / part
             val factor = (shapeScale / 1.15f).coerceIn(0.75f, 1.4f)
             width *= factor

@@ -84,7 +84,7 @@ enum class KeyShape(val title: String, private val artId: String? = null) {
     // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.kt）
     CAT_FACE("貓咪", "catFace"), BEAR("熊熊", "bear"), PAW("肉球", "paw"), CLOUD_PUFF("棉花雲", "cloudPuff"), PIXEL("像素", "pixel"), PIXEL_HEART("像素心", "pixelHeart"),
     PUZZLE("拼圖", "puzzle"), BOOK("書本", "book"), BUTTERFLY("蝴蝶", "butterfly"),
-    STRAWBERRY("草莓", "strawberry"), FLOWER("櫻花", "flower"), MOON("月亮", "moon"), STAR("星星", "star"), HEART("愛心", "heart"), LATTE("拉花咖啡", "latte"), CAT_LINE("貓咪探頭", "catLine"), CIRCLE("圓形", "circle"), CHAMFER("削角", "chamfer");
+    STRAWBERRY("草莓", "strawberry"), FLOWER("櫻花", "flower"), MOON("月亮", "moon"), STAR("星星", "star"), HEART("愛心", "heart"), LATTE("拉花咖啡", "latte"), CAT_LINE("貓咪探頭", "catLine"), CIRCLE("圓形", "circle");
 
     val art: KeyShapeArt? get() = artId?.let { KeyShapeArt.shapes[it] }
 

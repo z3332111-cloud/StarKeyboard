@@ -97,9 +97,6 @@ enum FoxLetterTheme {
         return result
     }
 
-    /// 截圖裡一般的鍵：高最多是寬的 1.25 倍。再高就是被拉長了
-    private static let tallest: CGFloat = 1.25
-
     static func frame(in bounds: CGRect, gap: CGFloat, scale: CGFloat, compact: Bool = false) -> CGRect {
         guard bounds.width > 6, bounds.height > 6 else { return .zero }
         let gap = min(1.8, max(0.3, gap))
@@ -111,10 +108,10 @@ enum FoxLetterTheme {
             width = min(bounds.width - 1.4, baseW * factor)
             height = min(bounds.height - 1.4, baseH * factor)
         } else {
-            // 一般的鍵：預設填滿按鍵（和截圖一樣），「造型大小」整顆等比放大縮小，可以超出按鍵一點
+            // 一般的鍵：照原圖的比例（圓的就是圓的），按鍵再瘦也不拉高；「造型大小」整顆等比放大縮小，可以超出按鍵一點
             let part: CGFloat = compact ? 0.78 : 1
             width = baseW
-            height = min(baseH, width * tallest * part)
+            height = min(baseH, width * part)
             if width > height / part { width = height / part }
             let factor = min(1.4, max(0.75, scale / 1.15))
             width *= factor
