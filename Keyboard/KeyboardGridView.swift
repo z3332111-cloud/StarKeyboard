@@ -236,9 +236,8 @@ final class KeyButton: UIView {
         CATransaction.commit()
         let textRect = body
         if style.shape.isSoftShape {
-            // Keep the glyph inside the smaller body when keyboard height is reduced.
-            // 線條造型的字可以比身體框大一點，「字的大小」才調得動
-            let cap = textRect.height * (art ? 1.4 : 0.85)
+            // 上限跟著整顆按鍵，不跟著造型裡放字的框：造型不拉長之後框變小，字會被卡住，「字的大小」就調不動
+            let cap = bounds.height * 0.75
             label.font = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, cap),
                                        weight: spec.kind == .normal ? .regular : .semibold)
             if case .symbol(let name) = spec.face {
@@ -246,8 +245,13 @@ final class KeyButton: UIView {
                     pointSize: min(18 * style.fontScale, cap), weight: .medium))
             }
         }
-        // 字的框左右放寬一點，字放大時才不會被縮小
-        label.frame = art ? textRect.insetBy(dx: -textRect.width * 0.15, dy: -textRect.height * 0.2) : textRect.insetBy(dx: 2, dy: 0)
+        // 字的框以造型的字區為中心放寬到整顆按鍵，字放大時才不會被縮回去（寬鍵和長方形的圓角照舊）
+        if style.shape != .rounded && bounds.width <= bounds.height * 1.35 {
+            let w = max(textRect.width, bounds.width - 2), h = max(textRect.height, label.font.lineHeight)
+            label.frame = CGRect(x: textRect.midX - w / 2, y: textRect.midY - h / 2, width: w, height: h)
+        } else {
+            label.frame = textRect.insetBy(dx: 2, dy: 0)
+        }
         icon.frame = textRect
         hintLabel.font = .systemFont(ofSize: min(10 * style.fontScale, textRect.height * 0.3), weight: .medium)
         hintLabel.frame = CGRect(x: textRect.minX, y: textRect.minY + 1, width: textRect.width - 3, height: hintLabel.font.lineHeight)
@@ -717,8 +721,13 @@ final class KeyButton: UIView {
         }
         let edge = foxNormalInk.outline != nil || foxPressedInk.outline != nil ? min(0.6, geometry.label.height * 0.05) : 0
         // 造型放大時字還是留在按鍵裡
-        let textRect = geometry.label.offsetBy(dx: frame.minX, dy: frame.minY).insetBy(dx: edge, dy: edge).intersection(bounds)
-        let wanted = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, textRect.height), weight: .bold)
+        var textRect = geometry.label.offsetBy(dx: frame.minX, dy: frame.minY).insetBy(dx: edge, dy: edge).intersection(bounds)
+        // 插畫裡放字的框比較小：字放大時框跟著撐開（中心不動、不超出按鍵），「字的大小」才調得動
+        let wanted = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, bounds.height * 0.75), weight: .bold)
+        if bounds.width <= bounds.height * 1.35 {
+            let w = max(textRect.width, bounds.width - 2), h = max(textRect.height, wanted.lineHeight)
+            textRect = CGRect(x: textRect.midX - w / 2, y: textRect.midY - h / 2, width: w, height: h).intersection(bounds)
+        }
         label.font = wanted.withSize(wanted.pointSize * min(1, textRect.height / wanted.lineHeight))
         label.frame = textRect
         icon.frame = textRect
