@@ -1078,6 +1078,11 @@ final class KeyboardSettings {
         get { bool("customDark", false) }
         set { d.set(newValue, forKey: "customDark") }
     }
+    /// 角色主題也放背景照片（預設不放，用主題自己的底）
+    var themePhoto: Bool {
+        get { bool("themePhoto", false) }
+        set { d.set(newValue, forKey: "themePhoto") }
+    }
     /// 套用小狐狸之前的主題：連續閃退時換回去
     var themeBeforeFox: String {
         get { d.string(forKey: "themeBeforeFox") ?? "strawberry" }

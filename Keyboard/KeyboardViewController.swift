@@ -2025,8 +2025,8 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func startPhotoAdjust() {
-        guard !style.isIllustrated else {
-            toast("照片已保留；切回一般主題後可調整位置")
+        guard !style.isIllustrated || settings.themePhoto else {
+            toast("先打開主題下面的「這個主題也放背景照片」")
             return
         }
         guard backgroundImage != nil else {
@@ -2093,7 +2093,7 @@ final class KeyboardViewController: UIInputViewController {
     private var loadedMaxSide: CGFloat = 0
 
     private func loadBackground() {
-        let url = settings.hasBackground && !style.isIllustrated ? settings.currentPhotoURL : nil
+        let url = settings.hasBackground && (!style.isIllustrated || settings.themePhoto) ? settings.currentPhotoURL : nil
         let need = url.map { backgroundMaxSide(url: $0) } ?? 0
         // 同一張照片：放大後需要更清楚才重讀
         guard url?.path != loadedPhoto || (url != nil && backgroundImage == nil) || need > loadedMaxSide * 1.15 else { return }
