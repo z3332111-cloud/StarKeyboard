@@ -91,18 +91,28 @@ enum FoxLetterTheme {
         return result
     }
 
+    /// 截圖裡一般的鍵：高最多是寬的 1.25 倍。再高就是被拉長了
+    private static let tallest: CGFloat = 1.25
+
     static func frame(in bounds: CGRect, gap: CGFloat, scale: CGFloat, compact: Bool = false) -> CGRect {
         guard bounds.width > 6, bounds.height > 6 else { return .zero }
         let gap = min(1.8, max(0.3, gap))
-        let factor = min(1.12, max(0.8, scale / 1.15))
-        var width = min(bounds.width - 1.4, max(5, bounds.width - 2 * gap) * factor)
-        var height = min(bounds.height - 1.4, max(5, bounds.height - 4 * gap) * factor)
-        // 一般的鍵照圖本來的比例（圖是正方形，矮鍵只用上面 78%），按鍵再瘦也不拉長
-        if width <= height * 1.35 {
+        let baseW = max(5, bounds.width - 2 * gap), baseH = max(5, bounds.height - 4 * gap)
+        var width: CGFloat, height: CGFloat
+        if bounds.width > bounds.height * 1.35 {
+            // 寬鍵的中間會延展，不會變形；不超出按鍵，才不會蓋到旁邊
+            let factor = min(1.12, max(0.8, scale / 1.15))
+            width = min(bounds.width - 1.4, baseW * factor)
+            height = min(bounds.height - 1.4, baseH * factor)
+        } else {
+            // 一般的鍵：預設填滿按鍵（和截圖一樣），「造型大小」整顆等比放大縮小，可以超出按鍵一點
             let part: CGFloat = compact ? 0.78 : 1
-            let side = min(width, height / part)
-            width = side
-            height = side * part
+            width = baseW
+            height = min(baseH, width * tallest * part)
+            if width > height / part { width = height / part }
+            let factor = min(1.4, max(0.75, scale / 1.15))
+            width *= factor
+            height *= factor
         }
         return CGRect(x: bounds.midX - width / 2, y: bounds.midY - height / 2, width: width, height: height)
     }

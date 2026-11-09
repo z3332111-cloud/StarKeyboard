@@ -168,7 +168,7 @@ final class KeyButton: UIView {
         // 立體：按鍵往上留出側面的厚度
         depth = finish == .raised ? min(4.5, outer.height * 0.12) : 0
         outer.size.height -= depth
-        outer = style.shape.naturalRect(in: outer)
+        outer = style.shape.naturalRect(in: outer, scale: style.shapeScale)
         let path = style.shape.path(in: outer)
         var shift = CGAffineTransform(translationX: 0, y: depth > 0 ? depth : (finish == .puffy ? 3 : 1.5))
         CATransaction.begin()
@@ -695,7 +695,8 @@ final class KeyButton: UIView {
             return
         }
         let edge = foxNormalInk.outline != nil || foxPressedInk.outline != nil ? min(0.6, geometry.label.height * 0.05) : 0
-        let textRect = geometry.label.offsetBy(dx: frame.minX, dy: frame.minY).insetBy(dx: edge, dy: edge)
+        // 造型放大時字還是留在按鍵裡
+        let textRect = geometry.label.offsetBy(dx: frame.minX, dy: frame.minY).insetBy(dx: edge, dy: edge).intersection(bounds)
         let wanted = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, textRect.height), weight: .bold)
         label.font = wanted.withSize(wanted.pointSize * min(1, textRect.height / wanted.lineHeight))
         label.frame = textRect

@@ -248,11 +248,13 @@ enum KeyShape: String, CaseIterable {
         }
     }
 
-    /// 造型畫在按鍵的哪裡：保持比例置中，按鍵再瘦也不拉長（空白鍵這種寬鍵照舊）
-    func naturalRect(in r: CGRect) -> CGRect {
+    /// 造型畫在按鍵的哪裡：保持比例置中，按鍵再瘦也不拉長（空白鍵這種寬鍵照舊）；scale 是「造型大小」
+    func naturalRect(in r: CGRect, scale: CGFloat) -> CGRect {
         guard let a = naturalAspect, r.width <= r.height * 1.35 else { return r }
         var w = r.width, h = min(r.height, r.width * a)
         if r.width * a > r.height { h = r.height; w = h / a }
+        w *= scale
+        h *= scale
         return CGRect(x: r.midX - w / 2, y: r.midY - h / 2, width: w, height: h)
     }
 

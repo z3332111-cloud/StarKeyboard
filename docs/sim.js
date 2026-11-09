@@ -594,7 +594,6 @@
       face.classList.add('artface');
       host = el('span', 'artbox');
       host.style.setProperty('--a', art.aspect || 1);
-      if (art.natural) host.style.setProperty('--ss', 1);
       face.appendChild(host);
     }
     if (stretchArt) {

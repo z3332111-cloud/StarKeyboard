@@ -115,13 +115,15 @@ enum class KeyShape(val title: String, private val artId: String? = null) {
             else -> null
         }
 
-    /** 造型畫在按鍵的哪裡：保持比例置中，按鍵再瘦也不拉長（空白鍵這種寬鍵照舊） */
-    fun naturalRect(r: RectF): RectF {
+    /** 造型畫在按鍵的哪裡：保持比例置中，按鍵再瘦也不拉長（空白鍵這種寬鍵照舊）；scale 是「造型大小」 */
+    fun naturalRect(r: RectF, scale: Float): RectF {
         val a = naturalAspect
         if (a == null || r.width() > r.height() * 1.35f) return RectF(r)
         var w = r.width()
         var h = minOf(r.height(), w * a)
         if (w * a > r.height()) { h = r.height(); w = h / a }
+        w *= scale
+        h *= scale
         return RectF(r.centerX() - w / 2, r.centerY() - h / 2, r.centerX() + w / 2, r.centerY() + h / 2)
     }
 

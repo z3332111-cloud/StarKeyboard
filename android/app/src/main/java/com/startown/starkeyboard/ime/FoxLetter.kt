@@ -72,22 +72,33 @@ object FoxLetter {
         else -> max(0, index) % palettes.size
     }]
 
-    /** 插畫放在按鍵的哪裡（gap、scale 是使用者調的間距和造型大小） */
+    /** 插畫放在按鍵的哪裡（gap、scale 是使用者調的間距和造型大小）。大小照 FOX_LETTER_THEME_PLAN 的截圖 */
     fun frame(key: RectF, gapScale: Float, shapeScale: Float, dp: Float, compact: Boolean = false): RectF {
         val w = key.width() / dp
         val h = key.height() / dp
         if (w <= 6 || h <= 6) return RectF()
         val gap = gapScale.coerceIn(0.3f, 1.8f)
-        val factor = (shapeScale / 1.15f).coerceIn(0.8f, 1.12f)
-        var width = min(w - 1.4f, max(5f, w - 2 * gap) * factor) * dp
-        var height = min(h - 1.4f, max(5f, h - 4 * gap) * factor) * dp
-        // 一般的鍵照圖本來的比例（圖是正方形，矮鍵只用上面 78%），按鍵再瘦也不拉長
-        if (width <= height * 1.35f) {
+        val baseW = max(5f, w - 2 * gap)
+        val baseH = max(5f, h - 4 * gap)
+        var width: Float
+        var height: Float
+        if (w > h * 1.35f) {
+            // 寬鍵的中間會延展，不會變形；不超出按鍵，才不會蓋到旁邊
+            val factor = (shapeScale / 1.15f).coerceIn(0.8f, 1.12f)
+            width = min(w - 1.4f, baseW * factor)
+            height = min(h - 1.4f, baseH * factor)
+        } else {
+            // 一般的鍵：預設填滿按鍵（和截圖一樣，高最多是寬的 1.25 倍），「造型大小」整顆等比放大縮小，可以超出按鍵一點
             val part = if (compact) 0.78f else 1f
-            val side = min(width, height / part)
-            width = side
-            height = side * part
+            width = baseW
+            height = min(baseH, width * 1.25f * part)
+            if (width > height / part) width = height / part
+            val factor = (shapeScale / 1.15f).coerceIn(0.75f, 1.4f)
+            width *= factor
+            height *= factor
         }
+        width *= dp
+        height *= dp
         return RectF(key.centerX() - width / 2, key.centerY() - height / 2, key.centerX() + width / 2, key.centerY() + height / 2)
     }
 

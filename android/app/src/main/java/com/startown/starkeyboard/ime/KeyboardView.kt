@@ -217,7 +217,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             // 立體：按鍵往上留出側面的厚度
             k.depth = if (style.finish == KeyFinish.RAISED) minOf(4.5f * dp, outer.height() * 0.12f) else 0f
             outer.bottom -= k.depth
-            outer.set(style.shape.naturalRect(outer))
+            outer.set(style.shape.naturalRect(outer, style.shapeScale))
             k.path = style.shape.path(outer, dp)
             k.detail = style.shape.detailPath(outer, dp)
             if (style.isFoxLetter) {
@@ -463,7 +463,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         FoxLetter.drawKey(context, canvas, frame, k.index, k.spec.action, personal, compact, foxPaint)
         if (drawSpaceArt(canvas, k)) return
         val ink = (if (k.pressed) k.foxPressedInk else k.foxInk) ?: return
-        val rect = FoxLetter.labelRect(frame, compact, dp)
+        // 造型放大時字還是留在按鍵裡
+        val rect = FoxLetter.labelRect(frame, compact, dp).also { it.intersect(k.frame) }
         textPaint.typeface = KeyFonts.get(context, style.fontId) ?: Typeface.DEFAULT_BOLD
         var size = minOf(k.spec.fontSize * dp * style.fontScale, rect.height())
         textPaint.textSize = size
