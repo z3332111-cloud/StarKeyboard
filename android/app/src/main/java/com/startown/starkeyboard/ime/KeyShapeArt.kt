@@ -25,13 +25,10 @@ class KeyShapeArt(
     val stretch: Boolean,
     /** 小裝飾用線條的顏色（貓咪的眼睛、肉球） */
     val lineDetail: Boolean,
-    /** 按鍵很瘦時最多拉高幾倍（圖案才不會太小）；正圓是 1 */
-    private val tall: Float = 1.3f,
 ) {
     /** 按鍵裡實際畫圖案的方框：保持比例、置中 */
     fun fit(r: RectF): RectF {
-        // 最多比設計的再高 30%（按鍵很瘦時圖案才不會太小），還是圓圓的
-        var w = r.width(); var h = minOf(r.height(), w * aspect * tall)
+        var w = r.width(); var h = minOf(r.height(), w * aspect)
         if (r.width() * aspect > r.height()) { h = r.height(); w = h / aspect }
         return RectF(r.centerX() - w / 2, r.centerY() - h / 2, r.centerX() + w / 2, r.centerY() + h / 2)
     }
@@ -161,7 +158,7 @@ class KeyShapeArt(
                 floatArrayOf(0f, 49f, 0f, 1f, 51f, 0f, 2f, 78f, 0f, 100f, 22f, 100f, 50f, 2f, 100f, 78f, 78f, 100f, 51f, 100f, 1f, 49f, 100f, 2f, 22f, 100f, 0f, 78f, 0f, 50f, 2f, 0f, 22f, 22f, 0f, 49f, 0f, 4f),
                 floatArrayOf(),
                 floatArrayOf(),
-                null, null, 0f, 1f, true, false, 1f),
+                null, null, 0f, 1f, true, false),
         )
 
         /** 0 = 移到、1 = 直線、2 = 三次曲線、3 = 二次曲線、4 = 收尾 */

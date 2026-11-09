@@ -34,6 +34,7 @@
     ['rounded', '圓角', 50], ['jelly', '果凍', 50], ['catEar', '貓耳', 57], ['cloud', '雲朵', 58], ['bunny', '兔兔', 61, 1], ['puppy', '狗狗', 56, 1],
     ['pudding', '布丁', 59.5, 1], ['jellyfish', '水母', 46, 1], ['flame', '火焰', 62.5, 1], ['droplet', '水滴', 60.5, 1], ['duck', '鴨鴨', 65, 1]
   ];
+  var NATURAL = { jelly: 1, catEar: 1.1, cloud: 0.95, bunny: 1.25, puppy: 1.1, pudding: 1.1, jellyfish: 1.15, flame: 1.2, droplet: 1.2, duck: 1.05 };
   var DETAIL = { pudding: ['#a86635', '#d7a15f'], flame: ['#ed914a', '#ffd46b'], droplet: ['#4aadd5', '#b8efff'], duck: ['#d78a32', '#ffd276'], bubble: ['#ffffff', '#ffffff'] };
   // 線條造型（docs/sim-shapes.js，和 App 同一份資料）加進清單，圖形放進頁面的 svg
   var ART = window.SIM_ART_SHAPES || [];
@@ -585,13 +586,15 @@
     var soft = info[3];
     // 線條造型保持自己的比例（按鍵太瘦就上下留白），不會被拉長
     var art = !k.wide && ART.filter(function (a) { return a.id === S.shape; })[0];
+    // 程式畫的造型也照自己的比例，按鍵再瘦也不拉長（圓角就是長方形的鍵）
+    if (!art && !k.wide && NATURAL[S.shape]) art = { aspect: NATURAL[S.shape], natural: true };
     var stretchArt = k.wide && ART.filter(function (a) { return a.id === S.shape && a.stretch; })[0];
     var host = face;
     if (art) {
       face.classList.add('artface');
       host = el('span', 'artbox');
       host.style.setProperty('--a', art.aspect || 1);
-      if (art.tall) host.style.setProperty('--tall', art.tall);
+      if (art.natural) host.style.setProperty('--ss', 1);
       face.appendChild(host);
     }
     if (stretchArt) {

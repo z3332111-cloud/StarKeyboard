@@ -99,6 +99,32 @@ enum class KeyShape(val title: String, private val artId: String? = null) {
     }
 
     // 會自己拉長的造型（貓咪探頭）寬鍵也畫原本的樣子，不換成膠囊
+    /** 程式畫的造型本來的高÷寬；圓角就是長方形的鍵，線條造型自己有比例 */
+    private val naturalAspect: Float?
+        get() = when (this) {
+            JELLY -> 1f
+            CAT_EAR -> 1.1f
+            CLOUD -> 0.95f
+            BUNNY -> 1.25f
+            PUPPY -> 1.1f
+            PUDDING -> 1.1f
+            JELLYFISH -> 1.15f
+            FLAME -> 1.2f
+            DROPLET -> 1.2f
+            DUCK -> 1.05f
+            else -> null
+        }
+
+    /** 造型畫在按鍵的哪裡：保持比例置中，按鍵再瘦也不拉長（空白鍵這種寬鍵照舊） */
+    fun naturalRect(r: RectF): RectF {
+        val a = naturalAspect
+        if (a == null || r.width() > r.height() * 1.35f) return RectF(r)
+        var w = r.width()
+        var h = minOf(r.height(), w * a)
+        if (w * a > r.height()) { h = r.height(); w = h / a }
+        return RectF(r.centerX() - w / 2, r.centerY() - h / 2, r.centerX() + w / 2, r.centerY() + h / 2)
+    }
+
     private fun isWide(r: RectF) = isSoftShape && art?.stretch != true && r.width() > r.height() * 1.65f
 
     /** 只畫線的部分（尾巴、鬍鬚） */

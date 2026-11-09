@@ -91,12 +91,19 @@ enum FoxLetterTheme {
         return result
     }
 
-    static func frame(in bounds: CGRect, gap: CGFloat, scale: CGFloat) -> CGRect {
+    static func frame(in bounds: CGRect, gap: CGFloat, scale: CGFloat, compact: Bool = false) -> CGRect {
         guard bounds.width > 6, bounds.height > 6 else { return .zero }
         let gap = min(1.8, max(0.3, gap))
         let factor = min(1.12, max(0.8, scale / 1.15))
-        let width = min(bounds.width - 1.4, max(5, bounds.width - 2 * gap) * factor)
-        let height = min(bounds.height - 1.4, max(5, bounds.height - 4 * gap) * factor)
+        var width = min(bounds.width - 1.4, max(5, bounds.width - 2 * gap) * factor)
+        var height = min(bounds.height - 1.4, max(5, bounds.height - 4 * gap) * factor)
+        // 一般的鍵照圖本來的比例（圖是正方形，矮鍵只用上面 78%），按鍵再瘦也不拉長
+        if width <= height * 1.35 {
+            let part: CGFloat = compact ? 0.78 : 1
+            let side = min(width, height / part)
+            width = side
+            height = side * part
+        }
         return CGRect(x: bounds.midX - width / 2, y: bounds.midY - height / 2, width: width, height: height)
     }
 

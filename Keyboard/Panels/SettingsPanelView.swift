@@ -553,8 +553,8 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         NSLayoutConstraint.activate([
             preview.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 12),
             preview.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-            preview.widthAnchor.constraint(equalToConstant: 43),
-            preview.heightAnchor.constraint(equalToConstant: 62),
+            preview.widthAnchor.constraint(equalToConstant: 56),
+            preview.heightAnchor.constraint(equalToConstant: 56),
             title.leadingAnchor.constraint(equalTo: preview.trailingAnchor, constant: 12),
             title.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -12),
             title.topAnchor.constraint(equalTo: button.topAnchor, constant: 18),

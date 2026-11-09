@@ -27,7 +27,6 @@ for (const raw of fs.readFileSync(path.join(__dirname, 'key_shapes.txt'), 'utf8'
   else if (key === 'color') cur.color = rest[0] === 'accent' ? null : rest.map(h => parseInt(h, 16));
   else if (key === 'alpha') cur.alpha = Number(value);
   else if (key === 'aspect') cur.aspect = Number(value);
-  else if (key === 'tall') cur.tall = Number(value);
   else throw new Error('看不懂：' + line);
 }
 
@@ -159,7 +158,7 @@ const swiftEntries = shapes.map(s => [
   `            detail: [${s.dops.join(', ')}],`,
   `            lines: [${s.lops.join(', ')}],`,
   `            detailLight: ${s.color ? hex(s.color[0]) : 'nil'}, detailDark: ${s.color ? hex(s.color[1]) : 'nil'}, detailAlpha: ${s.alpha}, aspect: ${s.aspect},`,
-  `            stretch: ${s.stretch}, lineDetail: ${s.lineDetail}${s.tall ? `, tall: ${s.tall}` : ''}),`,
+  `            stretch: ${s.stretch}, lineDetail: ${s.lineDetail}),`,
 ].join('\n')).join('\n');
 
 const swift = [
@@ -186,8 +185,6 @@ const swift = [
   '    let stretch: Bool',
   '    /// 小裝飾用線條的顏色（貓咪的眼睛、肉球）',
   '    let lineDetail: Bool',
-  '    /// 按鍵很瘦時最多拉高幾倍（圖案才不會太小）；正圓是 1',
-  '    var tall: CGFloat = 1.3',
   '',
   `    static let order: [String] = [${ids}]`,
   '',
@@ -197,8 +194,7 @@ const swift = [
   '',
   '    /// 按鍵裡實際畫圖案的方框：保持比例、置中',
   '    func fit(_ r: CGRect) -> CGRect {',
-  '        // 最多比設計的再高 30%（按鍵很瘦時圖案才不會太小），還是圓圓的',
-  '        var w = r.width, h = min(r.height, r.width * aspect * tall)',
+  '        var w = r.width, h = min(r.height, r.width * aspect)',
   '        if r.width * aspect > r.height { h = r.height; w = h / aspect }',
   '        return CGRect(x: r.midX - w / 2, y: r.midY - h / 2, width: w, height: h)',
   '    }',
@@ -258,7 +254,7 @@ const ktEntries = shapes.map(s => [
   `                floatArrayOf(${s.ops.map(f).join(', ')}),`,
   `                floatArrayOf(${s.dops.map(f).join(', ')}),`,
   `                floatArrayOf(${s.lops.map(f).join(', ')}),`,
-  `                ${s.color ? hex(s.color[0]) : 'null'}, ${s.color ? hex(s.color[1]) : 'null'}, ${s.alpha}f, ${s.aspect}f, ${s.stretch}, ${s.lineDetail}${s.tall ? `, ${s.tall}f` : ''}),`,
+  `                ${s.color ? hex(s.color[0]) : 'null'}, ${s.color ? hex(s.color[1]) : 'null'}, ${s.alpha}f, ${s.aspect}f, ${s.stretch}, ${s.lineDetail}),`,
 ].join('\n')).join('\n');
 
 const kt = [
@@ -289,13 +285,10 @@ const kt = [
   '    val stretch: Boolean,',
   '    /** 小裝飾用線條的顏色（貓咪的眼睛、肉球） */',
   '    val lineDetail: Boolean,',
-  '    /** 按鍵很瘦時最多拉高幾倍（圖案才不會太小）；正圓是 1 */',
-  '    private val tall: Float = 1.3f,',
   ') {',
   '    /** 按鍵裡實際畫圖案的方框：保持比例、置中 */',
   '    fun fit(r: RectF): RectF {',
-  '        // 最多比設計的再高 30%（按鍵很瘦時圖案才不會太小），還是圓圓的',
-  '        var w = r.width(); var h = minOf(r.height(), w * aspect * tall)',
+  '        var w = r.width(); var h = minOf(r.height(), w * aspect)',
   '        if (r.width() * aspect > r.height()) { h = r.height(); w = h / aspect }',
   '        return RectF(r.centerX() - w / 2, r.centerY() - h / 2, r.centerX() + w / 2, r.centerY() + h / 2)',
   '    }',
@@ -360,7 +353,7 @@ const css = n => '#' + n.toString(16).padStart(6, '0');
 const web = shapes.map(s => ({
   id: s.id, title: s.title, center: r2(s.body[1] + s.body[3] / 2), d: s.svg, detail: s.dsvg, lines: s.lsvg, lineDetail: s.lineDetail,
   stretch: s.stretch ? { ops: s.ops, dops: s.dops, lops: s.lops } : null,
-  color: s.color ? s.color.map(css) : null, alpha: s.alpha, aspect: s.aspect, tall: s.tall,
+  color: s.color ? s.color.map(css) : null, alpha: s.alpha, aspect: s.aspect,
 }));
 fs.writeFileSync(path.join(root, 'docs/sim-shapes.js'), `/* ${note} */\nwindow.SIM_ART_SHAPES = ${JSON.stringify(web)};\n`);
 console.log('造型 ' + shapes.length + ' 個：' + shapes.map(s => s.title).join('、'));

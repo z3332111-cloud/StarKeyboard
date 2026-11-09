@@ -168,6 +168,7 @@ final class KeyButton: UIView {
         // 立體：按鍵往上留出側面的厚度
         depth = finish == .raised ? min(4.5, outer.height * 0.12) : 0
         outer.size.height -= depth
+        outer = style.shape.naturalRect(in: outer)
         let path = style.shape.path(in: outer)
         var shift = CGAffineTransform(translationX: 0, y: depth > 0 ? depth : (finish == .puffy ? 3 : 1.5))
         CATransaction.begin()
@@ -682,9 +683,9 @@ final class KeyButton: UIView {
 
     private func layoutFoxLetter() {
         guard let artwork = foxArtwork else { return }
-        let frame = FoxLetterTheme.frame(in: bounds, gap: style.gapScale, scale: style.shapeScale)
+        let compact = bounds.height < 40 && !spec.action.isCharacter
+        let frame = FoxLetterTheme.frame(in: bounds, gap: style.gapScale, scale: style.shapeScale, compact: compact)
         artwork.frame = frame
-        let compact = frame.height < 38 && !spec.action.isCharacter
         artwork.configure(index: illustratedIndex, action: spec.action, personalSpaceArt: hasPersonalSpaceArt, compact: compact)
         let geometry = FoxLetterTheme.layout(in: artwork.bounds, compact: compact)
         guard !geometry.frame.isEmpty else {

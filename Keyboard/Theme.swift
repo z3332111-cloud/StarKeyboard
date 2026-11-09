@@ -231,6 +231,31 @@ enum KeyShape: String, CaseIterable {
     }
 
     // 會自己拉長的造型（貓咪探頭）寬鍵也畫原本的樣子，不換成膠囊
+    /// 程式畫的造型本來的高÷寬；圓角就是長方形的鍵，線條造型自己有比例
+    private var naturalAspect: CGFloat? {
+        switch self {
+        case .jelly: return 1
+        case .catEar: return 1.1
+        case .cloud: return 0.95
+        case .bunny: return 1.25
+        case .puppy: return 1.1
+        case .pudding: return 1.1
+        case .jellyfish: return 1.15
+        case .flame: return 1.2
+        case .droplet: return 1.2
+        case .duck: return 1.05
+        default: return nil
+        }
+    }
+
+    /// 造型畫在按鍵的哪裡：保持比例置中，按鍵再瘦也不拉長（空白鍵這種寬鍵照舊）
+    func naturalRect(in r: CGRect) -> CGRect {
+        guard let a = naturalAspect, r.width <= r.height * 1.35 else { return r }
+        var w = r.width, h = min(r.height, r.width * a)
+        if r.width * a > r.height { h = r.height; w = h / a }
+        return CGRect(x: r.midX - w / 2, y: r.midY - h / 2, width: w, height: h)
+    }
+
     private func isWide(_ r: CGRect) -> Bool { isSoftShape && art?.stretch != true && r.width > r.height * 1.65 }
 
     /// 只畫線的部分（尾巴、鬍鬚）

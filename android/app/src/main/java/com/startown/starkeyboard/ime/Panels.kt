@@ -699,7 +699,7 @@ class SettingsPanel(
             contentDescription = "小狐狸的楓葉信，角色主題"
             setOnClickListener { settings.themeId = FoxLetter.ID; onChange() }
         }
-        card.addView(FoxPreviewView(context), LayoutParams(dpi(43f), dpi(62f)).apply { rightMargin = dpi(12f) })
+        card.addView(FoxPreviewView(context), LayoutParams(dpi(56f), dpi(56f)).apply { rightMargin = dpi(12f) })
         val words = LinearLayout(context).apply { orientation = VERTICAL }
         words.addView(TextView(context).apply {
             text = if (selected) "小狐狸的楓葉信 ✓" else "小狐狸的楓葉信"
