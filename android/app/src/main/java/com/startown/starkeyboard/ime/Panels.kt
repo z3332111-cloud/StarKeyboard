@@ -715,6 +715,10 @@ class SettingsPanel(
         col.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(row) },
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
         val current = settings.themeId
+        if (settings.style.isIllustrated) {
+            toggle("這個主題也放背景照片", settings.themePhoto) { settings.themePhoto = it; onChange(); rebuildHere() }
+            if (settings.themePhoto && !settings.hasBackground) note("還沒有照片：到下面的「背景照片」新增一張。")
+        }
         if (ThemePacks.files(current).isNotEmpty() && ThemePacks.isReady(context, current)) {
             button("移除「" + KeyboardTheme.named(current).name + "」的圖（之後可以再下載）") {
                 settings.themeId = settings.themeBeforeFox
@@ -778,7 +782,7 @@ class SettingsPanel(
         if (ThemeLooks.named(settings.themeId)?.hasArt == false) {
             note("這個主題已配好造型和質感；切回其他主題就恢復你原本選的。")
         } else if (settings.style.isIllustrated) {
-            note("這個主題已搭配角色造型與插畫質感。原本的造型、質感和背景照片會保留，切回其他主題就恢復。")
+            note("這個主題已搭配角色造型與插畫質感。原本的造型和質感會保留，切回其他主題就恢復。")
         } else {
         header("按鍵造型")
         for (group in KeyShape.values().toList().chunked(4)) {

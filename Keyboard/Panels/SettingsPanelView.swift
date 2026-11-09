@@ -153,7 +153,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         if style.themeLook?.hasArt == false {
             stack.addArrangedSubview(note("這個主題已配好造型和質感；切回其他主題就恢復你原本選的。"))
         } else if style.isIllustrated {
-            stack.addArrangedSubview(note("這個主題已搭配角色造型與插畫質感。原本的造型、質感和背景照片會保留，切回其他主題即可恢復；高度、字體、間距與動畫仍可調整。"))
+            stack.addArrangedSubview(note("這個主題已搭配角色造型與插畫質感。原本的造型和質感會保留，切回其他主題即可恢復；高度、字體、間距與動畫仍可調整。"))
         } else {
             stack.addArrangedSubview(header("按鍵造型"))
             stack.addArrangedSubview(shapeRow())
@@ -577,6 +577,15 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         scrollRow.contentSize = CGSize(width: x, height: 84)
         box.addArrangedSubview(scrollRow)
         let current = settings.themeID
+        if style.isIllustrated {
+            box.addArrangedSubview(switchRow("這個主題也放背景照片", on: settings.themePhoto) { [weak self] on in
+                self?.settings.themePhoto = on
+                self?.onChange?()
+            })
+            if settings.themePhoto && !settings.hasBackground {
+                box.addArrangedSubview(note("還沒有照片：到下面的「背景圖片」新增一張。"))
+            }
+        }
         if !ThemePacks.files(current).isEmpty, ThemePacks.isReady(current) {
             box.addArrangedSubview(buttonRow([("移除「\(KeyboardTheme.named(current).name)」的圖（之後可以再下載）", { [weak self] in
                 guard let self = self else { return }

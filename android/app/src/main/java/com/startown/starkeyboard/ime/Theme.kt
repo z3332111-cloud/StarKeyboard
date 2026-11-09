@@ -628,6 +628,10 @@ class KeyboardSettings(context: Context) {
     var shape: KeyShape
         get() = runCatching { KeyShape.valueOf(p.getString("shape", "JELLY")!!) }.getOrDefault(KeyShape.JELLY)
         set(v) = p.edit().putString("shape", v.name).apply()
+    /** 角色主題也放背景照片（預設不放，用主題自己的底） */
+    var themePhoto: Boolean
+        get() = p.getBoolean("themePhoto", false)
+        set(v) = p.edit().putBoolean("themePhoto", v).apply()
     /** 套用下載主題之前的主題：移除圖或圖不見時換回去 */
     var themeBeforeFox: String
         get() = p.getString("themeBeforeFox", null) ?: "strawberry"

@@ -1468,8 +1468,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun startPhotoAdjust() {
         val r = root ?: return
-        if (style.isIllustrated) {
-            toast("照片已保留；切回一般主題後可調整位置")
+        if (style.isIllustrated && !settings.themePhoto) {
+            toast("先打開主題下面的「這個主題也放背景照片」")
             return
         }
         if (!settings.hasBackground) {
@@ -1902,8 +1902,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val foxPaper = if (s.isFoxLetter) FoxLetter.backdrop(this) else null
         r.background = if (foxPaper != null) FoxPaperDrawable(foxPaper)
             else GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(s.theme.top, s.theme.bottom))
-        // 小狐狸有自己的水彩背景；照片留著，切回其他主題就恢復
-        if (settings.hasBackground && !s.isIllustrated) {
+        // 角色主題有自己的底；要不要放照片由「這個主題也放背景照片」決定，照片一直留著
+        if (settings.hasBackground && (!s.isIllustrated || settings.themePhoto)) {
             // 拖滑桿時也會跑這裡：照片沒換就不用重新讀檔
             val file = settings.backgroundFile
             val stamp = file.path + ":" + file.lastModified()
