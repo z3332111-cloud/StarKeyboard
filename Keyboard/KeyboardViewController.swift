@@ -184,8 +184,22 @@ final class KeyboardViewController: UIInputViewController {
         for id in soundIDs.values { AudioServicesDisposeSystemSoundID(id) }
     }
 
+    // 小狐狸主題連開三次都撐不過幾秒（卡死、閃退）：先換回原本的主題，不然鍵盤一打開就退，連設定都進不去
+    private var foxFellBack = false
+
+    private func guardFoxLaunch() {
+        guard settings.themeID == FoxLetterTheme.id else { settings.foxLaunches = 0; return }
+        settings.foxLaunches += 1
+        if settings.foxLaunches >= 3 {
+            settings.foxLaunches = 0
+            settings.themeID = settings.themeBeforeFox
+            foxFellBack = true
+        }
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
+        guardFoxLaunch()
         // 讓 iOS 照我們自己設的高度（不然「鍵盤高度」滑桿會被系統的預設高度蓋掉）
         (view as? UIInputView)?.allowsSelfSizing = true
         heightRuler.isUserInteractionEnabled = false
@@ -351,6 +365,12 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        if foxFellBack {
+            foxFellBack = false
+            toast("小狐狸主題開不起來，先換回原本的主題")
+        }
+        // 撐過幾秒就算正常
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in self?.settings.foxLaunches = 0 }
         layoutDiagnostics.record("viewDidAppear.beforeExistingHeightReset", force: true)
         // 鍵盤剛載入時設的高度有時會被系統忽略：出現後重新套一次
         heightConstraint?.isActive = false
@@ -370,6 +390,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        settings.foxLaunches = 0
         layoutDiagnostics.record("viewWillDisappear", force: true)
         clipboardTimer?.invalidate()
         clipboardTimer = nil

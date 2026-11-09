@@ -563,8 +563,10 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             subtitle.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 5),
         ])
         button.addAction(UIAction { [weak self] _ in
-            self?.settings.themeID = FoxLetterTheme.id
-            self?.onChange?()
+            guard let self = self else { return }
+            if self.settings.themeID != FoxLetterTheme.id { self.settings.themeBeforeFox = self.settings.themeID }
+            self.settings.themeID = FoxLetterTheme.id
+            self.onChange?()
         }, for: .touchUpInside)
         return button
     }

@@ -195,7 +195,7 @@ struct KeyboardTheme {
 enum KeyShape: String, CaseIterable {
     case rounded, jelly, catEar, cloud, bunny, puppy, pudding, jellyfish, flame, droplet, duck
     // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.swift）
-    case catFace, bear, paw, cloudPuff, pixel, pixelHeart, puzzle, book, butterfly, strawberry, flower, moon, star, heart, latte, catLine
+    case catFace, bear, paw, cloudPuff, pixel, pixelHeart, puzzle, book, butterfly, strawberry, flower, moon, star, heart, latte, catLine, circle
 
     var art: KeyShapeArt? { KeyShapeArt.shapes[rawValue] }
 
@@ -1050,6 +1050,16 @@ final class KeyboardSettings {
     var customDark: Bool {
         get { bool("customDark", false) }
         set { d.set(newValue, forKey: "customDark") }
+    }
+    /// 套用小狐狸之前的主題：連續閃退時換回去
+    var themeBeforeFox: String {
+        get { d.string(forKey: "themeBeforeFox") ?? "strawberry" }
+        set { d.set(newValue, forKey: "themeBeforeFox") }
+    }
+    /// 小狐狸主題開到一半就結束的次數（正常用過就歸零）
+    var foxLaunches: Int {
+        get { d.integer(forKey: "foxLaunches") }
+        set { d.set(newValue, forKey: "foxLaunches"); d.synchronize() }
     }
     var keyFinish: KeyFinish {
         get { KeyFinish(rawValue: d.string(forKey: "keyFinish") ?? "") ?? .flat }

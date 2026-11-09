@@ -11,7 +11,6 @@ import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.RectF
-import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.view.View
 import kotlin.math.max
@@ -41,15 +40,13 @@ object FoxLetter {
     fun resolved(style: KeyboardStyle) =
         if (style.theme.id == ID) style.copy(shape = KeyShape.ROUNDED, finish = KeyFinish.FLAT) else style
 
-    // ===== 圖集：只解一次，每顆鍵共用；縮成一半（iPhone 也是縮到 768 以內）才不會吃太多記憶體 =====
+    // ===== 圖集：只解一次，每顆鍵共用 =====
 
     private val images = HashMap<String, Bitmap?>()
 
     private fun image(context: Context, name: String): Bitmap? = images.getOrPut(name) {
         runCatching {
-            context.applicationContext.assets.open("$name.png").use {
-                BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = 2 })
-            }
+            context.applicationContext.assets.open("$name.png").use { BitmapFactory.decodeStream(it) }
         }.getOrNull()
     }
 
@@ -166,7 +163,7 @@ object FoxLetter {
 
 val KeyboardStyle.isFoxLetter get() = theme.id == FoxLetter.ID
 
-/** 整片鍵盤的底：深紫紙感（圖的上面 20% 是山景，留給標題區） */
+/** 整片鍵盤的底：深紫紙感（只用圖下面 80%，上面是山景） */
 class FoxPaperDrawable(private val image: Bitmap) : Drawable() {
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val src = Rect(0, (image.height * 0.2f).toInt(), image.width, image.height)
@@ -202,30 +199,6 @@ class FoxBarDrawable(private val image: Bitmap?, private val dp: Float, private 
     override fun setColorFilter(colorFilter: ColorFilter?) {}
     @Deprecated("Deprecated in Java")
     override fun getOpacity() = PixelFormat.TRANSLUCENT
-}
-
-/** 鍵盤最上面的山景標題 */
-class FoxHeaderView(context: Context) : View(context) {
-    private val image by lazy { FoxLetter.backdrop(context) }   // 用這個主題才讀圖
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val title = "小狐狸的楓葉信"
-    private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-        color = Color.parseColor("#674838")
-        typeface = runCatching { KeyFonts.get(context, KeyFont.HUNINN.id) }.getOrNull() ?: Typeface.DEFAULT_BOLD
-        isFakeBoldText = true
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        val w = width.toFloat()
-        val h = height.toFloat()
-        image?.let { canvas.drawBitmap(it, Rect(0, 0, it.width, (it.height * 0.18f).toInt()), RectF(0f, 0f, w, h), paint) }
-        titlePaint.textSize = 19 * resources.displayMetrics.density
-        val tw = titlePaint.measureText(title)
-        if (tw > w * 0.53f) titlePaint.textSize *= w * 0.53f / tw
-        val fm = titlePaint.fontMetrics
-        canvas.drawText(title, w / 2, h / 2 - (fm.ascent + fm.descent) / 2, titlePaint)
-    }
 }
 
 /** 設定裡的小預覽：一顆狐狸鍵帽 */

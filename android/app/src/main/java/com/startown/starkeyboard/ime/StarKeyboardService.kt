@@ -144,7 +144,6 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private var photoAdjust: PhotoAdjustOverlay? = null
     private var backgroundStamp = ""
     private lateinit var topBar: TopBar
-    private lateinit var foxHeader: FoxHeaderView
     private lateinit var content: FrameLayout
     private lateinit var keyboard: KeyboardView
     private var panelView: View? = null
@@ -258,9 +257,6 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         }
         folderNameBox.visibility = View.GONE
         column.addView(folderNameBox, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (84 * dp).toInt()))
-        // 小狐狸主題最上面的山景標題
-        foxHeader = FoxHeaderView(this).apply { visibility = View.GONE }
-        column.addView(foxHeader, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (52 * dp).toInt()))
         column.addView(topBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (settings.candidateBarHeight * dp).toInt()))
         topBar.candidateFontSp = 23f * settings.candidateBarHeight / 50f
         column.addView(content, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, contentHeight()))
@@ -1890,11 +1886,6 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val foxPaper = if (s.isFoxLetter) FoxLetter.backdrop(this) else null
         r.background = if (foxPaper != null) FoxPaperDrawable(foxPaper)
             else GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(s.theme.top, s.theme.bottom))
-        foxHeader.visibility = if (s.isFoxLetter) View.VISIBLE else View.GONE
-        (foxHeader.layoutParams as? LinearLayout.LayoutParams)?.let { lp ->
-            val h = ((if (isLandscape) 34 else 52) * dp).toInt()
-            if (lp.height != h) { lp.height = h; foxHeader.requestLayout() }
-        }
         // 小狐狸有自己的水彩背景；照片留著，切回其他主題就恢復
         if (settings.hasBackground && !s.isFoxLetter) {
             // 拖滑桿時也會跑這裡：照片沒換就不用重新讀檔

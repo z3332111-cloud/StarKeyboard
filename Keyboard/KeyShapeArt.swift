@@ -21,8 +21,10 @@ struct KeyShapeArt {
     let stretch: Bool
     /// 小裝飾用線條的顏色（貓咪的眼睛、肉球）
     let lineDetail: Bool
+    /// 按鍵很瘦時最多拉高幾倍（圖案才不會太小）；正圓是 1
+    var tall: CGFloat = 1.3
 
-    static let order: [String] = ["catFace", "bear", "paw", "cloudPuff", "pixel", "pixelHeart", "puzzle", "book", "butterfly", "strawberry", "flower", "moon", "star", "heart", "latte", "catLine"]
+    static let order: [String] = ["catFace", "bear", "paw", "cloudPuff", "pixel", "pixelHeart", "puzzle", "book", "butterfly", "strawberry", "flower", "moon", "star", "heart", "latte", "catLine", "circle"]
 
     static let shapes: [String: KeyShapeArt] = [
         "catFace": KeyShapeArt(
@@ -137,12 +139,19 @@ struct KeyShapeArt {
             lines: [0, 19, 18, 2, 12, 20, 6, 17, 7, 12, 2, 8, 7, 12, 7, 13, 11, 2, 14, 13, 11, 15, 10, 12, 0, 79, 24, 1, 74, 23, 0, 79, 29, 1, 74, 30, 0, 94, 24, 1, 98, 23, 0, 94, 29, 1, 99, 30, 0, 88.7, 27, 3, 87, 29, 85.3, 27, 0, 87, 26.5, 1, 87, 27.5],
             detailLight: nil, detailDark: nil, detailAlpha: 1, aspect: 0.86,
             stretch: true, lineDetail: true),
+        "circle": KeyShapeArt(
+            title: "圓形", body: CGRect(x: 12, y: 12, width: 76, height: 76),
+            path: [0, 49, 0, 1, 51, 0, 2, 78, 0, 100, 22, 100, 50, 2, 100, 78, 78, 100, 51, 100, 1, 49, 100, 2, 22, 100, 0, 78, 0, 50, 2, 0, 22, 22, 0, 49, 0, 4],
+            detail: [],
+            lines: [],
+            detailLight: nil, detailDark: nil, detailAlpha: 0, aspect: 1,
+            stretch: true, lineDetail: false, tall: 1),
     ]
 
     /// 按鍵裡實際畫圖案的方框：保持比例、置中
     func fit(_ r: CGRect) -> CGRect {
         // 最多比設計的再高 30%（按鍵很瘦時圖案才不會太小），還是圓圓的
-        var w = r.width, h = min(r.height, r.width * aspect * 1.3)
+        var w = r.width, h = min(r.height, r.width * aspect * tall)
         if r.width * aspect > r.height { h = r.height; w = h / aspect }
         return CGRect(x: r.midX - w / 2, y: r.midY - h / 2, width: w, height: h)
     }

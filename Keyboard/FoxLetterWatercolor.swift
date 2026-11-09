@@ -3,19 +3,16 @@ import UIKit
 /// 圖集只解碼一次且先縮圖；每顆按鍵的圖層共用同一個 CGImage。
 @MainActor
 enum FoxLetterWatercolor {
-    private static let cache: NSCache<NSString, UIImage> = {
-        let cache = NSCache<NSString, UIImage>()
-        cache.totalCostLimit = 8 * 1024 * 1024
-        return cache
-    }()
+    // 不用 NSCache：記憶體一緊它就清掉，每顆鍵又各讀一次，反而把鍵盤撐爆（卡死、閃退）
+    private static var images: [String: UIImage] = [:]
 
     static func image(_ name: String) -> UIImage? {
-        let key = name as NSString
-        if let image = cache.object(forKey: key) { return image }
+        if let image = images[name] { return image }
         let bundle = Bundle(for: FoxLetterArtworkView.self)
-        guard let url = bundle.url(forResource: name, withExtension: "png", subdirectory: "FoxLetter"),
-              let image = UIImage.downsampled(url: url, maxSide: 768), let cg = image.cgImage else { return nil }
-        cache.setObject(image, forKey: key, cost: cg.bytesPerRow * cg.height)
+        guard let url = bundle.url(forResource: name, withExtension: "png", subdirectory: "FoxLetter") else { return nil }
+        // 讀圖的暫存馬上放掉，不要等到這一輪結束才一起放
+        let image = autoreleasepool { UIImage.downsampled(url: url, maxSide: 768) }
+        images[name] = image
         return image
     }
 

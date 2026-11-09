@@ -25,11 +25,13 @@ class KeyShapeArt(
     val stretch: Boolean,
     /** 小裝飾用線條的顏色（貓咪的眼睛、肉球） */
     val lineDetail: Boolean,
+    /** 按鍵很瘦時最多拉高幾倍（圖案才不會太小）；正圓是 1 */
+    private val tall: Float = 1.3f,
 ) {
     /** 按鍵裡實際畫圖案的方框：保持比例、置中 */
     fun fit(r: RectF): RectF {
         // 最多比設計的再高 30%（按鍵很瘦時圖案才不會太小），還是圓圓的
-        var w = r.width(); var h = minOf(r.height(), w * aspect * 1.3f)
+        var w = r.width(); var h = minOf(r.height(), w * aspect * tall)
         if (r.width() * aspect > r.height()) { h = r.height(); w = h / aspect }
         return RectF(r.centerX() - w / 2, r.centerY() - h / 2, r.centerX() + w / 2, r.centerY() + h / 2)
     }
@@ -55,7 +57,7 @@ class KeyShapeArt(
     }
 
     companion object {
-        val order = listOf("catFace", "bear", "paw", "cloudPuff", "pixel", "pixelHeart", "puzzle", "book", "butterfly", "strawberry", "flower", "moon", "star", "heart", "latte", "catLine")
+        val order = listOf("catFace", "bear", "paw", "cloudPuff", "pixel", "pixelHeart", "puzzle", "book", "butterfly", "strawberry", "flower", "moon", "star", "heart", "latte", "catLine", "circle")
 
         val shapes: Map<String, KeyShapeArt> = mapOf(
             "catFace" to KeyShapeArt(
@@ -154,6 +156,12 @@ class KeyShapeArt(
                 floatArrayOf(0f, 84.15f, 22.4f, 2f, 84.15f, 23.04f, 83.64f, 23.55f, 83f, 23.55f, 2f, 82.36f, 23.55f, 81.85f, 23.04f, 81.85f, 22.4f, 2f, 81.85f, 21.76f, 82.36f, 21.25f, 83f, 21.25f, 2f, 83.64f, 21.25f, 84.15f, 21.76f, 84.15f, 22.4f, 4f, 0f, 92.15f, 22.4f, 2f, 92.15f, 23.04f, 91.64f, 23.55f, 91f, 23.55f, 2f, 90.36f, 23.55f, 89.85f, 23.04f, 89.85f, 22.4f, 2f, 89.85f, 21.76f, 90.36f, 21.25f, 91f, 21.25f, 2f, 91.64f, 21.25f, 92.15f, 21.76f, 92.15f, 22.4f, 4f, 0f, 24.8f, 84f, 2f, 24.4f, 81.6f, 26.4f, 80f, 28f, 81.5f, 2f, 29.8f, 79.9f, 31.8f, 81.6f, 31.3f, 84f, 2f, 31.1f, 86.2f, 29.7f, 87f, 28f, 86.7f, 2f, 26.3f, 87f, 24.9f, 86.2f, 24.8f, 84f, 4f, 0f, 25.22f, 77.99f, 2f, 25.55f, 78.81f, 25.36f, 79.66f, 24.8f, 79.88f, 2f, 24.24f, 80.11f, 23.51f, 79.63f, 23.18f, 78.81f, 2f, 22.85f, 77.99f, 23.04f, 77.14f, 23.6f, 76.92f, 2f, 24.16f, 76.69f, 24.89f, 77.17f, 25.22f, 77.99f, 4f, 0f, 28.6f, 77.4f, 2f, 28.6f, 78.26f, 28.11f, 78.95f, 27.5f, 78.95f, 2f, 26.89f, 78.95f, 26.4f, 78.26f, 26.4f, 77.4f, 2f, 26.4f, 76.54f, 26.89f, 75.85f, 27.5f, 75.85f, 2f, 28.11f, 75.85f, 28.6f, 76.54f, 28.6f, 77.4f, 4f, 0f, 31.93f, 78.79f, 2f, 31.61f, 79.62f, 30.89f, 80.11f, 30.33f, 79.89f, 2f, 29.76f, 79.68f, 29.56f, 78.83f, 29.87f, 78.01f, 2f, 30.19f, 77.18f, 30.91f, 76.69f, 31.47f, 76.91f, 2f, 32.04f, 77.12f, 32.24f, 77.97f, 31.93f, 78.79f, 4f, 0f, 72.8f, 84f, 2f, 72.4f, 81.6f, 74.4f, 80f, 76f, 81.5f, 2f, 77.8f, 79.9f, 79.8f, 81.6f, 79.3f, 84f, 2f, 79.1f, 86.2f, 77.7f, 87f, 76f, 86.7f, 2f, 74.3f, 87f, 72.9f, 86.2f, 72.8f, 84f, 4f, 0f, 73.22f, 77.99f, 2f, 73.55f, 78.81f, 73.36f, 79.66f, 72.8f, 79.88f, 2f, 72.24f, 80.11f, 71.51f, 79.63f, 71.18f, 78.81f, 2f, 70.85f, 77.99f, 71.04f, 77.14f, 71.6f, 76.92f, 2f, 72.16f, 76.69f, 72.89f, 77.17f, 73.22f, 77.99f, 4f, 0f, 76.6f, 77.4f, 2f, 76.6f, 78.26f, 76.11f, 78.95f, 75.5f, 78.95f, 2f, 74.89f, 78.95f, 74.4f, 78.26f, 74.4f, 77.4f, 2f, 74.4f, 76.54f, 74.89f, 75.85f, 75.5f, 75.85f, 2f, 76.11f, 75.85f, 76.6f, 76.54f, 76.6f, 77.4f, 4f, 0f, 79.93f, 78.79f, 2f, 79.61f, 79.62f, 78.89f, 80.11f, 78.33f, 79.89f, 2f, 77.76f, 79.68f, 77.56f, 78.83f, 77.87f, 78.01f, 2f, 78.19f, 77.18f, 78.91f, 76.69f, 79.47f, 76.91f, 2f, 80.04f, 77.12f, 80.24f, 77.97f, 79.93f, 78.79f, 4f),
                 floatArrayOf(0f, 19f, 18f, 2f, 12f, 20f, 6f, 17f, 7f, 12f, 2f, 8f, 7f, 12f, 7f, 13f, 11f, 2f, 14f, 13f, 11f, 15f, 10f, 12f, 0f, 79f, 24f, 1f, 74f, 23f, 0f, 79f, 29f, 1f, 74f, 30f, 0f, 94f, 24f, 1f, 98f, 23f, 0f, 94f, 29f, 1f, 99f, 30f, 0f, 88.7f, 27f, 3f, 87f, 29f, 85.3f, 27f, 0f, 87f, 26.5f, 1f, 87f, 27.5f),
                 null, null, 1f, 0.86f, true, true),
+            "circle" to KeyShapeArt(
+                "圓形", floatArrayOf(12f, 12f, 76f, 76f),
+                floatArrayOf(0f, 49f, 0f, 1f, 51f, 0f, 2f, 78f, 0f, 100f, 22f, 100f, 50f, 2f, 100f, 78f, 78f, 100f, 51f, 100f, 1f, 49f, 100f, 2f, 22f, 100f, 0f, 78f, 0f, 50f, 2f, 0f, 22f, 22f, 0f, 49f, 0f, 4f),
+                floatArrayOf(),
+                floatArrayOf(),
+                null, null, 0f, 1f, true, false, 1f),
         )
 
         /** 0 = 移到、1 = 直線、2 = 三次曲線、3 = 二次曲線、4 = 收尾 */
