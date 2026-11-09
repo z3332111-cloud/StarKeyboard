@@ -474,6 +474,7 @@ class SettingsPanel(
     private val onPasteSpaceEmoji: () -> Unit,
     private val onCopyTypingLog: () -> Unit,
     private val onLiveSize: () -> Unit = {},
+    private val onDownloadTheme: (String) -> Unit = {},
     onBack: () -> Unit,
 ) : LinearLayout(context) {
     private val col = LinearLayout(context).apply { orientation = VERTICAL; setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(12f)) }
@@ -684,35 +685,43 @@ class SettingsPanel(
         col.addView(row)
     }
 
-    /** 小狐狸的楓葉信：角色主題有自己的一張卡片 */
-    private fun foxThemeRow() {
-        val selected = settings.themeId == FoxLetter.ID
-        val card = LinearLayout(context).apply {
-            orientation = HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dpi(12f), 0, dpi(12f), 0)
-            background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(android.graphics.Color.parseColor("#51424D"))
-                cornerRadius = dp(14f)
-                setStroke(if (selected) dpi(2f) else dpi(1f), android.graphics.Color.parseColor(if (selected) "#E9AE78" else "#A1847E"))
-            }
-            contentDescription = "小狐狸的楓葉信，角色主題"
-            setOnClickListener { settings.themeId = FoxLetter.ID; onChange() }
+    /** 角色主題：一排小卡片，有 ⬇ 的按一下才下載，不用可以移除 */
+    private fun packThemeRow() {
+        class Card(val id: String, val name: String, val emoji: String, val subtitle: String, val color: Int, val text: Int)
+        val cards = listOf(Card(FoxLetter.ID, FoxLetter.theme.name, "🦊", "秋日水彩", FoxLetter.theme.top, FoxLetter.theme.keyText)) +
+            ThemeLooks.all.map { Card(it.theme.id, it.theme.name, it.emoji, it.subtitle, it.theme.top,
+                if (it.theme.dark && it.theme.id != "pool") it.theme.keyText else android.graphics.Color.parseColor("#33291F")) }
+        val row = LinearLayout(context).apply { orientation = HORIZONTAL }
+        for (card in cards) {
+            val selected = settings.themeId == card.id
+            val ready = ThemePacks.isReady(context, card.id)
+            row.addView(Tap(context, card.emoji + "\n" + card.name + (if (selected) " ✓" else "") + "\n" + (if (ready) card.subtitle else "⬇ 按一下下載"), 11f, card.text, true) {
+                if (!ready) onDownloadTheme(card.id)
+                else {
+                    if (ThemeLooks.named(settings.themeId) == null && settings.themeId != FoxLetter.ID) settings.themeBeforeFox = settings.themeId
+                    settings.themeId = card.id
+                    onChange()
+                }
+            }.apply {
+                maxLines = 3
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(card.color)
+                    cornerRadius = dp(14f)
+                    setStroke(if (selected) dpi(2f) else dpi(1f), if (selected) t.accent else card.text.withAlpha(0.4f))
+                }
+                contentDescription = card.name + if (ready) "" else "，要下載"
+            }, LayoutParams(dpi(112f), dpi(80f)).apply { rightMargin = dpi(8f) })
         }
-        card.addView(FoxPreviewView(context), LayoutParams(dpi(56f), dpi(56f)).apply { rightMargin = dpi(12f) })
-        val words = LinearLayout(context).apply { orientation = VERTICAL }
-        words.addView(TextView(context).apply {
-            text = if (selected) "小狐狸的楓葉信 ✓" else "小狐狸的楓葉信"
-            textSize = 16f; paint.isFakeBoldText = true
-            setTextColor(android.graphics.Color.parseColor("#FFF5E4"))
-        })
-        words.addView(TextView(context).apply {
-            text = "秋日角色按鍵 · 點一下套用"
-            textSize = 11f
-            setTextColor(android.graphics.Color.parseColor("#E7C8B1"))
-        })
-        card.addView(words, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-        col.addView(card, LayoutParams(LayoutParams.MATCH_PARENT, dpi(82f)).apply { bottomMargin = dpi(8f) })
+        col.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(row) },
+            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
+        val current = settings.themeId
+        if (ThemePacks.files(current).isNotEmpty() && ThemePacks.isReady(context, current)) {
+            button("移除「" + KeyboardTheme.named(current).name + "」的圖（之後可以再下載）") {
+                settings.themeId = settings.themeBeforeFox
+                ThemePacks.remove(context, current)
+                onChange()
+            }
+        }
     }
 
     private fun toggle(title: String, on: Boolean, set: (Boolean) -> Unit) {
@@ -725,7 +734,7 @@ class SettingsPanel(
     private fun build() {
         sections.clear()
         header("主題")
-        foxThemeRow()
+        packThemeRow()
         val themes = LinearLayout(context).apply { orientation = HORIZONTAL }
         for (theme in KeyboardTheme.all + KeyboardTheme.custom(settings.customHue, settings.customSaturation, settings.customDark, settings.customHue2, settings.customSaturation2)) {
             val selected = theme.id == settings.themeId
@@ -766,8 +775,10 @@ class SettingsPanel(
             choices(listOf("淺色", "深色"), if (settings.customDark) 1 else 0) { settings.customDark = it == 1; onChange() }
         }
 
-        if (settings.themeId == FoxLetter.ID) {
-            note("小狐狸主題已搭配角色造型與插畫質感。原本的造型、質感和背景照片會保留，切回其他主題就恢復。")
+        if (ThemeLooks.named(settings.themeId)?.hasArt == false) {
+            note("這個主題已配好造型和質感；切回其他主題就恢復你原本選的。")
+        } else if (settings.style.isIllustrated) {
+            note("這個主題已搭配角色造型與插畫質感。原本的造型、質感和背景照片會保留，切回其他主題就恢復。")
         } else {
         header("按鍵造型")
         for (group in KeyShape.values().toList().chunked(4)) {
@@ -797,7 +808,7 @@ class SettingsPanel(
         note("果凍彈彈：壓扁再 duang duang 抖回來。跳跳：放開時蹦一下。搖搖：左右扭一扭。")
 
         header("空白鍵")
-        if (settings.themeId == FoxLetter.ID) note("可繼續使用自己的空白鍵圖片／GIF或表符。使用圖片時會收起信封配件，保留中央圖案空間。")
+        if (settings.style.isIllustrated) note("可繼續使用自己的空白鍵圖片／GIF或表符。使用圖片時會收起信封配件，保留中央圖案空間。")
         val spaceModes = listOf("theme" to "主題符號", "image" to "我的圖片", "emoji" to "表符", "text" to "只有字")
         choices(spaceModes.map { it.second }, spaceModes.indexOfFirst { it.first == settings.spaceStyle }.coerceAtLeast(0)) {
             if (spaceModes[it].first == "image" && !SpaceArt.hasImage(context)) onPickSpaceImage()

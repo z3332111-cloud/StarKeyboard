@@ -6,7 +6,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.10.7"
+    MARKETING_VERSION: "0.11.0"
     CURRENT_PROJECT_VERSION: "1"
     TARGETED_DEVICE_FAMILY: "1"
     DEVELOPMENT_TEAM: ""
@@ -44,8 +44,6 @@ targets:
       - path: Keyboard
         excludes:
           - Resources/FoxLetter/**
-      - path: Keyboard/Resources/FoxLetter
-        type: folder
       - path: Core/Sources/KeyboardCore
     info:
       path: Keyboard/Info.plist

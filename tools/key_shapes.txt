@@ -147,3 +147,13 @@ body 12 12 76 76
 path M49 0 L51 0 C78 0 100 22 100 50 C100 78 78 100 51 100 L49 100 C22 100 0 78 0 50 C0 22 22 0 49 0 Z
 color accent accent
 alpha 0
+
+== chamfer 削角
+// 儀器面板：右下角削掉一塊，左下一小條刻度
+aspect 1.2
+stretch
+body 8 12 84 72
+path M3 0 L97 0 Q100 0 100 3 L100 84 L84 100 L3 100 Q0 100 0 97 L0 3 Q0 0 3 0 Z
+lines M3 0 L97 0 Q100 0 100 3 L100 84 L84 100 L3 100 Q0 100 0 97 L0 3 Q0 0 3 0 Z M12 90 L24 90
+color accent accent
+alpha 0

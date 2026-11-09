@@ -47,7 +47,8 @@ data class KeyboardTheme(
             KeyboardTheme("dark", "經典深色", c("#2B2B2D"), c("#232325"), c("#6B6B6E"), c("#FFFFFF"), c("#474749"), c("#FFFFFF"), c("#2F7BF6"), c("#FFFFFF"), c("#111111"), "", true),
         )
 
-        fun named(id: String) = if (id == FoxLetter.ID) FoxLetter.theme else all.firstOrNull { it.id == id } ?: all[0]
+        fun named(id: String): KeyboardTheme = if (id == FoxLetter.ID) FoxLetter.theme
+            else ThemeLooks.named(id)?.theme ?: all.firstOrNull { it.id == id } ?: all[0]
 
         /** 自訂配色用的色票：(色相, 濃淡)，和 iPhone 版一樣 */
         val swatches = listOf(
@@ -83,7 +84,7 @@ enum class KeyShape(val title: String, private val artId: String? = null) {
     // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.kt）
     CAT_FACE("貓咪", "catFace"), BEAR("熊熊", "bear"), PAW("肉球", "paw"), CLOUD_PUFF("棉花雲", "cloudPuff"), PIXEL("像素", "pixel"), PIXEL_HEART("像素心", "pixelHeart"),
     PUZZLE("拼圖", "puzzle"), BOOK("書本", "book"), BUTTERFLY("蝴蝶", "butterfly"),
-    STRAWBERRY("草莓", "strawberry"), FLOWER("櫻花", "flower"), MOON("月亮", "moon"), STAR("星星", "star"), HEART("愛心", "heart"), LATTE("拉花咖啡", "latte"), CAT_LINE("貓咪探頭", "catLine"), CIRCLE("圓形", "circle");
+    STRAWBERRY("草莓", "strawberry"), FLOWER("櫻花", "flower"), MOON("月亮", "moon"), STAR("星星", "star"), HEART("愛心", "heart"), LATTE("拉花咖啡", "latte"), CAT_LINE("貓咪探頭", "catLine"), CIRCLE("圓形", "circle"), CHAMFER("削角", "chamfer");
 
     val art: KeyShapeArt? get() = artId?.let { KeyShapeArt.shapes[it] }
 
@@ -627,6 +628,10 @@ class KeyboardSettings(context: Context) {
     var shape: KeyShape
         get() = runCatching { KeyShape.valueOf(p.getString("shape", "JELLY")!!) }.getOrDefault(KeyShape.JELLY)
         set(v) = p.edit().putString("shape", v.name).apply()
+    /** 套用下載主題之前的主題：移除圖或圖不見時換回去 */
+    var themeBeforeFox: String
+        get() = p.getString("themeBeforeFox", null) ?: "strawberry"
+        set(v) = p.edit().putString("themeBeforeFox", v).apply()
     var keyAlpha: Float
         get() = p.getFloat("keyAlpha", 1f)
         set(v) = p.edit().putFloat("keyAlpha", v).apply()

@@ -50,7 +50,7 @@ final class KeyboardGlassSurface: UIVisualEffectView {
 
 extension KeyboardStyle {
     var usesNativeGlassBar: Bool {
-        !isFoxLetter && finish == .liquid && KeyboardGlassSurface.isSupported
+        !isIllustrated && finish == .liquid && KeyboardGlassSurface.isSupported
     }
 
     var usesNativeGlassKeys: Bool {

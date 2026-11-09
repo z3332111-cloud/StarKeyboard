@@ -8,8 +8,6 @@ val buildNumber = (System.getenv("BUILD_NUMBER") ?: "1").toInt()
 val keystorePath: String? = System.getenv("KEYSTORE_PATH")
 
 android {
-    // 小狐狸主題的水彩圖和 iPhone 共用同一份
-    sourceSets.getByName("main").assets.srcDir("../../Keyboard/Resources/FoxLetter")
     namespace = "com.startown.starkeyboard"
     compileSdk = 34
 

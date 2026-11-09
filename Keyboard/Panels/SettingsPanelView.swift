@@ -15,6 +15,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
     var onAdjustPhoto: (() -> Void)?
     var onPasteFont: (() -> Void)?
     var onDownloadFont: ((String) -> Void)?
+    var onDownloadTheme: ((String) -> Void)?
     var onPasteSpaceImage: (() -> Void)?
     var onPasteSpaceEmoji: (() -> Void)?
     var onCopyTypingLog: (() -> Void)?
@@ -117,7 +118,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         liveButton.setTitleColor(style.theme.specialText, for: .normal)
 
         stack.addArrangedSubview(header("主題"))
-        stack.addArrangedSubview(foxLetterThemeRow())
+        stack.addArrangedSubview(packThemeRow())
         stack.addArrangedSubview(themeRow())
         if settings.themeID == "custom" {
             // 自訂配色：點色票選顏色；雙色時可以分別選主色和第二色
@@ -149,8 +150,10 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             })
         }
 
-        if style.isFoxLetter {
-            stack.addArrangedSubview(note("小狐狸主題已搭配角色造型與插畫質感。原本的造型、質感和背景照片會保留，切回其他主題即可恢復；高度、字體、間距與動畫仍可調整。"))
+        if style.themeLook?.hasArt == false {
+            stack.addArrangedSubview(note("這個主題已配好造型和質感；切回其他主題就恢復你原本選的。"))
+        } else if style.isIllustrated {
+            stack.addArrangedSubview(note("這個主題已搭配角色造型與插畫質感。原本的造型、質感和背景照片會保留，切回其他主題即可恢復；高度、字體、間距與動畫仍可調整。"))
         } else {
             stack.addArrangedSubview(header("按鍵造型"))
             stack.addArrangedSubview(shapeRow())
@@ -165,7 +168,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         }
 
         stack.addArrangedSubview(header("空白鍵"))
-        if style.isFoxLetter {
+        if style.isIllustrated {
             stack.addArrangedSubview(note("可繼續使用自己的空白鍵圖片／GIF或表符。使用圖片時會收起信封配件，保留中央圖案空間。"))
         }
         let spaceModes = [("theme", "主題符號"), ("image", "我的圖片"), ("emoji", "表符"), ("text", "只有字")]
@@ -485,7 +488,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         scrollRow.showsHorizontalScrollIndicator = false
         scrollRow.heightAnchor.constraint(equalToConstant: 78).isActive = true
         var x: CGFloat = 0
-        for theme in KeyboardTheme.all.filter({ $0.id != FoxLetterTheme.id }) + [KeyboardTheme.named("custom")] {
+        for theme in KeyboardTheme.all.filter({ $0.id != FoxLetterTheme.id && ThemeLook.named($0.id) == nil }) + [KeyboardTheme.named("custom")] {
             let selected = theme.id == settings.themeID
             let b = UIButton(type: .custom)
             b.frame = CGRect(x: x, y: 0, width: 64, height: 76)
@@ -522,53 +525,67 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         return scrollRow
     }
 
-    private func foxLetterThemeRow() -> UIView {
-        let selected = settings.themeID == FoxLetterTheme.id
-        let button = UIButton(type: .custom)
-        button.heightAnchor.constraint(equalToConstant: 82).isActive = true
-        button.backgroundColor = UIColor(hex: 0x51424D)
-        button.layer.cornerRadius = 14
-        button.layer.borderWidth = selected ? 2 : 0.7
-        button.layer.borderColor = UIColor(hex: selected ? 0xE9AE78 : 0xA1847E).cgColor
-        button.accessibilityLabel = "小狐狸的楓葉信，角色主題"
-        button.accessibilityTraits = selected ? [.button, .selected] : [.button]
-        let preview = FoxLetterArtworkView(frame: .zero)
-        preview.translatesAutoresizingMaskIntoConstraints = false
-        preview.configure(index: 0, action: .text(""), personalSpaceArt: false)
-        button.addSubview(preview)
-        let title = UILabel()
-        title.text = selected ? "小狐狸的楓葉信 ✓" : "小狐狸的楓葉信"
-        title.textColor = UIColor(hex: 0xFFF5E4)
-        title.font = .rounded(16, .bold)
-        title.adjustsFontSizeToFitWidth = true
-        title.translatesAutoresizingMaskIntoConstraints = false
-        button.addSubview(title)
-        let subtitle = UILabel()
-        subtitle.text = "秋日角色按鍵 · 點一下套用"
-        subtitle.textColor = UIColor(hex: 0xE7C8B1)
-        subtitle.font = .rounded(11)
-        subtitle.adjustsFontSizeToFitWidth = true
-        subtitle.translatesAutoresizingMaskIntoConstraints = false
-        button.addSubview(subtitle)
-        NSLayoutConstraint.activate([
-            preview.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 12),
-            preview.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-            preview.widthAnchor.constraint(equalToConstant: 56),
-            preview.heightAnchor.constraint(equalToConstant: 56),
-            title.leadingAnchor.constraint(equalTo: preview.trailingAnchor, constant: 12),
-            title.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -12),
-            title.topAnchor.constraint(equalTo: button.topAnchor, constant: 18),
-            subtitle.leadingAnchor.constraint(equalTo: title.leadingAnchor),
-            subtitle.trailingAnchor.constraint(equalTo: title.trailingAnchor),
-            subtitle.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 5),
-        ])
-        button.addAction(UIAction { [weak self] _ in
-            guard let self = self else { return }
-            if self.settings.themeID != FoxLetterTheme.id { self.settings.themeBeforeFox = self.settings.themeID }
-            self.settings.themeID = FoxLetterTheme.id
-            self.onChange?()
-        }, for: .touchUpInside)
-        return button
+    private struct PackCard {
+        let id: String, name: String, emoji: String, subtitle: String
+        let color: UIColor, text: UIColor
+    }
+
+    /// 角色主題：一排小卡片，有 ⬇ 的按一下才下載，不用可以移除
+    private func packThemeRow() -> UIView {
+        let box = UIStackView()
+        box.axis = .vertical
+        box.spacing = 6
+        let scrollRow = UIScrollView()
+        scrollRow.showsHorizontalScrollIndicator = false
+        scrollRow.heightAnchor.constraint(equalToConstant: 84).isActive = true
+        var x: CGFloat = 0
+        var cards = [PackCard(id: FoxLetterTheme.id, name: "小狐狸的楓葉信", emoji: "🦊", subtitle: "秋日水彩",
+                              color: UIColor(hex: 0x51424D), text: UIColor(hex: 0xFFF5E4))]
+        for look in ThemeLook.all {
+            let t = look.theme
+            let text = t.isDark && t.id != "pool" ? t.keyText : UIColor(hex: 0x33291F)
+            cards.append(PackCard(id: t.id, name: t.name, emoji: look.emoji, subtitle: look.subtitle, color: t.backgroundTop, text: text))
+        }
+        for card in cards {
+            let selected = settings.themeID == card.id
+            let ready = ThemePacks.isReady(card.id)
+            let b = UIButton(type: .custom)
+            b.frame = CGRect(x: x, y: 2, width: 112, height: 80)
+            b.backgroundColor = card.color
+            b.layer.cornerRadius = 14
+            b.layer.borderWidth = selected ? 2 : 0.7
+            b.layer.borderColor = (selected ? style.theme.accent : card.text.withAlphaComponent(0.4)).cgColor
+            b.titleLabel?.numberOfLines = 3
+            b.titleLabel?.textAlignment = .center
+            b.titleLabel?.font = .rounded(11, .bold)
+            b.titleLabel?.adjustsFontSizeToFitWidth = true
+            b.setTitleColor(card.text, for: .normal)
+            b.setTitle("\(card.emoji)\n\(card.name)\(selected ? " ✓" : "")\n\(ready ? card.subtitle : "⬇ 按一下下載")", for: .normal)
+            b.accessibilityLabel = card.name + (ready ? "" : "，要下載")
+            b.addAction(UIAction { [weak self] _ in
+                guard let self = self else { return }
+                guard ready else { self.onDownloadTheme?(card.id); return }
+                if ThemeLook.named(self.settings.themeID) == nil && self.settings.themeID != FoxLetterTheme.id {
+                    self.settings.themeBeforeFox = self.settings.themeID
+                }
+                self.settings.themeID = card.id
+                self.onChange?()
+            }, for: .touchUpInside)
+            scrollRow.addSubview(b)
+            x += 120
+        }
+        scrollRow.contentSize = CGSize(width: x, height: 84)
+        box.addArrangedSubview(scrollRow)
+        let current = settings.themeID
+        if !ThemePacks.files(current).isEmpty, ThemePacks.isReady(current) {
+            box.addArrangedSubview(buttonRow([("移除「\(KeyboardTheme.named(current).name)」的圖（之後可以再下載）", { [weak self] in
+                guard let self = self else { return }
+                self.settings.themeID = self.settings.themeBeforeFox
+                ThemePacks.remove(current)
+                self.onChange?()
+            })]))
+        }
+        return box
     }
 
     private func shortcutRow(_ item: ShortcutStore.Item) -> UIView {

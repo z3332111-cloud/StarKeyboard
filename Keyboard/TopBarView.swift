@@ -337,7 +337,8 @@ final class TopBarView: UIView {
     private func applyStyle() {
         let t = style.theme
         // 底色單獨過渡，工具列、選字與編輯文字維持原本的清晰度。
-        backdropView.backgroundColor = t.isDark ? UIColor.black.withAlphaComponent(0.35) : UIColor.white.withAlphaComponent(0.6)
+        let packBar = style.themeLook != nil && t.id != "cat-outline"
+        backdropView.backgroundColor = packBar ? t.specialKey : (t.isDark ? UIColor.black.withAlphaComponent(0.35) : UIColor.white.withAlphaComponent(0.6))
         backdropView.layer.cornerRadius = style.isFoxLetter ? 16 : 0
         backdropView.layer.borderWidth = style.isFoxLetter ? 0.65 : 0
         backdropView.layer.borderColor = style.isFoxLetter ? t.keyText.withAlphaComponent(0.3).cgColor : nil

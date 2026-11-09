@@ -281,6 +281,8 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
         val t = style.theme
         // 整條（工具列、選字區、編輯框）都墊一層半透明的底，放背景照片時圖示和字才看得清楚（深色主題墊深色）
         if (style.isFoxLetter) background = FoxBarDrawable(FoxLetter.backdrop(context), dp(1f), t.keyText)
+        // 設計圖鑑的主題：素色的底（貓咪描邊要透出照片，例外）
+        else if (style.themeLook != null && t.id != "cat-outline") setBackgroundColor(t.special)
         else setBackgroundColor(if (t.dark) android.graphics.Color.BLACK.withAlpha(0.35f) else android.graphics.Color.WHITE.withAlpha(0.6f))
         when (val c = content) {
             is Content.Toolbar -> {

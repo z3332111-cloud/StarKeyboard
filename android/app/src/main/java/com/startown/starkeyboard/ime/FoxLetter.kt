@@ -12,10 +12,86 @@ import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
-import android.view.View
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+
+/** 設計圖鑑做成的主題（和 iPhone 版 Keyboard/ThemePacks.swift 一樣）。有圖集的要下載才能用，不用可以移除 */
+class ThemeLook(
+    val theme: KeyboardTheme, val emoji: String, val subtitle: String, val hasArt: Boolean,
+    val shape: KeyShape, val finish: KeyFinish, val ink: Int, val spaceInk: Int, val hint: Int,
+)
+
+object ThemeLooks {
+    private fun c(hex: String) = Color.parseColor(hex)
+
+    private fun make(id: String, name: String, emoji: String, subtitle: String, bed: String, bar: String, text: String, accent: String, accentText: String,
+                     shadow: String, dark: Boolean, ink: String, art: Boolean = true, shape: KeyShape = KeyShape.ROUNDED, finish: KeyFinish = KeyFinish.FLAT,
+                     bedBottom: String = bed, key: String = bar, specialText: String = text, spaceInk: String = ink, hint: String = text) = ThemeLook(
+        KeyboardTheme(id, name, c(bed), c(bedBottom), c(key), c(text), c(bar), c(specialText), c(accent), c(accentText), c(shadow), "", dark),
+        emoji, subtitle, art, shape, finish, c(ink), c(spaceInk), c(hint))
+
+    val all = listOf(
+        make("persimmon", "柿子貓的茶屋", "🍊", "秋日水彩", "#F8E6C6", "#E9CB9C", "#51351F", "#D9793A", "#FFFFFF", "#C9A878", false, "#412C20", spaceInk = "#302E1D"),
+        make("observatory", "小梟的月相室", "🦉", "秋日水彩", "#18243B", "#293850", "#F5E9CD", "#E3B566", "#171B31", "#0F1728", true, "#171B31", spaceInk = "#FFF4D9"),
+        make("railway", "稻雀的末班車", "🌾", "秋日水彩", "#294544", "#365851", "#FFF0CF", "#E0A64B", "#332817", "#1C302F", true, "#332817", spaceInk = "#4C3323"),
+        make("pool", "動物泳隊", "🏊", "孔版印刷", "#ACE1DC", "#1C5975", "#FFF3CE", "#F2743B", "#FFFFFF", "#115875", true, "#282335", hint = "#203735"),
+        make("fern", "蕨影暗房", "🌿", "植物藍曬", "#0C3553", "#0C3352", "#E6F2FA", "#8FC1E3", "#0C3352", "#061F33", true, "#FFFFFF"),
+        make("cat-outline", "貓咪描邊", "🐈", "線稿＋你的照片", "#2A2622", "#2A2622", "#FFFFFF", "#FFD48A", "#2A2622", "#000000", true, "#FFFFFF",
+            art = false, shape = KeyShape.CAT_LINE, finish = KeyFinish.OUTLINE, bedBottom = "#1D1A17"),
+        make("scope", "磷光示波器", "📟", "電子儀器", "#101E1B", "#142B25", "#CCF7D8", "#86EBAC", "#101E1B", "#0A1513", true, "#CCF7D8",
+            art = false, shape = KeyShape.CHAMFER, key = "#132C27", specialText = "#F0C36D"),
+    )
+
+    fun named(id: String) = all.firstOrNull { it.theme.id == id }
+}
+
+val KeyboardStyle.themeLook get() = ThemeLooks.named(theme.id)
+/** 按鍵是插畫（小狐狸和有圖集的主題） */
+val KeyboardStyle.isIllustrated get() = isFoxLetter || themeLook?.hasArt == true
+
+/** 主題圖要用才下載（和字體一樣，放在 GitHub Pages），不用可以移除 */
+object ThemePacks {
+    private const val BASE = "https://z3332111-cloud.github.io/StarKeyboard/theme-packs/"
+
+    fun files(id: String): List<String> = when {
+        id == FoxLetter.ID -> listOf("keycaps-watercolor-v2", "wide-keycaps-watercolor-v2", "background-watercolor-v2")
+        ThemeLooks.named(id)?.hasArt == true -> listOf("theme-$id")
+        else -> emptyList()
+    }
+
+    fun file(context: Context, name: String) = java.io.File(java.io.File(context.filesDir, "themepacks").apply { mkdirs() }, "$name.png")
+
+    /** 不用下載，或已經下載好了 */
+    fun isReady(context: Context, id: String) = files(id).all { file(context, it).exists() }
+
+    /** 在背景下載，完成後在主執行緒回報 */
+    fun download(context: Context, id: String, done: (Boolean) -> Unit) {
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        Thread {
+            val ok = runCatching {
+                for (name in files(id)) {
+                    val conn = java.net.URL("$BASE$name.png").openConnection() as java.net.HttpURLConnection
+                    conn.connectTimeout = 15000; conn.readTimeout = 30000; conn.instanceFollowRedirects = true
+                    require(conn.responseCode == 200)
+                    val tmp = java.io.File(context.cacheDir, "$name.part")
+                    conn.inputStream.use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                    val size = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(tmp.path, size)
+                    require(size.outWidth > 0)
+                    val target = file(context, name)
+                    target.delete()
+                    require(tmp.renameTo(target))
+                }
+            }.isSuccess
+            main.post { done(ok) }
+        }.start()
+    }
+
+    fun remove(context: Context, id: String) {
+        for (name in files(id)) file(context, name).delete()
+    }
+}
 
 /** 小狐狸的楓葉信（和 iPhone 版 Keyboard/FoxLetter*.swift 一樣的主題）：只提供外觀，按鍵動作和個人設定不變 */
 object FoxLetter {
@@ -38,16 +114,21 @@ object FoxLetter {
 
     /** 保留原本的造型和質感設定，離開這個主題就恢復 */
     fun resolved(style: KeyboardStyle) =
-        if (style.theme.id == ID) style.copy(shape = KeyShape.ROUNDED, finish = KeyFinish.FLAT) else style
+        ThemeLooks.named(style.theme.id)?.let { style.copy(shape = it.shape, finish = it.finish) }
+            ?: if (style.theme.id == ID) style.copy(shape = KeyShape.ROUNDED, finish = KeyFinish.FLAT) else style
 
     // ===== 圖集：只解一次，每顆鍵共用 =====
 
     private val images = HashMap<String, Bitmap?>()
 
-    private fun image(context: Context, name: String): Bitmap? = images.getOrPut(name) {
-        runCatching {
-            context.applicationContext.assets.open("$name.png").use { BitmapFactory.decodeStream(it) }
-        }.getOrNull()
+    private fun image(context: Context, name: String): Bitmap? {
+        images[name]?.let { return it }
+        // 換主題就放掉前一款的圖，記憶體裡只留正在用的
+        if (name.startsWith("theme-") || images.keys.any { it.startsWith("theme-") }) images.clear()
+        val file = ThemePacks.file(context, name)
+        val bitmap = if (file.exists()) runCatching { BitmapFactory.decodeFile(file.path) }.getOrNull() else null
+        if (bitmap != null) images[name] = bitmap
+        return bitmap
     }
 
     fun keycaps(context: Context) = image(context, "keycaps-watercolor-v2")
@@ -127,6 +208,33 @@ object FoxLetter {
             val sx = cell[0] + cell[2] * paperCuts[i]
             val src = Rect((sx * iw).toInt(), (cell[1] * ih).toInt(), ((sx + cell[2] * fraction) * iw).toInt(), ((cell[1] + cell[3] * heightPart) * ih).toInt())
             // 多蓋半個像素，接縫才不會露出一條線
+            canvas.drawBitmap(image, src, RectF(x, frame.top, x + width + 0.5f, frame.bottom), paint)
+            x += width
+        }
+    }
+
+    // ===== 設計圖鑑的主題：圖集上面一排三顆鍵帽（256×256）、下面一條寬鍵（768×192） =====
+
+    fun drawPackCap(context: Context, canvas: Canvas, frame: RectF, index: Int, look: ThemeLook, paint: Paint) {
+        val image = image(context, "theme-" + look.theme.id) ?: return
+        val position = max(0, index)
+        val cap = (position + position / 4) % 3
+        val cellW = image.width / 3
+        canvas.drawBitmap(image, Rect(cap * cellW, 0, (cap + 1) * cellW, image.height * 256 / 448), frame, paint)
+    }
+
+    /** 寬鍵：兩端的圖案不變形，中間延展 */
+    fun drawPackWide(context: Context, canvas: Canvas, frame: RectF, look: ThemeLook, paint: Paint) {
+        val image = image(context, "theme-" + look.theme.id) ?: return
+        val iw = image.width.toFloat()
+        val top = image.height * 256 / 448
+        val natural = min(frame.height() * 4, frame.width() / 0.45f)
+        val stretch = (frame.width() - natural * 0.45f) / 2
+        var x = frame.left
+        for (i in 0 until 5) {
+            val fraction = paperCuts[i + 1] - paperCuts[i]
+            val width = if (i == 1 || i == 3) stretch else natural * fraction
+            val src = Rect((paperCuts[i] * iw).toInt(), top, (paperCuts[i + 1] * iw).toInt(), image.height)
             canvas.drawBitmap(image, src, RectF(x, frame.top, x + width + 0.5f, frame.bottom), paint)
             x += width
         }
@@ -217,12 +325,4 @@ class FoxBarDrawable(private val image: Bitmap?, private val dp: Float, private 
     override fun setColorFilter(colorFilter: ColorFilter?) {}
     @Deprecated("Deprecated in Java")
     override fun getOpacity() = PixelFormat.TRANSLUCENT
-}
-
-/** 設定裡的小預覽：一顆狐狸鍵帽 */
-class FoxPreviewView(context: Context) : View(context) {
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    override fun onDraw(canvas: Canvas) {
-        FoxLetter.drawKey(context, canvas, RectF(0f, 0f, width.toFloat(), height.toFloat()), 0, KeyAction.Text(""), false, false, paint)
-    }
 }

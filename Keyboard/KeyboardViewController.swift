@@ -188,7 +188,14 @@ final class KeyboardViewController: UIInputViewController {
     private var foxFellBack = false
 
     private func guardFoxLaunch() {
-        guard settings.themeID == FoxLetterTheme.id else { settings.foxLaunches = 0; return }
+        let id = settings.themeID
+        guard !ThemePacks.files(id).isEmpty else { settings.foxLaunches = 0; return }
+        // 圖被移除了，或是舊版留下的小狐狸設定（現在要下載）：先換回去，到 ⚙ 再下載
+        if !ThemePacks.isReady(id) {
+            settings.themeID = settings.themeBeforeFox
+            foxFellBack = true
+            return
+        }
         settings.foxLaunches += 1
         if settings.foxLaunches >= 3 {
             settings.foxLaunches = 0
@@ -367,7 +374,7 @@ final class KeyboardViewController: UIInputViewController {
         super.viewDidAppear(animated)
         if foxFellBack {
             foxFellBack = false
-            toast("小狐狸主題開不起來，先換回原本的主題")
+            toast("這個主題要到 ⚙ 重新下載，先換回原本的主題")
         }
         // 撐過幾秒就算正常
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in self?.settings.foxLaunches = 0 }
@@ -1539,6 +1546,7 @@ final class KeyboardViewController: UIInputViewController {
             p.onLiveSize = { [weak self] in self?.startSizeAdjust() }
             p.onPasteFont = { [weak self] in self?.pasteFont() }
             p.onDownloadFont = { [weak self] id in self?.downloadFont(id) }
+            p.onDownloadTheme = { [weak self] id in self?.downloadTheme(id) }
             p.onPasteSpaceImage = { [weak self] in self?.pasteSpaceImage() }
             p.onPasteSpaceEmoji = { [weak self] in self?.pasteSpaceEmoji() }
             p.onCopyTypingLog = { [weak self] in
@@ -2017,7 +2025,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func startPhotoAdjust() {
-        guard !style.isFoxLetter else {
+        guard !style.isIllustrated else {
             toast("照片已保留；切回一般主題後可調整位置")
             return
         }
@@ -2085,7 +2093,7 @@ final class KeyboardViewController: UIInputViewController {
     private var loadedMaxSide: CGFloat = 0
 
     private func loadBackground() {
-        let url = settings.hasBackground && !style.isFoxLetter ? settings.currentPhotoURL : nil
+        let url = settings.hasBackground && !style.isIllustrated ? settings.currentPhotoURL : nil
         let need = url.map { backgroundMaxSide(url: $0) } ?? 0
         // 同一張照片：放大後需要更清楚才重讀
         guard url?.path != loadedPhoto || (url != nil && backgroundImage == nil) || need > loadedMaxSide * 1.15 else { return }
@@ -2220,6 +2228,28 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     /// 下載字體包裡的字體，好了就換成它
+    private func downloadTheme(_ id: String) {
+        guard hasFullAccess else {
+            toast("要先開啟「允許完整取用」才能下載")
+            return
+        }
+        let name = KeyboardTheme.named(id).name
+        toast("正在下載「\(name)」…")
+        ThemePacks.download(id) { [weak self] ok in
+            guard let self = self else { return }
+            if ok {
+                if ThemeLook.named(self.settings.themeID) == nil && self.settings.themeID != FoxLetterTheme.id {
+                    self.settings.themeBeforeFox = self.settings.themeID
+                }
+                self.settings.themeID = id
+                self.settingsChanged()
+                self.toast("「\(name)」下載好了")
+            } else {
+                self.toast("下載失敗，檢查一下網路再試")
+            }
+        }
+    }
+
     private func downloadFont(_ id: String) {
         guard hasFullAccess else {
             toast("要先開啟「允許完整取用」才能下載")

@@ -54,7 +54,7 @@ class KeyShapeArt(
     }
 
     companion object {
-        val order = listOf("catFace", "bear", "paw", "cloudPuff", "pixel", "pixelHeart", "puzzle", "book", "butterfly", "strawberry", "flower", "moon", "star", "heart", "latte", "catLine", "circle")
+        val order = listOf("catFace", "bear", "paw", "cloudPuff", "pixel", "pixelHeart", "puzzle", "book", "butterfly", "strawberry", "flower", "moon", "star", "heart", "latte", "catLine", "circle", "chamfer")
 
         val shapes: Map<String, KeyShapeArt> = mapOf(
             "catFace" to KeyShapeArt(
@@ -159,6 +159,12 @@ class KeyShapeArt(
                 floatArrayOf(),
                 floatArrayOf(),
                 null, null, 0f, 1f, true, false),
+            "chamfer" to KeyShapeArt(
+                "削角", floatArrayOf(8f, 12f, 84f, 72f),
+                floatArrayOf(0f, 3f, 0f, 1f, 97f, 0f, 3f, 100f, 0f, 100f, 3f, 1f, 100f, 84f, 1f, 84f, 100f, 1f, 3f, 100f, 3f, 0f, 100f, 0f, 97f, 1f, 0f, 3f, 3f, 0f, 0f, 3f, 0f, 4f),
+                floatArrayOf(),
+                floatArrayOf(0f, 3f, 0f, 1f, 97f, 0f, 3f, 100f, 0f, 100f, 3f, 1f, 100f, 84f, 1f, 84f, 100f, 1f, 3f, 100f, 3f, 0f, 100f, 0f, 97f, 1f, 0f, 3f, 3f, 0f, 0f, 3f, 0f, 4f, 0f, 12f, 90f, 1f, 24f, 90f),
+                null, null, 0f, 1.2f, true, false),
         )
 
         /** 0 = 移到、1 = 直線、2 = 三次曲線、3 = 二次曲線、4 = 收尾 */

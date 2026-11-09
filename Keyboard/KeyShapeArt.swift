@@ -22,7 +22,7 @@ struct KeyShapeArt {
     /// 小裝飾用線條的顏色（貓咪的眼睛、肉球）
     let lineDetail: Bool
 
-    static let order: [String] = ["catFace", "bear", "paw", "cloudPuff", "pixel", "pixelHeart", "puzzle", "book", "butterfly", "strawberry", "flower", "moon", "star", "heart", "latte", "catLine", "circle"]
+    static let order: [String] = ["catFace", "bear", "paw", "cloudPuff", "pixel", "pixelHeart", "puzzle", "book", "butterfly", "strawberry", "flower", "moon", "star", "heart", "latte", "catLine", "circle", "chamfer"]
 
     static let shapes: [String: KeyShapeArt] = [
         "catFace": KeyShapeArt(
@@ -143,6 +143,13 @@ struct KeyShapeArt {
             detail: [],
             lines: [],
             detailLight: nil, detailDark: nil, detailAlpha: 0, aspect: 1,
+            stretch: true, lineDetail: false),
+        "chamfer": KeyShapeArt(
+            title: "削角", body: CGRect(x: 8, y: 12, width: 84, height: 72),
+            path: [0, 3, 0, 1, 97, 0, 3, 100, 0, 100, 3, 1, 100, 84, 1, 84, 100, 1, 3, 100, 3, 0, 100, 0, 97, 1, 0, 3, 3, 0, 0, 3, 0, 4],
+            detail: [],
+            lines: [0, 3, 0, 1, 97, 0, 3, 100, 0, 100, 3, 1, 100, 84, 1, 84, 100, 1, 3, 100, 3, 0, 100, 0, 97, 1, 0, 3, 3, 0, 0, 3, 0, 4, 0, 12, 90, 1, 24, 90],
+            detailLight: nil, detailDark: nil, detailAlpha: 0, aspect: 1.2,
             stretch: true, lineDetail: false),
     ]
 

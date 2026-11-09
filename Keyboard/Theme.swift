@@ -145,7 +145,7 @@ struct KeyboardTheme {
                       accent: UIColor(hex: 0x2F7BF6), accentText: .white,
                       shadow: UIColor(hex: 0x111111), decoration: "", isDark: true),
         FoxLetterArtwork.theme,
-    ]
+    ] + ThemeLook.all.map { $0.theme }
 
     static func named(_ id: String) -> KeyboardTheme {
         if id == "custom" {
@@ -195,7 +195,7 @@ struct KeyboardTheme {
 enum KeyShape: String, CaseIterable {
     case rounded, jelly, catEar, cloud, bunny, puppy, pudding, jellyfish, flame, droplet, duck
     // 下面這些用線條資料畫（tools/key_shapes.txt → KeyShapeArt.swift）
-    case catFace, bear, paw, cloudPuff, pixel, pixelHeart, puzzle, book, butterfly, strawberry, flower, moon, star, heart, latte, catLine, circle
+    case catFace, bear, paw, cloudPuff, pixel, pixelHeart, puzzle, book, butterfly, strawberry, flower, moon, star, heart, latte, catLine, circle, chamfer
 
     var art: KeyShapeArt? { KeyShapeArt.shapes[rawValue] }
 

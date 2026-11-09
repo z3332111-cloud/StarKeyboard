@@ -298,7 +298,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 else canvas.scale(k.scale, k.scale, k.frame.centerX(), k.frame.centerY())
             }
             val a = style.keyAlpha
-            if (style.isFoxLetter) {
+            if (style.isIllustrated) {
                 drawFoxKey(canvas, k)
                 canvas.restore()
                 continue
@@ -455,6 +455,10 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
 
     /** 小狐狸主題：水彩鍵帽＋程式畫的字（字不烘在圖裡，換字型、大小都照常） */
     private fun drawFoxKey(canvas: Canvas, k: Key) {
+        style.themeLook?.let { look ->
+            drawPackKey(canvas, k, look)
+            return
+        }
         val compact = k.frame.height() < 40 * dp && !k.spec.action.isCharacter
         val frame = FoxLetter.frame(k.frame, style.gapScale, style.shapeScale, dp, compact)
         if (frame.isEmpty) return
@@ -492,6 +496,55 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             canvas.drawText(k.spec.hint, h.centerX(), h.top + hintPaint.textSize, hintPaint)
             hintPaint.textAlign = Paint.Align.RIGHT
         }
+    }
+
+    /** 設計圖鑑的主題：字的鍵是鍵帽、空白鍵是寬圖、功能鍵是素色方塊 */
+    private fun drawPackKey(canvas: Canvas, k: Key, look: ThemeLook) {
+        val action = k.spec.action
+        val opacity = style.keyAlpha * (if (k.pressed) 0.82f else 1f)
+        val color: Int
+        val rect: RectF
+        if (action != KeyAction.Space && !action.isCharacter) {
+            val chip = RectF(k.frame).apply { inset(2.5f * dp * style.gapScale, 4 * dp * style.gapScale) }
+            if (chip.isEmpty) return
+            val radius = minOf(8 * dp, chip.height() * 0.22f)
+            fillPaint.color = look.theme.special.withAlpha(opacity)
+            canvas.drawRoundRect(chip, radius, radius, fillPaint)
+            color = look.theme.specialText
+            rect = chip
+        } else {
+            val frame = FoxLetter.frame(k.frame, style.gapScale, style.shapeScale, dp)
+            if (frame.isEmpty) return
+            foxPaint.alpha = (opacity * 255).toInt().coerceIn(0, 255)
+            if (action == KeyAction.Space) {
+                FoxLetter.drawPackWide(context, canvas, frame, look, foxPaint)
+                color = look.spaceInk
+            } else {
+                FoxLetter.drawPackCap(context, canvas, frame, k.index, look, foxPaint)
+                color = look.ink
+                if (k.spec.hint.isNotEmpty()) {
+                    val h = FoxLetter.hintRect(frame, dp)
+                    hintPaint.textAlign = Paint.Align.CENTER
+                    hintPaint.color = look.hint
+                    hintPaint.textSize = minOf(9 * dp * style.fontScale, h.height())
+                    canvas.drawText(k.spec.hint, h.centerX(), h.top + hintPaint.textSize, hintPaint)
+                    hintPaint.textAlign = Paint.Align.RIGHT
+                }
+            }
+            rect = FoxLetter.labelRect(frame, false, dp).also { it.intersect(k.frame) }
+        }
+        if (drawSpaceArt(canvas, k)) return
+        textPaint.typeface = KeyFonts.get(context, style.fontId) ?: Typeface.DEFAULT_BOLD
+        textPaint.color = color
+        var size = minOf(k.spec.fontSize * dp * style.fontScale, rect.height())
+        textPaint.textSize = size
+        val w = textPaint.measureText(k.spec.label)
+        if (w > rect.width() && w > 0) {
+            size *= rect.width() / w
+            textPaint.textSize = size
+        }
+        val fm = textPaint.fontMetrics
+        canvas.drawText(k.spec.label, rect.centerX(), rect.centerY() - (fm.ascent + fm.descent) / 2, textPaint)
     }
 
     /** 放大泡泡：在按鍵上方畫一個大大的字（最上排就往下一點，不要被切掉） */

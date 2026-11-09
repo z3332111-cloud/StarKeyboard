@@ -84,6 +84,12 @@ enum FoxLetterTheme {
 
     /// 保留原設定物件；離開角色主題即可恢復之前的造型和質感。
     static func resolved(_ style: KeyboardStyle) -> KeyboardStyle {
+        if let look = ThemeLook.named(style.theme.id) {
+            var result = style
+            result.shape = look.shape
+            result.finish = look.finish
+            return result
+        }
         guard style.theme.id == id else { return style }
         var result = style
         result.shape = .rounded
@@ -222,7 +228,18 @@ final class FoxLetterArtworkView: UIView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    /// 設計圖鑑做的主題：用它的圖集；nil 是小狐狸
+    var look: ThemeLook?
+
     func configure(index: Int, action: KeyAction, personalSpaceArt: Bool, compact requestedCompact: Bool? = nil) {
+        if let look = look {
+            drawing.isHidden = true
+            paper.isHidden = false
+            textColor = action == .space ? look.spaceInk : (action.isCharacter ? look.ink : look.theme.specialText)
+            furColor = look.theme.key
+            paper.configure(look: look, index: index, action: action)
+            return
+        }
         let compact = requestedCompact ?? isCompact
         let position = index
         let index = FoxLetterTheme.variant(at: index, action: action)

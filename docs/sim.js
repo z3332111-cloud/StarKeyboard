@@ -99,6 +99,13 @@
     return { name: '自訂', top: hsb(h, s * .15, 1), bottom: hsb(h2, s2 * .25, .97), key: '#ffffff', text: hsb(h, s * .6 + .2, .45), special: hsb(h2, s2 * .35, .95), specialText: hsb(h2, s2 * .7, .38), accent: hsb(h2, s2 * .6, .9), accentText: '#ffffff', shadow: hsb(h, s * .4, .82) };
   }
   THEMES.custom = customTheme();
+  THEMES.persimmon = { name: '柿子貓的茶屋', top: '#f8e6c6', bottom: '#f8e6c6', key: '#e9cb9c', text: '#51351f', special: '#e9cb9c', specialText: '#51351f', accent: '#d9793a', accentText: '#ffffff', shadow: '#c9a878', look: ['#412c20', '#302e1d'] };
+  THEMES.observatory = { name: '小梟的月相室', top: '#18243b', bottom: '#18243b', key: '#293850', text: '#f5e9cd', special: '#293850', specialText: '#f5e9cd', accent: '#e3b566', accentText: '#171b31', shadow: '#0f1728', dark: true, look: ['#171b31', '#fff4d9'] };
+  THEMES.railway = { name: '稻雀的末班車', top: '#294544', bottom: '#294544', key: '#365851', text: '#fff0cf', special: '#365851', specialText: '#fff0cf', accent: '#e0a64b', accentText: '#332817', shadow: '#1c302f', dark: true, look: ['#332817', '#4c3323'] };
+  THEMES.pool = { name: '動物泳隊', top: '#ace1dc', bottom: '#ace1dc', key: '#1c5975', text: '#fff3ce', special: '#1c5975', specialText: '#fff3ce', accent: '#f2743b', accentText: '#ffffff', shadow: '#115875', dark: true, look: ['#282335', '#282335'] };
+  THEMES.fern = { name: '蕨影暗房', top: '#0c3553', bottom: '#0c3553', key: '#0c3352', text: '#e6f2fa', special: '#0c3352', specialText: '#e6f2fa', accent: '#8fc1e3', accentText: '#0c3352', shadow: '#061f33', dark: true, look: ['#ffffff', '#ffffff'] };
+  THEMES['cat-outline'] = { name: '貓咪描邊', top: '#2a2622', bottom: '#1d1a17', key: '#2a2622', text: '#ffffff', special: '#2a2622', specialText: '#ffffff', accent: '#ffd48a', accentText: '#2a2622', shadow: '#000000', dark: true, preset: ['catLine', 'outline'] };
+  THEMES.scope = { name: '磷光示波器', top: '#101e1b', bottom: '#101e1b', key: '#132c27', text: '#ccf7d8', special: '#142b25', specialText: '#f0c36d', accent: '#86ebac', accentText: '#101e1b', shadow: '#0a1513', dark: true, preset: ['chamfer', 'flat'] };
   THEMES.fox = { name: '小狐狸的楓葉信', top: '#51424d', bottom: '#392f3d', key: '#6c5050', text: '#fff5e4', special: '#59434a', specialText: '#fff5e4', accent: '#e9ae78', accentText: '#3f2c27', shadow: '#271d27', dark: true };
   var FINISHES = [['flat', '平面'], ['puffy', '胖胖'], ['raised', '立體'], ['outline', '線稿'], ['liquid', '液態玻璃', '新'], ['metal', '液態金屬', '新']];
   var EFFECTS = [['none', '無', []], ['stars', '星星', ['★', '☆', '✦']], ['hearts', '愛心', ['♥︎', '♡', '❤︎']], ['sparkles', '閃亮', ['✧', '✦', '⋆']], ['flowers', '花花', ['✿', '❀', '❁']], ['bubbles', '泡泡', ['○', '◦', '°']]];
@@ -566,7 +573,25 @@
   var foxIndex = 0, FOX_SPRITES = [[0, 3, 6], [1, 5], [2, 7], [4], [8]], FOX_INK = ['#fff9ef', '#543b2f', '#fff9ef', '#fff9ef', '#fff9ef'];
   function foxArt(b, face, k) {
     var i = foxIndex++, art = el('i', 'fox-art');
-    if (k.wide) {
+    var look = THEMES[S.theme].look;
+    if (look) {
+      // 設計圖鑑的主題：圖集上面一排三顆鍵帽、下面一條寬鍵；功能鍵是素色方塊
+      art.style.backgroundImage = 'url(theme-packs/theme-' + S.theme + '.png)';
+      if (k.act === 'space' && !k.kind) {
+        art.classList.add('wide');
+        art.style.backgroundSize = '100% 233.3%';
+        art.style.backgroundPosition = '0 100%';
+        b.style.color = look[1];
+      } else if (k.kind || k.wide) {
+        art.classList.add('chip');
+        art.style.backgroundImage = 'none';
+        b.style.color = THEMES[S.theme].specialText;
+      } else {
+        art.style.backgroundSize = '300% 175%';
+        art.style.backgroundPosition = ((i + Math.floor(i / 4)) % 3) * 50 + '% 0';
+        b.style.color = look[0];
+      }
+    } else if (k.wide) {
       art.classList.add('wide');
       art.style.backgroundPosition = '50% ' + (k.act === 'space' ? '10.83%' : '90%');
       b.style.color = FOX_INK[0];
@@ -622,7 +647,7 @@
     host.appendChild(lbl);
     b.appendChild(face);
     b.style.flex = k.w === 0 ? '1 1 0' : (k.w || 1) + ' 0 0';
-    if (S.theme === 'fox') foxArt(b, face, k);
+    if (S.theme === 'fox' || THEMES[S.theme].look) foxArt(b, face, k);
     return b;
   }
   function renderKeys() {
@@ -926,7 +951,7 @@
     inputEl.appendChild(document.createTextNode(after));
   }
   function render() {
-    phone.dataset.fox = S.theme === 'fox' ? '1' : ''; phone.dataset.shape = S.shape; phone.dataset.finish = S.finish; phone.dataset.soft = shapeInfo()[3] ? "1" : "0";
+    phone.dataset.fox = S.theme === 'fox' ? '1' : ''; phone.dataset.art = S.theme === 'fox' || THEMES[S.theme].look ? '1' : ''; phone.dataset.shape = S.shape; phone.dataset.finish = S.finish; phone.dataset.soft = shapeInfo()[3] ? "1" : "0";
     kb.classList.toggle('hidden', S.hidden);
     if (!isComposing() && S.mode === 'english' && !S.editor && !S.result) {
       var en = englishSuggestions();
@@ -1122,8 +1147,11 @@
     if (id === 'custom') THEMES.custom = customTheme();
     var box = document.getElementById('sim-custom'); if (box) box.hidden = id !== 'custom';
     // 小狐狸有自己的造型；原本選的造型和質感留著，切回其他主題就恢復
-    if (id === 'fox' && S.theme !== 'fox') { S.foxSaved = [S.shape, S.finish]; S.shape = 'rounded'; S.finish = 'flat'; }
-    else if (id !== 'fox' && S.theme === 'fox' && S.foxSaved) { S.shape = S.foxSaved[0]; S.finish = S.foxSaved[1]; }
+    var lookOf = function (x) { var o = THEMES[x]; return o && (x === 'fox' || o.look ? ['rounded', 'flat'] : o.preset); };
+    if (lookOf(id)) {
+      if (!lookOf(S.theme)) S.foxSaved = [S.shape, S.finish];
+      S.shape = lookOf(id)[0]; S.finish = lookOf(id)[1];
+    } else if (lookOf(S.theme) && S.foxSaved) { S.shape = S.foxSaved[0]; S.finish = S.foxSaved[1]; }
     S.theme = id; var t = THEMES[id];
     var map = { top: 'top', bottom: 'bottom', key: 'key', text: 'key-text', special: 'special', specialText: 'special-text', accent: 'key-accent', accentText: 'accent-text', shadow: 'key-shadow' };
     Object.keys(map).forEach(function (k) { phone.style.setProperty('--' + map[k], t[k]); });

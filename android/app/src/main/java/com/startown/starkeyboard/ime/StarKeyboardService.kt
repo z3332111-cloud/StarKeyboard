@@ -174,6 +174,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     override fun onCreate() {
         super.onCreate()
         settings = KeyboardSettings(this)
+        // 圖被移除了，或是舊版留下的小狐狸設定（現在要下載）：先換回去，到 ⚙ 再下載
+        if (!ThemePacks.isReady(this, settings.themeId)) settings.themeId = settings.themeBeforeFox
         getSharedPreferences("keyboard", Context.MODE_PRIVATE).registerOnSharedPreferenceChangeListener(liveListener)
         clipStore = ClipboardStore(File(filesDir, "clipboard.json"), settings.clipLimit)
         emoStore = EmoticonStore(filesDir)
@@ -1411,6 +1413,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 onOpenApp = { openApp() },
                 onAdjustPhoto = { startPhotoAdjust() },
                 onLiveSize = { startSizeAdjust() },
+                onDownloadTheme = { id -> downloadTheme(id) },
                 shortcuts = shortcuts,
                 onAddShortcut = { beginEditor(EditorPurpose.SHORTCUT_PHRASE) },
                 onResetLearning = { engine?.resetLearning(); toast("已清除選字學習紀錄") },
@@ -1465,7 +1468,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     private fun startPhotoAdjust() {
         val r = root ?: return
-        if (style.isFoxLetter) {
+        if (style.isIllustrated) {
             toast("照片已保留；切回一般主題後可調整位置")
             return
         }
@@ -1544,6 +1547,19 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     /** 下載字體包裡的字體，好了就換成它 */
+    private fun downloadTheme(id: String) {
+        val name = KeyboardTheme.named(id).name
+        toast("正在下載「$name」…")
+        ThemePacks.download(this, id) { ok ->
+            if (ok) {
+                if (ThemeLooks.named(settings.themeId) == null && settings.themeId != FoxLetter.ID) settings.themeBeforeFox = settings.themeId
+                settings.themeId = id
+                settingsChanged()
+                toast("「$name」下載好了")
+            } else toast("下載失敗，檢查一下網路再試")
+        }
+    }
+
     private fun downloadFont(id: String) {
         val name = KeyFont.values().firstOrNull { it.id == id }?.title ?: "字體"
         toast("正在下載「$name」…")
@@ -1887,7 +1903,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         r.background = if (foxPaper != null) FoxPaperDrawable(foxPaper)
             else GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(s.theme.top, s.theme.bottom))
         // 小狐狸有自己的水彩背景；照片留著，切回其他主題就恢復
-        if (settings.hasBackground && !s.isFoxLetter) {
+        if (settings.hasBackground && !s.isIllustrated) {
             // 拖滑桿時也會跑這裡：照片沒換就不用重新讀檔
             val file = settings.backgroundFile
             val stamp = file.path + ":" + file.lastModified()

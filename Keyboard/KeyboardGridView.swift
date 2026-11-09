@@ -6,7 +6,7 @@ final class KeyButton: UIView {
         didSet {
             updateFace()
             applyColors()
-            if style.isFoxLetter { setNeedsLayout() }
+            if style.isIllustrated { setNeedsLayout() }
         }
     }
     var style: KeyboardStyle {
@@ -23,7 +23,7 @@ final class KeyButton: UIView {
         didSet { updateVisualOpacity() }
     }
     var illustratedIndex = 0 {
-        didSet { if oldValue != illustratedIndex && style.isFoxLetter { applyColors() } }
+        didSet { if oldValue != illustratedIndex && style.isIllustrated { applyColors() } }
     }
 
     private let content = UIView()
@@ -151,7 +151,7 @@ final class KeyButton: UIView {
         super.layoutSubviews()
         content.bounds = bounds
         content.center = CGPoint(x: bounds.midX, y: bounds.midY)
-        if style.isFoxLetter {
+        if style.isIllustrated {
             layoutFoxLetter()
             return
         }
@@ -267,7 +267,7 @@ final class KeyButton: UIView {
 
     /// 原生玻璃直接取景；替代畫法則把背景照片換成按鍵座標，再稍微放大。
     func layoutGlass(path: CGPath? = nil, outer: CGRect? = nil, body: CGRect? = nil) {
-        if style.isFoxLetter {
+        if style.isIllustrated {
             glassVersion = GlassBackdrop.version
             setPaintedLayersHidden(true)
             return
@@ -387,7 +387,7 @@ final class KeyButton: UIView {
     }
 
     private func applyColors() {
-        if style.isFoxLetter {
+        if style.isIllustrated {
             nativeGlass?.removeFromSuperview()
             nativeGlass = nil
             if foxArtwork == nil {
@@ -396,6 +396,7 @@ final class KeyButton: UIView {
                 foxArtwork = artwork
                 setNeedsLayout()
             }
+            foxArtwork?.look = style.themeLook
             setPaintedLayersHidden(true)
             glassLayer.contents = nil
             content.layer.shouldRasterize = false
@@ -403,7 +404,12 @@ final class KeyButton: UIView {
             guard let artwork = foxArtwork else { return }
             let configuration = FoxInkConfiguration(fur: artwork.furColor, preferred: artwork.textColor,
                 top: style.theme.backgroundTop, bottom: style.theme.backgroundBottom, opacity: style.keyAlpha)
-            if configuration != foxInkConfiguration {
+            if style.themeLook != nil {
+                // 設計圖鑑的主題字色已經配好，不用再算對比
+                foxInkConfiguration = nil
+                foxNormalInk = FoxLetterTheme.Ink(color: artwork.textColor, outline: nil)
+                foxPressedInk = foxNormalInk
+            } else if configuration != foxInkConfiguration {
                 foxInkConfiguration = configuration
                 foxNormalInk = FoxLetterTheme.paperInk(FoxLetterTheme.ink(fur: artwork.furColor, preferred: artwork.textColor,
                     opacity: style.keyAlpha, theme: style.theme))
@@ -424,7 +430,7 @@ final class KeyButton: UIView {
                 foxPressedSymbol = nil
                 setNeedsLayout()
             }
-            hintLabel.textColor = style.theme.keyText
+            hintLabel.textColor = style.themeLook?.hint ?? style.theme.keyText
             hintLabel.textAlignment = .center
             updateFoxFeedback()
             return
@@ -554,9 +560,9 @@ final class KeyButton: UIView {
     }
 
     private func pressChanged() {
-        if style.isFoxLetter { updateFoxFeedback() }
+        if style.isIllustrated { updateFoxFeedback() }
         else { applyColors() }
-        if (style.usesNativeGlassKeys || style.isFoxLetter) && UIAccessibility.isReduceMotionEnabled {
+        if (style.usesNativeGlassKeys || style.isIllustrated) && UIAccessibility.isReduceMotionEnabled {
             content.layer.removeAllAnimations()
             content.transform = .identity
             return
@@ -598,7 +604,7 @@ final class KeyButton: UIView {
             UIView.animate(withDuration: 0.05, delay: 0, options: [.allowUserInteraction, .beginFromCurrentState]) {
                 // 胖胖的鍵按下去會被壓扁
                 switch self.style.finish {
-                case _ where self.style.isFoxLetter: self.content.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
+                case _ where self.style.isIllustrated: self.content.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
                 case .puffy: self.content.transform = CGAffineTransform(scaleX: 1.06, y: 0.86)
                 case .raised: self.content.transform = CGAffineTransform(translationX: 0, y: self.depth * 0.85)
                 case .liquid:
@@ -656,7 +662,7 @@ final class KeyButton: UIView {
     }
 
     private func updateVisualOpacity() {
-        if style.isFoxLetter {
+        if style.isIllustrated {
             content.alpha = 1
             foxArtwork?.setSurfaceOpacity(style.keyAlpha * visualOpacity, pressed: isPressed)
             label.alpha = visualOpacity
@@ -683,7 +689,22 @@ final class KeyButton: UIView {
 
     private func layoutFoxLetter() {
         guard let artwork = foxArtwork else { return }
-        let compact = bounds.height < 40 && !spec.action.isCharacter
+        if style.themeLook != nil && !spec.action.isCharacter && spec.action != .space {
+            // 設計圖鑑主題的功能鍵：素色方塊，字放中間
+            let chipFrame = bounds.insetBy(dx: 2.5 * style.gapScale, dy: 4 * style.gapScale)
+            artwork.frame = chipFrame
+            artwork.configure(index: illustratedIndex, action: spec.action, personalSpaceArt: hasPersonalSpaceArt)
+            label.font = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, chipFrame.height * 0.8), weight: .semibold)
+            label.frame = chipFrame.insetBy(dx: 2, dy: 0)
+            icon.frame = chipFrame
+            hintLabel.frame = .zero
+            if case .symbol(let name) = spec.face {
+                icon.image = UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(
+                    pointSize: min(18 * style.fontScale, chipFrame.height * 0.6), weight: .semibold))
+            }
+            return
+        }
+        let compact = style.isFoxLetter && bounds.height < 40 && !spec.action.isCharacter
         let frame = FoxLetterTheme.frame(in: bounds, gap: style.gapScale, scale: style.shapeScale, compact: compact)
         artwork.frame = frame
         artwork.configure(index: illustratedIndex, action: spec.action, personalSpaceArt: hasPersonalSpaceArt, compact: compact)
