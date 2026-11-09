@@ -461,13 +461,17 @@ final class KeyboardViewController: UIInputViewController {
         let b = view.bounds
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        backdropView.frame = b
-        gradientLayer.frame = b
-        foxPaperLayer.frame = b
+        // 背景範圍：平常等於鍵盤；開了「蓋灰邊」測試就往上多畫一段
+        let over: CGFloat = settings.coverTopGap ? 24 : 0
+        let back = CGRect(x: 0, y: 0, width: b.width, height: b.height + over)
+        backdropView.frame = CGRect(x: 0, y: -over, width: b.width, height: back.height)
+        gradientLayer.frame = back
+        foxPaperLayer.frame = back
         CATransaction.commit()
-        backgroundImageView.frame = backgroundFrame(in: b)
+        backgroundImageView.frame = backgroundFrame(in: back)
         photoAdjustView?.frame = b
-        tintOverlay.frame = b
+        tintOverlay.frame = back
+        applyTopOverdraw()
         folderNameBox.frame = CGRect(x: 10, y: 6, width: b.width - 20, height: max(0, folderBoxHeight - 10))
         let barH = CGFloat(settings.candidateBarHeight)
         topBar.candidateFontSize = CGFloat(CandidateBarMetrics.fontSize(barHeight: settings.candidateBarHeight))
@@ -483,6 +487,18 @@ final class KeyboardViewController: UIInputViewController {
         let toastW = min(b.width - 40, 300)
         toastLabel.frame = CGRect(x: (b.width - toastW) / 2, y: barY + barH + 8, width: toastW, height: 44)
         layoutDiagnostics.record("viewDidLayoutSubviews")
+    }
+
+    /// iOS 26 之後系統可能在鍵盤上方多留 17pt，鍵盤這邊量不到。測試開關打開時拿掉裁切，看背景能不能畫到那一段。
+    private func applyTopOverdraw() {
+        let on = settings.coverTopGap
+        view.clipsToBounds = !on
+        guard on else { return }
+        var parent = view.superview
+        while let current = parent {
+            current.clipsToBounds = false
+            parent = current.superview
+        }
     }
 
     override func viewSafeAreaInsetsDidChange() {
@@ -2083,7 +2099,7 @@ final class KeyboardViewController: UIInputViewController {
         settings.backgroundFocusY = clamp(CGFloat(settings.backgroundFocusY) - d.y / h, visible: b.height / h)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        backgroundImageView.frame = backgroundFrame(in: b)
+        backgroundImageView.frame = backgroundFrame(in: backdropView.bounds)
         CATransaction.commit()
     }
 
@@ -2434,7 +2450,7 @@ final class KeyboardViewController: UIInputViewController {
         guard isViewLoaded else { return "view not loaded" }
         var lines = ["controller=\(ObjectIdentifier(self)) attached=\(view.window != nil) landscape=\(isLandscape)",
                      "mode=\(mode.rawValue) fox=\(style.isFoxLetter) panel=\(panel != nil)",
-                     "folderHeight=\(folderBoxHeight) barHeight=\(settings.candidateBarHeight)"]
+                     "folderHeight=\(folderBoxHeight) barHeight=\(settings.candidateBarHeight) coverTopGap=\(settings.coverTopGap)"]
         if let constraint = heightConstraint {
             lines.append("height requested=\(constraint.constant) actual=\(view.bounds.height) delta=\(view.bounds.height - constraint.constant) active=\(constraint.isActive) priority=\(constraint.priority.rawValue)")
         } else {

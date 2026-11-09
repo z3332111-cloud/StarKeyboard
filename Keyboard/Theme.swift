@@ -1079,6 +1079,11 @@ final class KeyboardSettings {
         set { d.set(newValue, forKey: "customDark") }
     }
     /// 角色主題也放背景照片（預設不放，用主題自己的底）
+    /// 測試用：把背景往上畫超出鍵盤範圍，看能不能蓋住 iOS 多留的灰邊（預設關）
+    var coverTopGap: Bool {
+        get { bool("coverTopGap", false) }
+        set { d.set(newValue, forKey: "coverTopGap") }
+    }
     var themePhoto: Bool {
         get { bool("themePhoto", false) }
         set { d.set(newValue, forKey: "themePhoto") }

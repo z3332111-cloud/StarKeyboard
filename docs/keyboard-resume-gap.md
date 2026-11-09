@@ -7,6 +7,14 @@
 - 宿主多出的頂部間距，目前沒有找到 extension 能蓋掉的方法；要等真機診斷紀錄確認。
 - 實驗開關和小狐狸的山景標題已由 PR #5 移除（v0.10.6）；小狐狸也會出現這段空隙，不是線索。
 
+## v0.11.3 補充（2026/11/09 重讀論壇）
+
+- 論壇上多位開發者量到相同的 17pt：宿主的 `inputView.top` 從 0 變 17，extension 的 view、window、safe area 都不變，所以 extension 偵測不到。
+- 空隙跟切換來源有關：從 Apple 英文鍵盤切來會有，從 Apple Emoji 鍵盤切來沒有（兩位開發者回報，本機待驗）。iOS 18.5 模擬器沒有這個問題。
+- 論壇回報試過無效：`allowsSelfSizing`、`safeAreaRegions = []`、出現時重新排版、`UIInputView` style。所以不再做 `inputViewStyle` 實驗。
+- 新增預設關閉的測試開關 `coverTopGap`：拿掉裁切、把背景往上多畫 24pt，看系統會不會裁掉。論壇有人說蓋不住但沒寫試法。沒有灰邊時若沒被裁切，會蓋到宿主畫面，所以不預設打開。
+- 待驗：灰邊出現時直接切到 Simeji，灰邊還在不在。
+
 ## 已知重現條件
 
 - 使用者回報 iOS 27.2，Discord 和其他 App 都會發生。

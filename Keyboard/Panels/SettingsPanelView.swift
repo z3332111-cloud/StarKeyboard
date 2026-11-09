@@ -201,6 +201,11 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         stack.addArrangedSubview(note("打字時注音被拆開（例如「我覺得」變「我居約得」），先不要刪，直接打開 ⚙ 按這個，再貼給開發的人。紀錄是最近 80 次按鍵的注音、時間和選過的字。"))
 
         stack.addArrangedSubview(header("鍵盤上方多出空隙？"))
+        stack.addArrangedSubview(switchRow("測試：把背景往上畫，蓋住灰邊", on: settings.coverTopGap) { [weak self] on in
+            self?.settings.coverTopGap = on
+            self?.onChange?()
+        })
+        stack.addArrangedSubview(note("灰邊是 iOS 系統多留的，不一定蓋得住。打開後灰邊還在，或是鍵盤上方蓋到畫面，就關掉。"))
         stack.addArrangedSubview(buttonRow([("開始版面診斷", { [weak self] in self?.onStartLayoutDiagnostics?() })]))
         stack.addArrangedSubview(buttonRow([
             ("複製版面紀錄", { [weak self] in self?.onCopyLayoutDiagnostics?() }),
