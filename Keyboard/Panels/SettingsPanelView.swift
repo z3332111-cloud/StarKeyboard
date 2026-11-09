@@ -204,15 +204,6 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             ("停止診斷", { [weak self] in self?.onStopLayoutDiagnostics?() }),
         ]))
         stack.addArrangedSubview(note("先在正常時開始，再切到其他 App 並返回。空隙出現後，先複製紀錄再關閉 App。只記錄尺寸、位置與顯示事件，不記錄打字內容；最近 160 筆保留在記憶體，鍵盤程序重啟後清除。複製需要允許完整取用。"))
-        stack.addArrangedSubview(switchRow("實驗：鍵盤底色不透明", on: settings.gapTestOpaqueBackground) { [weak self] on in
-            self?.settings.gapTestOpaqueBackground = on
-            self?.onChange?()
-        })
-        stack.addArrangedSubview(switchRow("實驗：用系統預設高度（高度滑桿暫時無效）", on: settings.gapTestSystemHeight) { [weak self] on in
-            self?.settings.gapTestSystemHeight = on
-            self?.onChange?()
-        })
-        stack.addArrangedSubview(note("一次只開一個。切換後先從多工畫面關掉要測的 App 再打開，然後照原本步驟切 App 再回來，看空隙還在不在。"))
 
         stack.addArrangedSubview(header("按鍵特效（按下去冒出小圖案）"))
         stack.addArrangedSubview(choiceRow(KeyEffect.allCases.map { $0.title },

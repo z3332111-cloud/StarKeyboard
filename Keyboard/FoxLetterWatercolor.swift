@@ -3,7 +3,6 @@ import UIKit
 /// 圖集只解碼一次且先縮圖；每顆按鍵的圖層共用同一個 CGImage。
 @MainActor
 enum FoxLetterWatercolor {
-    static let headerHeight: CGFloat = 52
     private static let cache: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
         cache.totalCostLimit = 8 * 1024 * 1024
@@ -105,37 +104,5 @@ final class FoxLetterWatercolorKeyView: UIView {
             }
         }
         CATransaction.commit()
-    }
-}
-
-final class FoxLetterLandscapeView: UIView {
-    private let painting = CALayer()
-    private let title = UILabel()
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        isUserInteractionEnabled = false
-        clipsToBounds = true
-        painting.contents = FoxLetterWatercolor.backdrop
-        painting.contentsRect = CGRect(x: 0, y: 0, width: 1, height: 0.18)
-        layer.addSublayer(painting)
-        title.text = "小狐狸的楓葉信"
-        title.textAlignment = .center
-        title.textColor = UIColor(hex: 0x674838)
-        title.font = KeyFonts.font(KeyFont.huninn.rawValue, size: 19, weight: .bold)
-        title.adjustsFontSizeToFitWidth = true
-        title.minimumScaleFactor = 0.7
-        addSubview(title)
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        painting.frame = bounds
-        CATransaction.commit()
-        title.frame = CGRect(x: bounds.width * 0.24, y: 2, width: bounds.width * 0.53, height: bounds.height - 4)
     }
 }

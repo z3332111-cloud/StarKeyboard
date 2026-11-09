@@ -146,8 +146,6 @@ final class KeyboardViewController: UIInputViewController {
     private let backdropView = KeyboardBackdropView()
     private let gradientLayer = CAGradientLayer()
     private let foxPaperLayer = CALayer()
-    private var foxLandscape: FoxLetterLandscapeView?
-    private var foxHeaderHeight: CGFloat { style.isFoxLetter ? (isLandscape ? 34 : FoxLetterWatercolor.headerHeight) : 0 }
     private let backgroundImageView = UIImageView()
     private var photoAdjustView: PhotoAdjustView?
     /// 邊看鍵盤邊調大小（蓋在選字列的位置）
@@ -445,8 +443,7 @@ final class KeyboardViewController: UIInputViewController {
         folderNameBox.frame = CGRect(x: 10, y: 6, width: b.width - 20, height: max(0, folderBoxHeight - 10))
         let barH = CGFloat(settings.candidateBarHeight)
         topBar.candidateFontSize = CGFloat(CandidateBarMetrics.fontSize(barHeight: settings.candidateBarHeight))
-        foxLandscape?.frame = CGRect(x: 0, y: folderBoxHeight, width: b.width, height: foxHeaderHeight)
-        let barY = folderBoxHeight + foxHeaderHeight
+        let barY = folderBoxHeight
         topBar.frame = CGRect(x: 0, y: barY, width: b.width, height: barH)
         sizeBar?.frame = CGRect(x: 0, y: barY, width: b.width, height: barH)
         contentView.frame = CGRect(x: 0, y: barY + barH, width: b.width, height: max(0, b.height - barH - barY))
@@ -2260,16 +2257,9 @@ final class KeyboardViewController: UIInputViewController {
     private func applyStyle() {
         let s = style
         if s.isFoxLetter {
-            if foxLandscape == nil {
-                let landscape = FoxLetterLandscapeView(frame: .zero)
-                view.insertSubview(landscape, belowSubview: topBar)
-                foxLandscape = landscape
-            }
             foxPaperLayer.contents = FoxLetterWatercolor.backdrop
             foxPaperLayer.isHidden = false
         } else {
-            foxLandscape?.removeFromSuperview()
-            foxLandscape = nil
             foxPaperLayer.contents = nil
             foxPaperLayer.isHidden = true
         }
@@ -2393,14 +2383,13 @@ final class KeyboardViewController: UIInputViewController {
         guard isViewLoaded else { return "view not loaded" }
         var lines = ["controller=\(ObjectIdentifier(self)) attached=\(view.window != nil) landscape=\(isLandscape)",
                      "mode=\(mode.rawValue) fox=\(style.isFoxLetter) panel=\(panel != nil)",
-                     "folderHeight=\(folderBoxHeight) foxHeaderHeight=\(foxHeaderHeight) barHeight=\(settings.candidateBarHeight)"]
+                     "folderHeight=\(folderBoxHeight) barHeight=\(settings.candidateBarHeight)"]
         if let constraint = heightConstraint {
             lines.append("height requested=\(constraint.constant) actual=\(view.bounds.height) delta=\(view.bounds.height - constraint.constant) active=\(constraint.isActive) priority=\(constraint.priority.rawValue)")
         } else {
             lines.append("height constraint=nil")
         }
         lines.append("allowsSelfSizing=\((view as? UIInputView)?.allowsSelfSizing == true) ambiguous=\(view.hasAmbiguousLayout)")
-        lines.append("gapTest opaqueBackground=\(settings.gapTestOpaqueBackground) systemHeight=\(settings.gapTestSystemHeight)")
         lines.append(KeyboardLayoutDiagnostics.geometry("inputView", view))
         lines.append(KeyboardLayoutDiagnostics.geometry("heightRuler", heightRuler))
         lines.append(KeyboardLayoutDiagnostics.geometry("backdrop", backdropView))
@@ -2421,14 +2410,6 @@ final class KeyboardViewController: UIInputViewController {
         return lines.joined(separator: "\n")
     }
 
-    /// 上方空隙實驗開關（見 docs/keyboard-resume-gap.md）；每次排高度時一起套用
-    private func applyGapExperiments() {
-        let opaque = settings.gapTestOpaqueBackground
-        view.backgroundColor = opaque ? style.theme.backgroundTop.withAlphaComponent(1) : .clear
-        view.isOpaque = opaque
-        (view as? UIInputView)?.allowsSelfSizing = !settings.gapTestSystemHeight
-    }
-
     private func updateHeight() {
         let fiveRows = (mode == .zhuyin || mode == .pinyin) && layer == .letters || layer == .numbers
         let content: CGFloat
@@ -2439,13 +2420,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         // 使用者自己調的高度；橫放時螢幕矮，最多只放大到 1.1 倍
         let scale = isLandscape ? min(settings.heightScale, 1.1) : settings.heightScale
-        let h = folderBoxHeight + foxHeaderHeight + CGFloat(settings.candidateBarHeight) + (content * scale).rounded()
-        applyGapExperiments()
-        if settings.gapTestSystemHeight {
-            heightConstraint?.isActive = false
-            heightConstraint = nil
-            return
-        }
+        let h = folderBoxHeight + CGFloat(settings.candidateBarHeight) + (content * scale).rounded()
         if let c = heightConstraint {
             if c.constant != h { c.constant = h }
         } else {
