@@ -91,6 +91,115 @@ object ThemePacks {
     }
 }
 
+/**
+ * 角色主題（插畫按鍵）的質感：照圖案的透明邊緣算出凹凸，把亮面和陰影畫進圖裡。
+ * 換質感時整張圖集算一次，每顆鍵共用。和 iPhone 版 Keyboard/ArtFinish.swift、網站 sim.js 同一套算法。
+ */
+object ArtFinish {
+    /** 插畫可以選的質感（線稿是畫框線，插畫用不到） */
+    val choices = listOf(KeyFinish.FLAT, KeyFinish.PUFFY, KeyFinish.RAISED, KeyFinish.LIQUID, KeyFinish.METAL)
+
+    private fun radius(f: KeyFinish) = when (f) {
+        KeyFinish.PUFFY -> 18f
+        KeyFinish.RAISED -> 9f
+        else -> 7f
+    }
+
+    fun apply(src: Bitmap, f: KeyFinish): Bitmap {
+        if (f == KeyFinish.FLAT || f !in choices) return src
+        val w = src.width
+        val h = src.height
+        if (w <= 2 || h <= 2) return src
+        val px = IntArray(w * h)
+        src.getPixels(px, 0, w, 0, 0, w, h)
+        val alpha = FloatArray(w * h) { ((px[it] ushr 24) and 0xFF) / 255f }
+        val s = w / 768f
+        val r1 = max(1, Math.round(radius(f) * s))
+        val h1 = blur(blur(alpha, w, h, r1), w, h, r1)
+        val big = f != KeyFinish.RAISED
+        val r2 = max(1, Math.round(40 * s))
+        val h2 = if (big) blur(blur(alpha, w, h, r2), w, h, r2) else h1
+        val c = FloatArray(3)
+        for (y in 0 until h) for (x in 0 until w) {
+            val i = y * w + x
+            val a = (px[i] ushr 24) and 0xFF
+            if (a == 0) continue
+            c[0] = ((px[i] shr 16) and 0xFF) / 255f
+            c[1] = ((px[i] shr 8) and 0xFF) / 255f
+            c[2] = (px[i] and 0xFF) / 255f
+            pixel(c, shade(h1, w, h, x, y, r1), if (big) shade(h2, w, h, x, y, r2) else 0f, f)
+            px[i] = (a shl 24) or (Math.round(c[0] * 255) shl 16) or (Math.round(c[1] * 255) shl 8) or Math.round(c[2] * 255)
+        }
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        out.setPixels(px, 0, w, 0, 0, w, h)
+        return out
+    }
+
+    /** 正數往白、負數往黑 */
+    private fun light(v: Float, t: Float) = if (t >= 0) v + (1 - v) * t else v * (1 + t)
+
+    private fun pixel(c: FloatArray, e1: Float, e2: Float, f: KeyFinish) {
+        fun all(t: Float) { for (k in 0..2) c[k] = light(c[k], t) }
+        fun lum() = 0.3f * c[0] + 0.59f * c[1] + 0.11f * c[2]
+        when (f) {
+            KeyFinish.RAISED -> all(if (e1 > 0) e1 * 0.6f else e1 * 0.55f)
+            KeyFinish.PUFFY -> {
+                all(if (e1 > 0) e1 * 0.5f else e1 * 0.45f)
+                all(max(e2, 0f).pow(1.5f) * 0.25f)
+            }
+            KeyFinish.LIQUID -> {
+                all(if (e1 > 0) e1 * 0.35f else e1 * 0.35f)
+                all(max(e1, 0f).pow(2) * 0.9f)
+                all(max(e2, 0f).pow(1.5f) * 0.55f)
+                val l = lum()
+                for (k in 0..2) c[k] = l + (c[k] - l) * 1.18f
+            }
+            KeyFinish.METAL -> {
+                val l = lum()
+                for (k in 0..2) c[k] += (l - c[k]) * 0.6f
+                val env = 0.45f + 0.9f * (0.5f + 0.5f * kotlin.math.sin(e2 * 4 + 0.6f))
+                for (k in 0..2) c[k] *= env
+                if (e1 < 0) all(e1 * 0.5f)
+                all(max(e1, 0f).pow(2) * 1f)
+            }
+            else -> {}
+        }
+        for (k in 0..2) c[k] = c[k].coerceIn(0f, 1f)
+    }
+
+    /** 光從左上來：邊緣朝光的一面是正（亮），背光是負（暗），約 -1～1 */
+    private fun shade(m: FloatArray, w: Int, h: Int, x: Int, y: Int, r: Int): Float {
+        val gx = (m[y * w + min(x + 1, w - 1)] - m[y * w + max(x - 1, 0)]) / 2
+        val gy = (m[min(y + 1, h - 1) * w + x] - m[max(y - 1, 0) * w + x]) / 2
+        return ((0.45f * gx + gy) * (3 * r)).coerceIn(-1f, 1f)
+    }
+
+    /** 方框模糊（先橫再直，超出邊界用邊上的值） */
+    private fun blur(src: FloatArray, w: Int, h: Int, r: Int): FloatArray {
+        val n = (2 * r + 1).toFloat()
+        val tmp = FloatArray(w * h)
+        for (y in 0 until h) {
+            val row = y * w
+            var sum = 0f
+            for (k in -r..r) sum += src[row + k.coerceIn(0, w - 1)]
+            for (x in 0 until w) {
+                tmp[row + x] = sum / n
+                sum += src[row + min(x + r + 1, w - 1)] - src[row + max(x - r, 0)]
+            }
+        }
+        val out = FloatArray(w * h)
+        for (x in 0 until w) {
+            var sum = 0f
+            for (k in -r..r) sum += tmp[k.coerceIn(0, h - 1) * w + x]
+            for (y in 0 until h) {
+                out[y * w + x] = sum / n
+                sum += tmp[min(y + r + 1, h - 1) * w + x] - tmp[max(y - r, 0) * w + x]
+            }
+        }
+        return out
+    }
+}
+
 /** 小狐狸的楓葉信（和 iPhone 版 Keyboard/FoxLetter*.swift 一樣的主題）：只提供外觀，按鍵動作和個人設定不變 */
 object FoxLetter {
     const val ID = "fox-letter"
@@ -119,12 +228,22 @@ object FoxLetter {
 
     private val images = HashMap<String, Bitmap?>()
 
+    /** 插畫按鍵的質感；換了就把按鍵圖重算（背景紙不加質感） */
+    var finish: KeyFinish = KeyFinish.FLAT
+        set(v) {
+            if (v == field) return
+            field = v
+            images.keys.retainAll(setOf("background-watercolor-v2"))
+        }
+
     private fun image(context: Context, name: String): Bitmap? {
         images[name]?.let { return it }
         // 換主題就放掉前一款的圖，記憶體裡只留正在用的
         if (name.startsWith("theme-") || images.keys.any { it.startsWith("theme-") }) images.clear()
         val file = ThemePacks.file(context, name)
-        val bitmap = if (file.exists()) runCatching { BitmapFactory.decodeFile(file.path) }.getOrNull() else null
+        val plain = if (file.exists()) runCatching { BitmapFactory.decodeFile(file.path) }.getOrNull() else null
+        val bitmap = if (plain != null && name != "background-watercolor-v2" && finish != KeyFinish.FLAT)
+            runCatching { ArtFinish.apply(plain, finish) }.getOrDefault(plain) else plain
         if (bitmap != null) images[name] = bitmap
         return bitmap
     }

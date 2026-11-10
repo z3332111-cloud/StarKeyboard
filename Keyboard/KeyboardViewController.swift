@@ -184,8 +184,9 @@ final class KeyboardViewController: UIInputViewController {
         for id in soundIDs.values { AudioServicesDisposeSystemSoundID(id) }
     }
 
-    // 小狐狸主題連開三次都撐不過幾秒（卡死、閃退）：先換回原本的主題，不然鍵盤一打開就退，連設定都進不去
-    private var foxFellBack = false
+    // 角色主題連續三次一載入就當掉（3 秒內結束）：先換回原本的主題，不然鍵盤一打開就退，連設定都進不去。
+    // 只算真的當掉：3 秒後、鍵盤收起來、切到別的 App 都會歸零（以前只看有沒有撐過 5 秒，iOS 常常沒顯示就把鍵盤收掉，會被誤算）
+    private var foxFellBack: String?
 
     private func guardFoxLaunch() {
         let id = settings.themeID
@@ -193,15 +194,29 @@ final class KeyboardViewController: UIInputViewController {
         // 圖被移除了，或是舊版留下的小狐狸設定（現在要下載）：先換回去，到 ⚙ 再下載
         if !ThemePacks.isReady(id) {
             settings.themeID = settings.themeBeforeFox
-            foxFellBack = true
+            foxFellBack = "這個主題的圖不見了，先換回原本的主題；到 ⚙ 可以重新下載"
             return
         }
-        settings.foxLaunches += 1
         if settings.foxLaunches >= 3 {
             settings.foxLaunches = 0
             settings.themeID = settings.themeBeforeFox
-            foxFellBack = true
+            foxFellBack = "主題剛剛好像讓鍵盤當掉，先換回原本的主題；可以到 ⚙ 再選一次"
+            return
         }
+        settings.foxLaunches += 1
+        clearFoxLaunchSoon()
+        NotificationCenter.default.addObserver(self, selector: #selector(hostLeft), name: .NSExtensionHostDidEnterBackground, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(hostLeft), name: .NSExtensionHostWillResignActive, object: nil)
+    }
+
+    /// 撐過 3 秒就不是當掉
+    private func clearFoxLaunchSoon() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.settings.foxLaunches = 0 }
+    }
+
+    /// 切到別的 App：鍵盤可能被系統收掉，不算當掉
+    @objc private func hostLeft() {
+        settings.foxLaunches = 0
     }
 
     override func viewDidLoad() {
@@ -372,12 +387,11 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        if foxFellBack {
-            foxFellBack = false
-            toast("這個主題要到 ⚙ 重新下載，先換回原本的主題")
+        if let message = foxFellBack {
+            foxFellBack = nil
+            toast(message)
         }
-        // 撐過幾秒就算正常
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in self?.settings.foxLaunches = 0 }
+        clearFoxLaunchSoon()
         layoutDiagnostics.record("viewDidAppear.beforeExistingHeightReset", force: true)
         // 鍵盤剛載入時設的高度有時會被系統忽略：出現後重新套一次
         heightConstraint?.isActive = false
@@ -2323,6 +2337,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func applyStyle() {
         let s = style
+        FoxLetterWatercolor.finish = s.isIllustrated ? settings.artFinish : .flat
         if s.isFoxLetter {
             foxPaperLayer.contents = FoxLetterWatercolor.backdrop
             foxPaperLayer.isHidden = false

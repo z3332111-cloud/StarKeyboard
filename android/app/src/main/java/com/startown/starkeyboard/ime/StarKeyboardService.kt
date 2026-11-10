@@ -1899,6 +1899,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val r = root ?: return
         val s = style
         styleKey = s.theme.id + s.shape.name + s.fontId
+        FoxLetter.finish = if (s.isIllustrated) settings.artFinish else KeyFinish.FLAT
         val foxPaper = if (s.isFoxLetter) FoxLetter.backdrop(this) else null
         r.background = if (foxPaper != null) FoxPaperDrawable(foxPaper)
             else GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(s.theme.top, s.theme.bottom))

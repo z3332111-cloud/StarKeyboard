@@ -1098,6 +1098,14 @@ final class KeyboardSettings {
         get { d.integer(forKey: "foxLaunches") }
         set { d.set(newValue, forKey: "foxLaunches"); d.synchronize() }
     }
+    /// 角色主題（插畫按鍵）的質感；和一般按鍵的質感分開存，切回其他主題不會互相影響
+    var artFinish: KeyFinish {
+        get {
+            let f = KeyFinish(rawValue: d.string(forKey: "artFinish") ?? "") ?? .flat
+            return ArtFinish.choices.contains(f) ? f : .flat
+        }
+        set { d.set(newValue.rawValue, forKey: "artFinish") }
+    }
     var keyFinish: KeyFinish {
         get { KeyFinish(rawValue: d.string(forKey: "keyFinish") ?? "") ?? .flat }
         set { d.set(newValue.rawValue, forKey: "keyFinish") }

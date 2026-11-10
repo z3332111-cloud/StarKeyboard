@@ -121,7 +121,7 @@
 
   // ===== 狀態 =====
   var S = {
-    theme: 'lavender', shape: 'bunny', finish: 'puffy', effect: 'stars', font: 'system',
+    theme: 'lavender', shape: 'bunny', finish: 'puffy', artFinish: 'flat', effect: 'stars', font: 'system',
     height: 1, fontScale: 1, gap: 1, sound: false,
     modes: ['zhuyin', 'english', 'pinyin', 'japanese', 'korean', 'handwriting'], mode: 'zhuyin', layer: 'letters', shift: 'off', fullWidth: true,
     text: '', caret: 0,
@@ -569,13 +569,87 @@
     return svg;
   }
   // 小狐狸主題：水彩鍵帽（9 格圖集，寬鍵另一張）；每一直排同一隻狐狸，和手機上一樣
+
+  // 角色主題的質感：照圖案的透明邊緣算出凹凸，把亮面和陰影畫進圖裡（和手機上 ArtFinish 同一套算法）
+  var ART_FINISHES = ['flat', 'puffy', 'raised', 'liquid', 'metal'], artCache = {};
+  function artBlur(src, w, h, r) {
+    var n = 2 * r + 1, tmp = new Float32Array(w * h), out = new Float32Array(w * h), x, y, k, sum, row;
+    for (y = 0; y < h; y++) {
+      row = y * w; sum = 0;
+      for (k = -r; k <= r; k++) sum += src[row + Math.min(Math.max(k, 0), w - 1)];
+      for (x = 0; x < w; x++) { tmp[row + x] = sum / n; sum += src[row + Math.min(x + r + 1, w - 1)] - src[row + Math.max(x - r, 0)]; }
+    }
+    for (x = 0; x < w; x++) {
+      sum = 0;
+      for (k = -r; k <= r; k++) sum += tmp[Math.min(Math.max(k, 0), h - 1) * w + x];
+      for (y = 0; y < h; y++) { out[y * w + x] = sum / n; sum += tmp[Math.min(y + r + 1, h - 1) * w + x] - tmp[Math.max(y - r, 0) * w + x]; }
+    }
+    return out;
+  }
+  function artShade(m, w, h, x, y, r) {
+    var gx = (m[y * w + Math.min(x + 1, w - 1)] - m[y * w + Math.max(x - 1, 0)]) / 2;
+    var gy = (m[Math.min(y + 1, h - 1) * w + x] - m[Math.max(y - 1, 0) * w + x]) / 2;
+    return Math.min(1, Math.max(-1, (0.45 * gx + gy) * 3 * r));
+  }
+  function artLight(v, t) { return t >= 0 ? v + (1 - v) * t : v * (1 + t); }
+  function artPixel(c, e1, e2, f) {
+    var r = c[0], g = c[1], b = c[2], lum, env;
+    function all(t) { r = artLight(r, t); g = artLight(g, t); b = artLight(b, t); }
+    if (f === 'raised') all(e1 > 0 ? e1 * 0.6 : e1 * 0.55);
+    else if (f === 'puffy') { all(e1 > 0 ? e1 * 0.5 : e1 * 0.45); all(Math.pow(Math.max(e2, 0), 1.5) * 0.25); }
+    else if (f === 'liquid') {
+      all(e1 > 0 ? e1 * 0.35 : e1 * 0.35);
+      all(Math.pow(Math.max(e1, 0), 2) * 0.9);
+      all(Math.pow(Math.max(e2, 0), 1.5) * 0.55);
+      lum = 0.3 * r + 0.59 * g + 0.11 * b;
+      r = lum + (r - lum) * 1.18; g = lum + (g - lum) * 1.18; b = lum + (b - lum) * 1.18;
+    } else if (f === 'metal') {
+      lum = 0.3 * r + 0.59 * g + 0.11 * b;
+      r += (lum - r) * 0.6; g += (lum - g) * 0.6; b += (lum - b) * 0.6;
+      env = 0.45 + 0.9 * (0.5 + 0.5 * Math.sin(e2 * 4 + 0.6));
+      r *= env; g *= env; b *= env;
+      if (e1 < 0) all(e1 * 0.5);
+      all(Math.pow(Math.max(e1, 0), 2) * 1);
+    }
+    return [Math.min(1, Math.max(0, r)), Math.min(1, Math.max(0, g)), Math.min(1, Math.max(0, b))];
+  }
+  function artFinishImage(img, f) {
+    var w = img.naturalWidth, h = img.naturalHeight, cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    var ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0);
+    var data = ctx.getImageData(0, 0, w, h), px = data.data, alpha = new Float32Array(w * h), i, x, y;
+    for (i = 0; i < w * h; i++) alpha[i] = px[i * 4 + 3] / 255;
+    var s = w / 768, r1 = Math.max(1, Math.round((f === 'puffy' ? 18 : f === 'raised' ? 9 : 7) * s)), big = f !== 'raised';
+    var r2 = Math.max(1, Math.round(40 * s)), h1 = artBlur(artBlur(alpha, w, h, r1), w, h, r1), h2 = big ? artBlur(artBlur(alpha, w, h, r2), w, h, r2) : h1;
+    for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
+      i = y * w + x;
+      if (!px[i * 4 + 3]) continue;
+      var c = artPixel([px[i * 4] / 255, px[i * 4 + 1] / 255, px[i * 4 + 2] / 255], artShade(h1, w, h, x, y, r1), big ? artShade(h2, w, h, x, y, r2) : 0, f);
+      px[i * 4] = Math.round(c[0] * 255); px[i * 4 + 1] = Math.round(c[1] * 255); px[i * 4 + 2] = Math.round(c[2] * 255);
+    }
+    ctx.putImageData(data, 0, 0);
+    return cv.toDataURL('image/png');
+  }
+  /** 算好了回傳圖片網址；還沒算好先回傳 null，算好再重畫一次 */
+  function finishedArt(src) {
+    var f = S.artFinish;
+    if (f === 'flat') return null;
+    var key = src + '|' + f;
+    if (artCache[key] !== undefined) return artCache[key];
+    artCache[key] = null;
+    var img = new Image();
+    img.onload = function () { try { artCache[key] = artFinishImage(img, f); } catch (e) { return; } render(); };
+    img.src = src;
+    return null;
+  }
+  function artUrl(src) { var done = finishedArt(src); return 'url(' + (done || src) + ')'; }
   var foxIndex = 0, FOX_SPRITES = [[0, 3, 6], [1, 5], [2, 7], [4], [8]], FOX_INK = ['#fff9ef', '#543b2f', '#fff9ef', '#fff9ef', '#fff9ef'];
   function foxArt(b, face, k) {
     var i = foxIndex++, art = el('i', 'fox-art');
     var look = THEMES[S.theme].look;
     if (look) {
       // 設計圖鑑的主題：圖集上面一排三顆鍵帽、下面一條寬鍵；功能鍵是素色方塊
-      art.style.backgroundImage = 'url(theme-packs/theme-' + S.theme + '.png)';
+      art.style.backgroundImage = artUrl('theme-packs/theme-' + S.theme + '.png');
       if (k.act === 'space' && !k.kind) {
         art.classList.add('wide');
         art.style.backgroundSize = '100% 233.3%';
@@ -592,11 +666,13 @@
       }
     } else if (k.wide) {
       art.classList.add('wide');
+      if (S.artFinish !== 'flat') art.style.backgroundImage = artUrl('sim-fox/wide.png');
       art.style.backgroundPosition = '50% ' + (k.act === 'space' ? '10.83%' : '90%');
       b.style.color = FOX_INK[0];
     } else {
       var isReturn = k.label === '↵', list = FOX_SPRITES[i % 5], s = isReturn ? 7 : list[Math.floor(i / 5) % list.length];
       art.style.backgroundPosition = (s % 3) * 50 + '% ' + Math.floor(s / 3) * 50 + '%';
+      if (S.artFinish !== 'flat') art.style.backgroundImage = artUrl('sim-fox/keycaps.png');
       b.style.color = isReturn ? FOX_INK[0] : FOX_INK[i % 5];
     }
     face.insertBefore(art, face.firstChild);
@@ -933,7 +1009,7 @@
     }
     group('主題', Object.keys(THEMES).map(function (k) { return [k, THEMES[k].name]; }), S.theme, setTheme);
     group('按鍵造型', SHAPES, S.shape, setShape);
-    group('按鍵質感', FINISHES, S.finish, setFinish);
+    group('按鍵質感', isArtTheme() ? FINISHES.filter(function (f) { return ART_FINISHES.indexOf(f[0]) >= 0; }) : FINISHES, isArtTheme() ? S.artFinish : S.finish, setFinish);
     group('按鍵特效', EFFECTS, S.effect, setEffect);
     group('字體', FONTS, S.font, setFont);
     group('按鍵聲', [['off', '關'], ['on', '叮叮']], S.sound ? 'on' : 'off', function (v) { S.sound = v === 'on'; $('sim-sound').checked = S.sound; render(); });
@@ -1156,7 +1232,7 @@
     Object.keys(map).forEach(function (k) { phone.style.setProperty('--' + map[k], t[k]); });
     phone.style.setProperty('--key-face', t.key);
     $('sim-theme-name').textContent = t.name;
-    pressed('#sim-colors button', id); setDetail(); render();
+    pressed('#sim-colors button', id); pressed('#sim-finishes button', isArtTheme() ? S.artFinish : S.finish); setDetail(); render();
   }
   function setDetail() {
     var d = DETAIL[S.shape], t = THEMES[S.theme];
@@ -1165,7 +1241,15 @@
     phone.style.setProperty('--line-ink', S.finish === 'outline' ? (t.dark ? 'rgba(250,251,255,.94)' : 'rgba(41,43,44,.84)') : 'color-mix(in srgb, ' + t.text + ' 80%, transparent)');
   }
   function setShape(id) { S.shape = id; $('sim-shape-name').textContent = shapeInfo()[1]; pressed('#sim-shapes button', id); setDetail(); render(); }
-  function setFinish(id) { S.finish = id; pressed('#sim-finishes button', id); setDetail(); render(); }
+  function isArtTheme() { return S.theme === 'fox' || !!THEMES[S.theme].look; }
+  // 角色主題的質感另外記，切回其他主題不會互相影響；插畫沒有線稿
+  function setFinish(id) {
+    if (isArtTheme()) {
+      if (ART_FINISHES.indexOf(id) < 0) { toast('角色主題沒有線稿，可以選其他質感'); return; }
+      S.artFinish = id; pressed('#sim-finishes button', id); render(); return;
+    }
+    S.finish = id; pressed('#sim-finishes button', id); setDetail(); render();
+  }
   function setEffect(id) { S.effect = id; pressed('#sim-effects button', id); render(); }
   var loadedFonts = {};
   function setFont(id) {

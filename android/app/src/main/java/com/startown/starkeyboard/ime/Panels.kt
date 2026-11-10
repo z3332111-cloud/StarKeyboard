@@ -782,7 +782,12 @@ class SettingsPanel(
         if (ThemeLooks.named(settings.themeId)?.hasArt == false) {
             note("這個主題已配好造型和質感；切回其他主題就恢復你原本選的。")
         } else if (settings.style.isIllustrated) {
-            note("這個主題已搭配角色造型與插畫質感。原本的造型和質感會保留，切回其他主題就恢復。")
+            header("按鍵質感")
+            val artChoices = ArtFinish.choices
+            choices(artChoices.map { it.title }, artChoices.indexOf(settings.artFinish).coerceAtLeast(0)) {
+                settings.artFinish = artChoices[it]; onChange()
+            }
+            note("角色主題的質感另外記：胖胖是軟軟的陰影，立體是邊緣有厚度，液態玻璃亮亮的，液態金屬像金屬。換回其他主題，原本選的造型和質感會恢復。")
         } else {
         header("按鍵造型")
         for (group in KeyShape.values().toList().chunked(4)) {

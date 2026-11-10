@@ -806,6 +806,10 @@ class KeyboardSettings(context: Context) {
         set(v) = p.edit().putBoolean("customDark", v).apply()
     val theme: KeyboardTheme
         get() = if (themeId == "custom") KeyboardTheme.custom(customHue, customSaturation, customDark, customHue2, customSaturation2) else KeyboardTheme.named(themeId)
+    /** 角色主題（插畫按鍵）的質感；和一般按鍵的質感分開存，切回其他主題不會互相影響 */
+    var artFinish: KeyFinish
+        get() = runCatching { KeyFinish.valueOf(p.getString("artFinish", "FLAT")!!) }.getOrDefault(KeyFinish.FLAT).takeIf { it in ArtFinish.choices } ?: KeyFinish.FLAT
+        set(v) = p.edit().putString("artFinish", v.name).apply()
     var keyFinish: KeyFinish
         get() = runCatching { KeyFinish.valueOf(p.getString("keyFinish", "FLAT")!!.replace("GLASS", "RAISED")) }.getOrDefault(KeyFinish.FLAT)
         set(v) = p.edit().putString("keyFinish", v.name).apply()

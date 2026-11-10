@@ -6,6 +6,16 @@ enum FoxLetterWatercolor {
     // 不用 NSCache：記憶體一緊它就清掉，每顆鍵又各讀一次，反而把鍵盤撐爆（卡死、閃退）
     private static var images: [String: UIImage] = [:]
 
+    /// 插畫按鍵的質感；換了就把圖重算，version 加一讓每顆鍵重新拿圖
+    static var finish: KeyFinish = .flat {
+        didSet {
+            guard finish != oldValue else { return }
+            images = images.filter { $0.key == "background-watercolor-v2" }
+            version += 1
+        }
+    }
+    static var version = 0
+
     static func image(_ name: String) -> UIImage? {
         if let image = images[name] { return image }
         let bundle = Bundle(for: FoxLetterArtworkView.self)
@@ -13,7 +23,13 @@ enum FoxLetterWatercolor {
         // 換主題就放掉前一款的圖，記憶體裡只留正在用的
         if name.hasPrefix("theme-") || images.keys.contains(where: { $0.hasPrefix("theme-") }) { images.removeAll() }
         // 讀圖的暫存馬上放掉，不要等到這一輪結束才一起放
-        let image = autoreleasepool { UIImage.downsampled(url: url, maxSide: 768) }
+        let image: UIImage? = autoreleasepool {
+            let plain = UIImage.downsampled(url: url, maxSide: 768)
+            // 背景紙不加質感；按鍵圖照選的質感算一次
+            guard name != "background-watercolor-v2", finish != .flat, let cg = plain?.cgImage,
+                  let done = ArtFinish.apply(cg, finish: finish) else { return plain }
+            return UIImage(cgImage: done)
+        }
         images[name] = image
         return image
     }
@@ -41,6 +57,7 @@ final class FoxLetterWatercolorKeyView: UIView {
     private var compact = false
     private var wideRow = 0
     private var laidOutBounds = CGRect.null
+    private var imageVersion = -1
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -115,7 +132,8 @@ final class FoxLetterWatercolorKeyView: UIView {
         chip.isHidden = true
         let next = FoxLetterWatercolor.sprite(index: index, action: action, personalSpaceArt: personalSpaceArt)
         let nextRow = action == .space && !personalSpaceArt ? 0 : 1
-        guard next != sprite || compact != self.compact || nextRow != wideRow else { return }
+        guard next != sprite || compact != self.compact || nextRow != wideRow || imageVersion != FoxLetterWatercolor.version else { return }
+        imageVersion = FoxLetterWatercolor.version
         sprite = next
         self.compact = compact
         wideRow = nextRow
