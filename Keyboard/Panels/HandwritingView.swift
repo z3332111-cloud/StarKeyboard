@@ -4,6 +4,8 @@ import Vision
 /// 手寫：左邊寫字，右邊一排功能鍵。停筆一下就辨識，候選字顯示在上面那條
 final class HandwritingView: UIView {
     var onResult: (([String]) -> Void)?
+    /// 認不出來或辨識出錯：說明給使用者看，也記進打字紀錄
+    var onFailure: ((String) -> Void)?
     /// 上一個字辨識完後又開始寫新的字：先把第一個候選字送出
     var onAutoCommit: (() -> Void)?
     let sideGrid: KeyboardGridView
@@ -122,46 +124,68 @@ final class HandwritingView: UIView {
     private func recognize() {
         token += 1
         let current = token
-        HandwritingRecognizer.recognize(strokes: strokes) { [weak self] results in
+        HandwritingRecognizer.recognize(strokes: strokes) { [weak self] results, problem in
             guard let self = self, self.token == current else { return }
             self.lastResults = results
             self.onResult?(results)
+            if results.isEmpty {
+                self.onFailure?(problem.map { "手寫辨識出錯：\($0)" } ?? "沒認出來，寫大一點、一筆一筆分開一點再試試")
+            }
         }
     }
 }
 
 enum HandwritingRecognizer {
-    static func recognize(strokes: [[CGPoint]], completion: @escaping ([String]) -> Void) {
+    /// 辨識的設定：第一組沒結果或出錯，就換下一組再試（鍵盤裡有時某個語言模型載不起來）
+    private static let attempts: [[String]] = [["zh-Hant", "en-US"], ["zh-Hant"], ["zh-Hans", "en-US"]]
+
+    /// 回傳候選字，和最後一次出錯的原因（沒出錯是 nil）
+    static func recognize(strokes: [[CGPoint]], completion: @escaping ([String], String?) -> Void) {
         guard let image = render(strokes) else {
-            completion([])
+            completion([], nil)
             return
         }
-        let request = VNRecognizeTextRequest { request, _ in
-            var out: [String] = []
-            for obs in (request.results as? [VNRecognizedTextObservation]) ?? [] {
-                for candidate in obs.topCandidates(10) {
-                    let s = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !s.isEmpty && !out.contains(s) { out.append(s) }
-                }
-            }
-            // 認成好幾個字時，也把單字拆出來給人選
-            for s in out where s.count > 1 {
-                for ch in s where !out.contains(String(ch)) && !ch.isWhitespace {
-                    out.append(String(ch))
-                }
-            }
-            DispatchQueue.main.async { completion(out) }
-        }
-        request.recognitionLevel = .accurate
-        request.recognitionLanguages = ["zh-Hant", "en-US"]
-        request.usesLanguageCorrection = false
         DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
-            } catch {
-                DispatchQueue.main.async { completion([]) }
+            var problem: String?
+            for languages in attempts {
+                let request = VNRecognizeTextRequest()
+                request.recognitionLevel = .accurate
+                request.usesLanguageCorrection = false
+                let supported = (try? request.supportedRecognitionLanguages()) ?? []
+                let usable = languages.filter { supported.isEmpty || supported.contains($0) }
+                guard !usable.isEmpty else { problem = "這支手機的辨識不支援 \(languages.joined(separator: "、"))"; continue }
+                request.recognitionLanguages = usable
+                do {
+                    try autoreleasepool { try VNImageRequestHandler(cgImage: image, options: [:]).perform([request]) }
+                } catch {
+                    problem = error.localizedDescription
+                    continue
+                }
+                let out = candidates(request.results ?? [])
+                if !out.isEmpty {
+                    DispatchQueue.main.async { completion(out, nil) }
+                    return
+                }
+            }
+            DispatchQueue.main.async { completion([], problem) }
+        }
+    }
+
+    private static func candidates(_ observations: [VNRecognizedTextObservation]) -> [String] {
+        var out: [String] = []
+        for obs in observations {
+            for candidate in obs.topCandidates(10) {
+                let s = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !s.isEmpty && !out.contains(s) { out.append(s) }
             }
         }
+        // 認成好幾個字時，也把單字拆出來給人選
+        for s in out where s.count > 1 {
+            for ch in s where !out.contains(String(ch)) && !ch.isWhitespace {
+                out.append(String(ch))
+            }
+        }
+        return out
     }
 
     /// 把筆畫畫成白底黑字的圖，放大置中，留白邊

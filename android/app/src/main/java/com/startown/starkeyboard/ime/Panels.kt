@@ -475,6 +475,7 @@ class SettingsPanel(
     private val onCopyTypingLog: () -> Unit,
     private val onLiveSize: () -> Unit = {},
     private val onDownloadTheme: (String) -> Unit = {},
+    private val onShowLearning: () -> Unit = {},
     onBack: () -> Unit,
 ) : LinearLayout(context) {
     private val col = LinearLayout(context).apply { orientation = VERTICAL; setPadding(dpi(12f), dpi(8f), dpi(12f), dpi(12f)) }
@@ -986,6 +987,7 @@ class SettingsPanel(
         col.addView(limits)
 
         header("其他")
+        button("📒 看看記住了哪些字") { onShowLearning() }
         button("清除選字學習紀錄") { onResetLearning() }
         if (settings.latestBuild > BuildInfo.current(context)) {
             note("🎉 有新版：打開「糯糯鍵盤」App 下載安裝，直接蓋過去就好")

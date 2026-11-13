@@ -1608,6 +1608,18 @@ final class KeyboardViewController: UIInputViewController {
                 self?.layoutDiagnostics.stop()
                 self?.toast("版面診斷已停止，仍可複製本次紀錄")
             }
+            p.onShowLearning = { [weak self] in
+                guard let self = self else { return }
+                guard let model = self.engine?.userModel else { self.toast("字典還在載入，等一下再看"); return }
+                let s = model.summary()
+                if let problem = s.problem {
+                    self.toast("⚠️ 選字記憶存不進去：\(problem)")
+                } else if s.count == 0 {
+                    self.toast("還沒記住任何字：選過的字詞會記在這支手機上")
+                } else {
+                    self.toast("已記住 \(s.count) 個字詞\n最近：\(s.recent.joined(separator: "、"))")
+                }
+            }
             p.onResetLearning = { [weak self] in
                 self?.engine?.resetLearning()
                 self?.toast("已清除選字學習紀錄")
@@ -2433,6 +2445,11 @@ final class KeyboardViewController: UIInputViewController {
                     self.suggestions = results
                     self.suggestionSource = .handwriting
                     self.refreshTopBar()
+                }
+                hw.onFailure = { [weak self] message in
+                    guard let self = self else { return }
+                    self.zhuyin.note("手寫：\(message)")
+                    self.toast(message)
                 }
                 hw.onAutoCommit = { [weak self] in
                     guard let self = self, self.suggestionSource == .handwriting, let first = self.suggestions.first else { return }

@@ -119,6 +119,8 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         const val MAX_PHRASE = 6
         const val UNKNOWN_PENALTY = -30.0
         const val USER_PHRASE_BASE = -6.0
+        /** 學過的單字最多比同音字的第一名高多少（整句斷詞用） */
+        const val LEARNED_SINGLE_LEAD = 0.3
         const val TONE_PENALTY = -2.5
         const val PHONETIC_PENALTY = -1.2
         const val NEIGHBOR_PENALTY = -2.5
@@ -210,7 +212,15 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         for (p in userModel.phrases(key)) {
             if (p !in best && (!toneless || fits(p, readings, key))) best[p] = USER_PHRASE_BASE
         }
-        val result = best.entries.map { Scored(it.key, it.value + userModel.boost(key, it.key)) }
+        // 學過的單字只在同音字裡勝出：最多比字典最常用的同音字高一點。
+        // 不然常選的字（ㄏ 選「會」）每個字都加很多分，一長串就把「哈哈哈」這種詞拆成「會會會」
+        val dictionary = lookup(key)
+        val topSingle = dictionary.filter { it.text.length == 1 }.maxOfOrNull { it.score }
+        val result = best.entries.map {
+            var score = it.value + userModel.boost(key, it.key)
+            if (it.key.length == 1 && topSingle != null) score = minOf(score, maxOf(it.value, topSingle + LEARNED_SINGLE_LEAD))
+            Scored(it.key, score)
+        }
             .sortedWith(compareByDescending<Scored> { userModel.pickCount(key, it.text) }
                 .thenByDescending { userModel.recency(key, it.text) }
                 .thenByDescending { it.score })
@@ -410,7 +420,10 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
             // 每個打出來的音都查得到字：照打的音湊句子，不用猜按錯鍵的詞（ㄨㄛˇㄐㄧㄤˋ 是「我降」不是「以降」）
             val cover = exact.firstOrNull { it.text.length == n && it.text in typed }
                 ?: if (allTyped) null else exact.firstOrNull { it.text.length == n }
-            val sentence = cover?.text ?: composedSentence(readings)
+            val learnedCover = exact.firstOrNull { it.text.length == n && it.typed && userModel.pickCount(readings.joinToString("-"), it.text) > 0 }
+            val repeated = if (learnedCover == null) repeatedChar(readings) else null
+            // 整串都是同一個音（ㄏㄏㄏㄏ）：哈哈哈哈，不是剛好同聲母的成語（恍恍惚惚）
+            val sentence = repeated?.toString()?.repeat(n) ?: cover?.text ?: composedSentence(readings)
             if (sentence.isNotEmpty() && commit(sentence) == sentence) {
                 out.add(Candidate(sentence, n, Candidate.Kind.SENTENCE))
                 listed.add(sentence)
@@ -433,11 +446,29 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
     }
 
     /** 多字詞後面又接了同一個字時，改成下一個同音字，避免「就是是」這種句子。 */
+    /** 同一個音連打（三次以上）時要重複的字：字典裡有這個音的疊字（哈哈、安安）才算 */
+    private fun repeatedChar(readings: List<String>): Char? {
+        if (readings.size < 3) return null
+        val key = readings[0].removeSuffix("~")
+        if (readings.any { it.removeSuffix("~") != key }) return null
+        val twin = fuzzyPhrases(readings.subList(0, 2)).firstOrNull { it.corrections == 0 && it.text.length == 2 && it.text[0] == it.text[1] }
+        return twin?.text?.get(0)
+    }
+
     private fun composedSentence(readings: List<String>): String {
         val parts = bestSegments(readings)
-        val joined = parts.joinToString("") { it.text }
+        var joined = parts.joinToString("") { it.text }
         if (joined.length != readings.size) return joined
         val chars = joined.toCharArray()
+        // 同一個音連打三次以上（ㄏㄏㄏㄏ、ㄢㄢㄢ）整段用同一個字：哈哈哈哈，不要斷成「哈哈哈會」
+        var run = 0
+        while (run < readings.size) {
+            var end = run + 1
+            while (end < readings.size && readings[end].removeSuffix("~") == readings[run].removeSuffix("~")) end++
+            repeatedChar(readings.subList(run, end))?.let { c -> for (k in run until end) chars[k] = c }
+            run = end
+        }
+        joined = String(chars)
         val singleton = HashSet<Int>()
         var cursor = 0
         for (part in parts) {
@@ -656,14 +687,28 @@ class UserPhraseModel(private val file: File?) {
         save()
     }
 
+    /** 最後一次存檔失敗的原因（沒失敗是 null）。存不進去就不會有記憶，要讓使用者看得到 */
+    var saveProblem: String? = null
+        private set
+
+    /** 記住了幾個字詞、最近記住的幾個（給設定裡「看看記住了哪些字」） */
+    fun summary(limit: Int = 6): Pair<Int, List<String>> {
+        val words = counts[""]?.size ?: 0
+        val latest = HashMap<String, Int>()
+        for ((r, m) in recency) if (r.isNotEmpty()) for ((p, w) in m) if (w > (latest[p] ?: -1)) latest[p] = w
+        return words to latest.entries.sortedByDescending { it.value }.take(limit).map { it.key }
+    }
+
     private fun save() {
         val f = file ?: return
-        f.writeText(buildString {
-            for ((r, m) in counts) for ((p, c) in m) {
-                append(r).append('\t').append(p).append('\t').append(c)
-                    .append('\t').append(recency[r]?.get(p) ?: 0).append('\n')
-            }
-        })
+        saveProblem = runCatching {
+            f.writeText(buildString {
+                for ((r, m) in counts) for ((p, c) in m) {
+                    append(r).append('\t').append(p).append('\t').append(c)
+                        .append('\t').append(recency[r]?.get(p) ?: 0).append('\n')
+                }
+            })
+        }.exceptionOrNull()?.let { it.localizedMessage ?: it.toString() }
     }
 
     companion object {

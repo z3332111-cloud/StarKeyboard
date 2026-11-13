@@ -19,6 +19,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
     var onPasteSpaceImage: (() -> Void)?
     var onPasteSpaceEmoji: (() -> Void)?
     var onCopyTypingLog: (() -> Void)?
+    var onShowLearning: (() -> Void)?
     var onStartLayoutDiagnostics: (() -> Void)?
     var onCopyLayoutDiagnostics: (() -> Void)?
     var onStopLayoutDiagnostics: (() -> Void)?
@@ -415,6 +416,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
 
         stack.addArrangedSubview(header("其他"))
         stack.addArrangedSubview(buttonRow([
+            ("📒 看看記住了哪些字", { [weak self] in self?.onShowLearning?() }),
             ("清除選字學習紀錄", { [weak self] in self?.onResetLearning?() }),
         ]))
         if !hasFullAccess {

@@ -1417,6 +1417,19 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 shortcuts = shortcuts,
                 onAddShortcut = { beginEditor(EditorPurpose.SHORTCUT_PHRASE) },
                 onResetLearning = { engine?.resetLearning(); toast("已清除選字學習紀錄") },
+                onShowLearning = {
+                    val model = engine?.userModel
+                    if (model == null) toast("字典還在載入，等一下再看")
+                    else {
+                        val (count, recent) = model.summary()
+                        val problem = model.saveProblem
+                        toast(when {
+                            problem != null -> "⚠️ 選字記憶存不進去：$problem"
+                            count == 0 -> "還沒記住任何字：選過的字詞會記在這支手機上"
+                            else -> "已記住 $count 個字詞\n最近：${recent.joinToString("、")}"
+                        })
+                    }
+                },
                 onDownloadFont = { id -> downloadFont(id) },
                 onPickSpaceImage = {
                     startActivity(Intent(this, MainActivity::class.java)

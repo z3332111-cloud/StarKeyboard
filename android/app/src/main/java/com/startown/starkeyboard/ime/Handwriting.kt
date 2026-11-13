@@ -48,7 +48,7 @@ class InkRecognizer(private val onStatus: (String) -> Unit) {
                     .addOnSuccessListener { finish(m); onStatus("手寫辨識準備好了 ✍︎") }
                     .addOnFailureListener { downloading = false; onStatus("下載手寫辨識資料失敗，請確認網路後再試") }
             }
-        }.addOnFailureListener { downloading = false }
+        }.addOnFailureListener { downloading = false; onStatus("手寫辨識資料讀不到：${it.localizedMessage ?: "原因不明"}") }
     }
 
     private fun finish(m: DigitalInkRecognitionModel) {
@@ -61,6 +61,7 @@ class InkRecognizer(private val onStatus: (String) -> Unit) {
         val r = recognizer
         if (!ready || r == null) {
             prepare()
+            if (!downloading) onStatus("手寫辨識還沒準備好，請稍等再寫一次")
             done(emptyList())
             return
         }
@@ -75,8 +76,12 @@ class InkRecognizer(private val onStatus: (String) -> Unit) {
             .setWritingArea(com.google.mlkit.vision.digitalink.WritingArea(width, height))
             .build()
         r.recognize(ink.build(), context)
-            .addOnSuccessListener { result -> done(result.candidates.map { it.text }.filter { it.isNotBlank() }.distinct()) }
-            .addOnFailureListener { done(emptyList()) }
+            .addOnSuccessListener { result ->
+                val out = result.candidates.map { it.text }.filter { it.isNotBlank() }.distinct()
+                if (out.isEmpty()) onStatus("沒認出來，寫大一點、一筆一筆分開一點再試試")
+                done(out)
+            }
+            .addOnFailureListener { onStatus("手寫辨識出錯：${it.localizedMessage ?: "原因不明"}"); done(emptyList()) }
     }
 
     fun close() {

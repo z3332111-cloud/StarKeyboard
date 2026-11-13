@@ -64,6 +64,8 @@ final class ZhuyinEngine {
         }
     }
 
+    /// 學過的單字最多比同音字的第一名高多少（整句斷詞用）
+    static let learnedSingleLead: Double = 0.3
     static let tonePenalty: Double = -2.5
     static let phoneticPenalty: Double = -1.2
     static let neighborPenalty: Double = -2.5
@@ -249,8 +251,16 @@ final class ZhuyinEngine {
             order.append(phrase)
         }
 
-        var list = order.enumerated().map { (i, phrase) in
-            (i, Scored(text: phrase, score: best[phrase]! + userModel.boost(reading: key, phrase: phrase)))
+        // 學過的單字只在同音字裡勝出：最多比字典最常用的同音字高一點。
+        // 不然常選的字（ㄏ 選「會」）每個字都加很多分，一長串就把「哈哈哈」這種詞拆成「會會會」
+        let topSingle = lookup(key).filter { $0.phrase.count == 1 }.map { $0.score }.max()
+        var list = order.enumerated().map { (i, phrase) -> (Int, Scored) in
+            let raw = best[phrase]!
+            var score = raw + userModel.boost(reading: key, phrase: phrase)
+            if phrase.count == 1, let top = topSingle {
+                score = min(score, max(raw, top + Self.learnedSingleLead))
+            }
+            return (i, Scored(text: phrase, score: score))
         }
         // 選過一次就排在沒選過的前面；次數一樣再看最近一次，然後才是詞頻。
         list.sort { a, b in
@@ -596,7 +606,12 @@ final class ZhuyinEngine {
         // 每個打出來的音都查得到字：照打的音湊句子，猜按錯鍵的詞排在後面（ㄨㄛˇㄐㄧㄤˋ 是「我降」不是「以降」）
         let allTyped = readings.allSatisfy { !phrases([$0.hasSuffix("~") ? String($0.dropLast()) : $0][...]).isEmpty }
         var sentence = ""
-        if let cover = exact.first(where: { $0.corrections == 0 && $0.text.count == n }) {
+        let learnedCover = exact.first { $0.corrections == 0 && $0.text.count == n &&
+            userModel.preference(reading: Self.learnKey(readings), phrase: $0.text).count > 0 }
+        if learnedCover == nil, let c = repeatedChar(readings[...]) {
+            // 整串都是同一個音（ㄏㄏㄏㄏ）：哈哈哈哈，不是剛好同聲母的成語（恍恍惚惚）
+            sentence = String(repeating: c, count: n)
+        } else if let cover = exact.first(where: { $0.corrections == 0 && $0.text.count == n }) {
             sentence = cover.text
         } else if n > 1, !allTyped, let fixed = exact.first(where: { $0.corrections == 1 && $0.text.count == n }) {
             // 打出來的音拼不成詞，但改掉一個按到旁邊的鍵就是一個詞（ㄋㄜˇㄞˋ → 可愛）：比單字硬湊的句子可靠
@@ -711,11 +726,34 @@ final class ZhuyinEngine {
     }
 
     /// 字典詞蓋不住整段時，用斷詞。若多字詞後面又接了同一個字（就是＋是），改成下一個同音字。
+    /// 同一個音連打（三次以上）時要重複的字：字典裡有這個音的疊字（哈哈、安安）才算
+    private func repeatedChar(_ readings: ArraySlice<String>) -> Character? {
+        guard readings.count >= 3, let first = readings.first else { return nil }
+        let key = Self.learnKey([first])
+        guard readings.allSatisfy({ Self.learnKey([$0]) == key }) else { return nil }
+        let start = readings.startIndex
+        let twin = fuzzyPhrases(readings[start..<start + 2]).first {
+            $0.corrections == 0 && $0.text.count == 2 && Set($0.text).count == 1
+        }
+        return twin?.text.first
+    }
+
     private func composedSentence(_ readings: [String]) -> String {
         let parts = segmentation(of: readings, contextual: true)
-        let joined = parts.map { $0.text }.joined()
+        var joined = parts.map { $0.text }.joined()
         var chars = Array(joined)
         guard chars.count == readings.count else { return joined }
+        // 同一個音連打三次以上（ㄏㄏㄏㄏ、ㄢㄢㄢ）整段用同一個字：哈哈哈哈，不要斷成「哈哈哈會」
+        var run = 0
+        while run < readings.count {
+            var end = run + 1
+            while end < readings.count && Self.learnKey([readings[end]]) == Self.learnKey([readings[run]]) { end += 1 }
+            if let c = repeatedChar(readings[run..<end]) {
+                for k in run..<end { chars[k] = c }
+            }
+            run = end
+        }
+        joined = String(chars)
         var singleton = Set<Int>()
         var cursor = 0
         for part in parts {
@@ -1163,14 +1201,39 @@ final class UserPhraseModel {
         if asynchronousWrites { saveQueue.sync {} }
     }
 
+    /// 最後一次存檔失敗的原因（沒失敗是 nil）。存不進去就不會有記憶，要讓使用者看得到
+    private(set) var saveProblem: String?
+    private let problemLock = NSLock()
+
+    /// 記住了幾個字詞、最近記住的幾個（給設定裡「看看記住了哪些字」）
+    func summary(recent limit: Int = 6) -> (count: Int, recent: [String], problem: String?) {
+        let words = counts[Self.anyReading]?.count ?? 0
+        var latest: [String: Int] = [:]
+        for (reading, phrases) in recency where !reading.isEmpty {
+            for (phrase, when) in phrases where when > (latest[phrase] ?? -1) { latest[phrase] = when }
+        }
+        let recent = latest.sorted { $0.value > $1.value }.prefix(limit).map { $0.key }
+        problemLock.lock()
+        defer { problemLock.unlock() }
+        return (words, recent, saveProblem)
+    }
+
     private func save() {
         guard let url = fileURL else { return }
         let snapshot = Snapshot(counts: counts, recency: recency, clock: clock)
+        let write = { [weak self] in
+            var problem: String?
+            do { try JSONFile.write(snapshot, to: url) } catch { problem = error.localizedDescription }
+            guard let self else { return }
+            self.problemLock.lock()
+            self.saveProblem = problem
+            self.problemLock.unlock()
+        }
         if asynchronousWrites {
             // 串行寫入不可亂序；鍵盤收起前會等最後一筆落盤。
-            saveQueue.async { JSONFile.save(snapshot, to: url) }
+            saveQueue.async(execute: write)
         } else {
-            JSONFile.save(snapshot, to: url)
+            write()
         }
     }
 }
