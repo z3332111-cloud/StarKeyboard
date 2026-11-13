@@ -63,6 +63,8 @@ struct Syllable: Equatable {
     var hasSound: Bool { initial != nil || medial != nil || rhyme != nil }
     /// 只打了一個注音、沒聲調（簡拼的打法，例如 ㄏ、ㄧ）
     var isSingleSymbol: Bool { [initial, medial, rhyme].filter { $0 != nil }.count == 1 && tone == nil }
+    /// 只打了聲母或介音（ㄏ、ㄧ）：這才是簡拼。只打韻母（ㄢ、ㄚ）本身就是一個完整的字（安、啊），不是簡拼
+    var isBareLead: Bool { isSingleSymbol && rhyme == nil }
 
     /// 沒打聲調就換下一個字（或只打了開頭）：查字典時當成「以這些注音開頭、聲調不限」
     var open = false
@@ -143,7 +145,7 @@ struct ZhuyinComposer {
             guard s.open else { return s.reading }
             // 前一個字是簡拼（ㄏㄎㄞ）或後面接著簡拼（ㄨㄞㄋ）才可能拆；後面接的是打完整的字就不拆
             let next = i + 1 < all.count ? all[i + 1] : nil
-            let split = s.maySplit && (next.map { $0.open && $0.isSingleSymbol } ?? s.afterAbbreviation)
+            let split = s.maySplit && (next.map { $0.open && $0.isBareLead } ?? s.afterAbbreviation)
             return s.reading + "*" + (split ? "~" : "")
         }
     }
@@ -211,7 +213,7 @@ struct ZhuyinComposer {
         if current.hasSound && (current.startsNew(with: kind) || !fits(c)) { closeCurrent() }
         if kind != .initial {
             current.maySplit = current.isSingleSymbol
-            current.afterAbbreviation = current.maySplit && syllables.last.map { $0.open && $0.isSingleSymbol } == true
+            current.afterAbbreviation = current.maySplit && syllables.last.map { $0.open && $0.isBareLead } == true
         }
         current.put(c)
         return true

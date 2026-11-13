@@ -39,6 +39,9 @@ final class ZhuyinEngine {
         let text: String
         let reading: String
         let score: Double
+        /// 聯想用：整個詞（淡水河），和是不是自己打過的
+        var whole = ""
+        var learned = false
     }
     // 只快取本機查詢；同一句話打不同注音時不重查前文，避免每按一鍵掃字典。
     private var predictionRows: [String: [Completion]] = [:]
@@ -132,11 +135,17 @@ final class ZhuyinEngine {
     static func settleSplits(_ readings: [String]) -> [String] {
         var out = readings
         for j in out.indices.dropLast() where out[j].hasSuffix("~") {
-            let next = out[j + 1]   // 只打一個注音的寫法是「ㄏ*」「ㄧ*」
-            let nextIsBare = next.count == 2 && next.hasSuffix("*")
+            let next = out[j + 1]   // 只打一個注音的寫法是「ㄏ*」「ㄧ*」；只打韻母（ㄢ*）是完整的字「安」，不算簡拼
+            let lead = next.first.flatMap { Bopomofo.kind(of: $0) }
+            let nextIsBare = next.count == 2 && next.hasSuffix("*") && (lead == .initial || lead == .medial)
             if !nextIsBare { out[j].removeLast() }
         }
         return out
+    }
+
+    /// 查學習紀錄用的讀音：拿掉「可能是兩個字」的 ~（帶著 ~ 會對不上，學過的詞就排不到前面）
+    static func learnKey<S: Sequence>(_ readings: S) -> String where S.Element == String {
+        readings.map { $0.hasSuffix("~") ? String($0.dropLast()) : $0 }.joined(separator: "-")
     }
 
     /// 讀音合不合 pattern：有 * 的音節只要開頭一樣（聲調不限），其他要完全一樣。合的話回傳要扣的分數
@@ -601,6 +610,20 @@ final class ZhuyinEngine {
             out.append(Candidate(text: sentence, span: n, kind: .sentence))
             listed.insert(sentence)
         }
+        // 第二個開始先放自己選過的字詞（單字、雙字詞），完整符合的詞（成語）還是第一個
+        func picked(_ item: Ranked) -> Bool {
+            item.corrections == 0 && userModel.preference(reading: Self.learnKey(readings.prefix(item.span)), phrase: item.text).count > 0
+        }
+        // 只打一個音節時，學過的字本來就排最前面
+        if n > 1 {
+            if out.isEmpty, let lead = exact.first(where: { $0.corrections == 0 && $0.text.count == n }) {
+                out.append(Candidate(text: lead.text, span: lead.span, kind: .phrase))
+                listed.insert(lead.text)
+            }
+            for item in exact.filter(picked) + shorter.filter(picked) where listed.insert(item.text).inserted {
+                out.append(Candidate(text: item.text, span: item.span, kind: .phrase))
+            }
+        }
         // 音都打得對時，照打的音查到的詞和單字都排在猜錯字的詞前面，不會被一堆用不到的詞擠到後面
         let ordered = allTyped
             ? exact.filter { $0.corrections == 0 } + shorter.filter { $0.corrections == 0 } +
@@ -634,8 +657,8 @@ final class ZhuyinEngine {
 
     private func sorted(_ items: [Ranked], readings: [String], initials: Bool) -> [Ranked] {
         items.sorted { a, b in
-            let keyA = readings.prefix(a.span).joined(separator: "-")
-            let keyB = readings.prefix(b.span).joined(separator: "-")
+            let keyA = Self.learnKey(readings.prefix(a.span))
+            let keyB = Self.learnKey(readings.prefix(b.span))
             let pa = userModel.preference(reading: keyA, phrase: a.text)
             let pb = userModel.preference(reading: keyB, phrase: b.text)
             // 帶 ~ 的音節本來就可能是兩個字（ㄎㄞ → 可愛），這種拆法要照分數排，不能當成「比較長的預測」。
@@ -665,7 +688,7 @@ final class ZhuyinEngine {
         guard !related.isEmpty else { return items }
         let scores = Dictionary(fuzzyPhrases(readings[...]).filter { $0.corrections == 0 }.map { ($0.text, $0.score) },
                                 uniquingKeysWith: max)
-        let key = readings.joined(separator: "-")
+        let key = Self.learnKey(readings)
         let learned = items.filter { $0.corrections == 0 && userModel.preference(reading: key, phrase: $0.text).count > 0 }
         var rest = items.filter { item in !learned.contains { $0.text == item.text && $0.span == item.span } }
         func support(_ text: String) -> Double {
@@ -704,6 +727,8 @@ final class ZhuyinEngine {
             guard let word = fuzzyPhrases(readings[0..<k]).first(where: { $0.corrections == 0 && $0.text.count == k }) else { continue }
             let w = Array(word.text)
             guard w.count == k, chars.starts(with: w), chars[k] == w[k - 1], singleton.contains(k) else { continue }
+            // 同一個音連打三次以上（晚安安安安、哈哈哈）是故意重複，不換字
+            if k + 1 < n, Self.learnKey([readings[k + 1]]) == Self.learnKey([readings[k]]) { continue }
             let banned = String(w[k - 1])
             if let alt = phrases(readings[k...k]).first(where: { $0.text.count == 1 && $0.text != banned }) {
                 chars[k] = Array(alt.text)[0]
@@ -796,6 +821,11 @@ final class ZhuyinEngine {
         }.prefix(limit).map { (text: $0.text, reading: $0.reading, score: $0.score) }
     }
 
+    /// 聯想裡自己打過的詞的分數：比字典最常用的詞（約 -2.3）還高
+    static let learnedFollowScore: Double = -1.5
+    /// 聯想的字典詞，後面每多一個字扣的分
+    static let longFollowPenalty: Double = 0.7
+
     /// 只取游標前連續中文的末三字；標點、空格、換行會中斷前文。
     private static func contextTail(_ text: String) -> String {
         String(text.suffix(3).reversed().prefix { ch in
@@ -822,17 +852,21 @@ final class ZhuyinEngine {
                     if rows.count == 80 { break }
                 }
             }
+            // 自己打過的接續排最前面（分數比字典最常用的詞還高）
             rows += learned.filter { $0.phrase.hasPrefix(head) && $0.phrase.count > length }.map {
-                Completion(text: $0.phrase, reading: $0.reading, score: Self.userPhraseBase)
+                Completion(text: $0.phrase, reading: $0.reading, score: Self.learnedFollowScore, learned: true)
             }
             for row in rows where row.text.hasPrefix(head) {
                 let sounds = row.reading.split(separator: "-")
                 guard sounds.count == row.text.count, sounds.count > length else { continue }
                 let rest = String(row.text.dropFirst(length))
-                let score = row.score + Double(length - 1) * 1.5 +
+                // 字典的接續：後面只多一兩個字的常用詞優先，很長的專有名詞（淡水河、淡江大學）往後
+                let longTail = row.score >= Self.learnedFollowScore ? 0 : Double(max(0, rest.count - 1)) * Self.longFollowPenalty
+                let score = row.score + Double(length - 1) * 1.5 - longTail +
                     userModel.boost(reading: row.reading, phrase: row.text)
                 if let old = best[rest], old.score >= score { continue }
-                best[rest] = Completion(text: rest, reading: sounds.dropFirst(length).joined(separator: "-"), score: score)
+                best[rest] = Completion(text: rest, reading: sounds.dropFirst(length).joined(separator: "-"), score: score,
+                                        whole: row.text, learned: row.learned)
             }
         }
         let result = best.values.sorted { $0.score != $1.score ? $0.score > $1.score : $0.text < $1.text }
@@ -856,7 +890,8 @@ final class ZhuyinEngine {
         queryLock.lock()
         defer { queryLock.unlock() }
         guard limit > 0 else { return [] }
-        return completions(after: text).prefix(limit).map { $0.text }
+        // 地名（淡水、淡水河、淡江大學）不推薦；自己打過的照樣推薦
+        return completions(after: text).filter { $0.learned || !PlaceNames.isPlace($0.whole) }.prefix(limit).map { $0.text }
     }
 
     /// 使用者選了某個詞：之後這個詞會排更前面

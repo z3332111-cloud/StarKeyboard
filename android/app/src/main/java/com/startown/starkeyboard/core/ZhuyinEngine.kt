@@ -416,6 +416,10 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
                 listed.add(sentence)
             }
         }
+        // 第二個開始先放自己選過的字詞（單字、雙字詞），完整符合的詞（成語）還是第一個
+        fun picked(it: Item) = it.typed && userModel.pickCount(readings.take(it.span).joinToString("-"), it.text) > 0
+        if (n > 1 && out.isEmpty()) exact.firstOrNull { it.typed && it.text.length == n }?.let { out.add(Candidate(it.text, it.span, Candidate.Kind.PHRASE)); listed.add(it.text) }
+        if (n > 1) for (item in exact.filter(::picked) + shorter.filter(::picked)) if (listed.add(item.text)) out.add(Candidate(item.text, item.span, Candidate.Kind.PHRASE))
         // 音都打得對時，照打的音查到的詞和單字都排在猜錯字的詞前面
         val ordered = if (allTyped)
             exact.filter { it.typed } + shorter.filter { it.typed } + exact.filter { !it.typed } + shorter.filter { !it.typed }
@@ -445,6 +449,8 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
             val word = fuzzyPhrases(readings.subList(0, k)).firstOrNull { it.corrections == 0 && it.text.length == k } ?: continue
             if (word.text.length != k || !joined.startsWith(word.text)) continue
             if (chars[k] != word.text.last() || k !in singleton) continue
+            // 同一個音連打三次以上（晚安安安安、哈哈哈）是故意重複，不換字
+            if (k + 1 < n && readings[k + 1].removeSuffix("~") == readings[k].removeSuffix("~")) continue
             val banned = word.text.last().toString()
             val alt = phrases(listOf(readings[k])).firstOrNull { it.text.length == 1 && it.text != banned } ?: continue
             chars[k] = alt.text[0]
@@ -461,11 +467,15 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
     /** 所有音節的開頭（給組字用，判斷注音能不能接在一起） */
     fun syllablePrefixes(): Set<String> = Bopomofo.prefixes(source.syllables())
 
-    /** 聯想詞：打完一個字後，接在它後面常見的字詞 */
+    /** 聯想詞：打完一個字後，接在它後面的字詞。自己打過的最前面；字典裡很長的專有名詞（淡水河、淡江大學）往後 */
     fun associations(after: String, limit: Int = 30): List<String> {
         if (after.isEmpty()) return emptyList()
         val head = after.substring(after.offsetByCodePoints(after.length, -1))
-        return source.startingWith(head, limit).map { it.substring(head.length) }.filter { it.isNotEmpty() }
+        val learned = userModel.learnedStartingWith(head).map { it.substring(head.length) }
+        // 地名（淡水、淡水河、淡江大學）不推薦；自己打過的照樣推薦
+        val dictionary = source.startingWith(head, limit * 2).filter { !PlaceNames.isPlace(it) }.map { it.substring(head.length) }
+            .withIndex().sortedBy { it.index + maxOf(0, it.value.length - 1) * 4 }.map { it.value }
+        return (learned + dictionary).filter { it.isNotEmpty() }.distinct().take(limit)
     }
 
     fun learn(readings: List<String>, text: String) {
@@ -542,6 +552,11 @@ class UserPhraseModel(private val file: File?) {
     }
 
     fun pickCount(reading: String, phrase: String) = matchingCounts(reading)[phrase] ?: 0
+
+    /** 選過、以 head 開頭的較長字詞（選越多次越前面），給聯想用 */
+    fun learnedStartingWith(head: String): List<String> =
+        (counts[""] ?: emptyMap<String, Int>()).filter { it.key.length > head.length && it.key.startsWith(head) }
+            .entries.sortedByDescending { it.value }.map { it.key }
 
     /** 剛好照這個讀音選過（不是用比對找到的） */
     fun hasExact(reading: String, phrase: String) = counts[reading]?.containsKey(phrase) == true
