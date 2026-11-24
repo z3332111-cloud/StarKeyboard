@@ -36,8 +36,13 @@ final class RankingEvalTests: XCTestCase {
                 if score < -5 && score < targetScore { sawRare = true }
             }
             if sawLonger { longer += 1 }
-            if sawRare { rare += 1 }
+            if sawRare {
+                rare += 1
+                rareCases.append("\(target) <= \(list.prefix(idx + 1).joined(separator: ","))")
+            }
         }
+        /// 哪些詞前面排了罕見詞（測試失敗時印出來，方便找原因）
+        var rareCases: [String] = []
     }
 
     func testCandidateRankingOnCommonWords() throws {
@@ -94,6 +99,10 @@ final class RankingEvalTests: XCTestCase {
         let abbrLine = line("abbr", beforeAbbr, afterAbbr)
         print(fullLine)
         print(abbrLine)
+        let newRare = Set(afterAbbr.rareCases).subtracting(beforeAbbr.rareCases)
+        if !newRare.isEmpty { print("RANKING abbr_rare_new " + newRare.sorted().joined(separator: " | ")) }
+        let newFullRare = Set(afterFull.rareCases).subtracting(beforeFull.rareCases)
+        if !newFullRare.isEmpty { print("RANKING full_rare_new " + newFullRare.sorted().joined(separator: " | ")) }
         print("RANKING words=\(words.count) lengths=\((1...4).map { "\($0):\((byLength[$0] ?? []).count)" }.joined(separator: ","))")
 
         XCTAssertGreaterThanOrEqual(afterFull.top1, beforeFull.top1)
