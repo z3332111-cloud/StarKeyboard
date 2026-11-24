@@ -294,11 +294,18 @@ jobs:
           gh release view font-pack >/dev/null 2>&1 || gh release create font-pack --title "糯糯鍵盤 字體包" --notes "鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。" --prerelease --latest=false
           gh release upload font-pack FontPack/*.ttf --clobber
 
+      # 用 action 上傳（同名檔案自動覆蓋）；gh release upload 在連線慢時會重試，第二次碰到「檔名已存在」就失敗
       - name: 字體包也放到公開的 nuonuo-keyboard（新版鍵盤從這裡下載）
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
-          PUBLIC_REPO: z3332111-cloud/nuonuo-keyboard
-        run: |
-          gh release view font-pack --repo "$PUBLIC_REPO" >/dev/null 2>&1 || gh release create font-pack --repo "$PUBLIC_REPO" --target main --title "糯糯鍵盤 字體包" --notes "鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。" --prerelease --latest=false
-          gh release upload font-pack FontPack/*.ttf --repo "$PUBLIC_REPO" --clobber
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: z3332111-cloud/nuonuo-keyboard
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          target_commitish: main
+          tag_name: font-pack
+          name: 糯糯鍵盤 字體包
+          body: 鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。
+          files: FontPack/*.ttf
+          prerelease: true
+          make_latest: "false"
+          overwrite_files: true
