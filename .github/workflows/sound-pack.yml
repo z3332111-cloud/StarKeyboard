@@ -23,18 +23,28 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: 上傳到公開的 nuonuo-keyboard
-        uses: softprops/action-gh-release@v2
-        with:
-          repository: z3332111-cloud/nuonuo-keyboard
-          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
-          target_commitish: main
-          tag_name: sound-pack
-          name: 糯糯鍵盤 機械軸聲音包
-          body: 鍵盤裡選到機械軸時才會下載的聲音（真實錄音，來自 kbsim，Copyright (c) Thomas Lai，MIT 授權，見 kbsim-LICENSE.txt）。不用手動下載。
-          files: |
-            SoundPack/*.wav
-            SoundPack/kbsim-LICENSE.txt
-          prerelease: true
-          make_latest: "false"
-          overwrite_files: true
+      # 一次平行上傳一百多個檔案時，偶爾有幾個沒換成新的（舊的還在）。
+      # 改成一個一個上傳（同名覆蓋），最後全部下載回來比對，不一樣的再傳一次，還是不一樣就算失敗。
+      - name: 上傳到公開的 nuonuo-keyboard（一個一個傳，傳完逐一比對）
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          REPO: z3332111-cloud/nuonuo-keyboard
+        run: |
+          gh release view sound-pack --repo "$REPO" >/dev/null 2>&1 || gh release create sound-pack --repo "$REPO" --target main \
+            --title "糯糯鍵盤 機械軸聲音包" --prerelease --latest=false \
+            --notes "鍵盤裡選到機械軸時才會下載的聲音（真實錄音，來自 kbsim，Copyright (c) Thomas Lai，MIT 授權，見 kbsim-LICENSE.txt）。不用手動下載。"
+          upload() { for i in 1 2 3; do gh release upload sound-pack "$1" --repo "$REPO" --clobber && return 0; sleep 3; done; return 1; }
+          for f in SoundPack/*; do upload "$f"; done
+          mkdir -p check
+          bad=0
+          for f in SoundPack/*; do
+            n=$(basename "$f")
+            for try in 1 2 3; do
+              curl -sSfL -o "check/$n" "https://github.com/$REPO/releases/download/sound-pack/$n" && cmp -s "$f" "check/$n" && break
+              echo "還不一樣，重傳：$n"
+              upload "$f"
+              sleep 5
+            done
+            cmp -s "$f" "check/$n" || { echo "::error::$n 上傳後還是不一樣"; bad=1; }
+          done
+          exit $bad
