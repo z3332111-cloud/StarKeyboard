@@ -357,7 +357,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             }
         }
         topBar.onToolbar = { toolbarTapped(it) }
-        topBar.onCandidate = { selectCandidate(it, true) }
+        // 點選字也有按鍵聲和震動
+        topBar.onCandidate = { feedback(); selectCandidate(it, true) }
         topBar.onTrailing = { trailing ->
             when (trailing) {
                 Trailing.EXPAND -> toggleCandidatePanel()
@@ -990,7 +991,6 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             val item = clipResults.getOrNull(i) ?: return
             endEditor()
             currentInputConnection?.commitText(item.text, 1)
-            feedback()
             return
         }
         editorResult?.let { r ->
@@ -1210,7 +1210,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             return
         }
         val rad = radicals ?: SQLitePhraseSource.radicals(this).also { radicals = it }
-        val p = CandidatePanel(this, style, { selectCandidate(it, true) }, { closeCandidatePanel() }, { backspace() }, { rad[it] })
+        val p = CandidatePanel(this, style, { feedback(); selectCandidate(it, true) }, { closeCandidatePanel() }, { backspace() }, { rad[it] })
         p.setCandidates(candidates.map { it.text })
         // 墊一層半透明的底，而且先把後面的按鍵藏起來，候選字才不會跟按鍵疊在一起看不清楚
         p.setBackgroundColor(if (style.theme.dark) android.graphics.Color.BLACK.withAlpha(0.4f) else android.graphics.Color.WHITE.withAlpha(0.6f))

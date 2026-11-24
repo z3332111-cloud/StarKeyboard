@@ -2,6 +2,14 @@ import UIKit
 
 /// iPhone 的角色主題：只提供外觀，按鍵動作、配置和個人設定由既有程式管理。
 enum FoxLetterTheme {
+    /// 設計圖鑑主題的功能鍵：鍵帽插畫保持差不多的比例（寬高 0.85～1.15），放在按鍵中間
+    static func packCapFrame(in chip: CGRect) -> CGRect {
+        guard chip.width > 0, chip.height > 0 else { return .zero }
+        var w = chip.width, h = chip.height
+        if w > h * 1.15 { w = h * 1.15 } else if w < h * 0.85 { h = w / 0.85 }
+        return CGRect(x: chip.midX - w / 2, y: chip.midY - h / 2, width: w, height: h)
+    }
+
     static let id = "fox-letter"
 
     struct Ink {
@@ -232,7 +240,8 @@ final class FoxLetterArtworkView: UIView {
         if let look = look {
             drawing.isHidden = true
             paper.isHidden = false
-            textColor = action == .space ? look.spaceInk : (action.isCharacter ? look.ink : look.theme.specialText)
+            // 功能鍵也畫成鍵帽，字用鍵帽的顏色
+            textColor = action == .space ? look.spaceInk : look.ink
             furColor = look.theme.key
             paper.configure(look: look, index: index, action: action)
             return

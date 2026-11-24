@@ -30,21 +30,21 @@ WEB_DIR = os.path.join(ROOT, "docs/assets/sounds")
 
 # 鍵盤裡的名字 → kbsim 的資料夾、音量（最大值）、要不要悶住（靜音軸）
 SWITCHES = {
-    # 音量（最大值）：手機直接用系統音量播，0.8 太炸、0.35 還是太大聲，使用者說留大約 2 成就好
-    "red": ("redink", 0.2, None),          # Gateron 紅墨軸（線性）
-    "brown": ("mxbrown", 0.2, None),       # Cherry MX 茶軸
-    "blue": ("mxblue", 0.18, None),        # Cherry MX 青軸（本來就響，再小一點）
-    "black": ("mxblack", 0.2, None),       # Cherry MX 黑軸
-    "silent": ("mxblack", 0.1, 900),       # 靜音軸：黑軸錄音悶住、調小聲（kbsim 沒有靜音軸）
-    "cream": ("cream", 0.2, None),         # NovelKeys 奶油軸
-    "holypanda": ("holypanda", 0.2, None), # 熊貓軸
-    "topre": ("topre", 0.2, None),         # 靜電容
-    "buckling": ("buckling", 0.17, None),  # IBM 彈簧老鍵盤（很響）
-    "alpaca": ("alpaca", 0.2, None),       # 羊駝軸（線性）
-    "blackink": ("blackink", 0.2, None),   # Gateron 黑墨軸（線性、偏低沉）
-    "turquoise": ("turquoise", 0.2, None), # Tealios 湖水綠軸（線性）
-    "boxnavy": ("boxnavy", 0.17, None),    # Kailh BOX 海軍軸（很響的有聲軸）
-    "bluealps": ("bluealps", 0.18, None),  # SKCM 藍色 Alps（老式有聲軸）
+    # 音量（最大值）：手機直接用系統音量播；0.8 太炸、0.2 還是太大聲，使用者說留大約 1 成
+    "red": ("redink", 0.1, None),           # Gateron 紅墨軸（線性）
+    "brown": ("mxbrown", 0.1, None),        # Cherry MX 茶軸
+    "blue": ("mxblue", 0.09, None),         # Cherry MX 青軸（本來就響，再小一點）
+    "black": ("mxblack", 0.1, None),        # Cherry MX 黑軸
+    "silent": ("mxblack", 0.05, 900),       # 靜音軸：黑軸錄音悶住、調小聲（kbsim 沒有靜音軸）
+    "cream": ("cream", 0.1, None),          # NovelKeys 奶油軸
+    "holypanda": ("holypanda", 0.1, None),  # 熊貓軸
+    "topre": ("topre", 0.1, None),          # 靜電容
+    "buckling": ("buckling", 0.085, None),  # IBM 彈簧老鍵盤（很響）
+    "alpaca": ("alpaca", 0.1, None),        # 羊駝軸（線性）
+    "blackink": ("blackink", 0.1, None),    # Gateron 黑墨軸（線性、偏低沉）
+    "turquoise": ("turquoise", 0.1, None),  # Tealios 湖水綠軸（線性）
+    "boxnavy": ("boxnavy", 0.085, None),    # Kailh BOX 海軍軸（很響的有聲軸）
+    "bluealps": ("bluealps", 0.09, None),   # SKCM 藍色 Alps（老式有聲軸）
 }
 
 

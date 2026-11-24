@@ -520,13 +520,17 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         val color: Int
         val rect: RectF
         if (action != KeyAction.Space && !action.isCharacter) {
+            // 功能鍵也是鍵帽插畫（固定第三顆，柿子貓是青瓷綠的那隻），照原本的比例放在中間，不拉成長條
             val chip = RectF(k.frame).apply { inset(2.5f * dp * style.gapScale, 4 * dp * style.gapScale) }
             if (chip.isEmpty) return
-            val radius = minOf(8 * dp, chip.height() * 0.22f)
-            fillPaint.color = look.theme.special.withAlpha(opacity)
-            canvas.drawRoundRect(chip, radius, radius, fillPaint)
-            color = look.theme.specialText
-            rect = chip
+            var w = chip.width(); var h = chip.height()
+            if (w > h * 1.15f) w = h * 1.15f else if (w < h * 0.85f) h = w / 0.85f
+            val cap = RectF(chip.centerX() - w / 2, chip.centerY() - h / 2, chip.centerX() + w / 2, chip.centerY() + h / 2)
+            foxPaint.alpha = (opacity * 255).toInt().coerceIn(0, 255)
+            FoxLetter.drawPackCap(context, canvas, cap, 2, look, foxPaint)
+            color = look.ink
+            // 字放在臉的中間（上面留給耳朵）
+            rect = RectF(cap.left + cap.width() * 0.14f, cap.top + cap.height() * 0.26f, cap.right - cap.width() * 0.14f, cap.top + cap.height() * 0.72f)
         } else {
             val frame = FoxLetter.frame(k.frame, style.gapScale, style.shapeScale, dp)
             if (frame.isEmpty) return

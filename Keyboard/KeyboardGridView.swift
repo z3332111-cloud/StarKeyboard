@@ -728,17 +728,21 @@ final class KeyButton: UIView {
     private func layoutFoxLetter() {
         guard let artwork = foxArtwork else { return }
         if style.themeLook != nil && !spec.action.isCharacter && spec.action != .space {
-            // 設計圖鑑主題的功能鍵：素色方塊，字放中間
+            // 設計圖鑑主題的功能鍵：也是鍵帽插畫（固定第三顆），照原本的比例放在中間，不拉成長條
             let chipFrame = bounds.insetBy(dx: 2.5 * style.gapScale, dy: 4 * style.gapScale)
-            artwork.frame = chipFrame
+            let capFrame = FoxLetterTheme.packCapFrame(in: chipFrame)
+            artwork.frame = capFrame
             artwork.configure(index: illustratedIndex, action: spec.action, personalSpaceArt: hasPersonalSpaceArt)
-            label.font = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, chipFrame.height * 0.8), weight: .semibold)
-            label.frame = chipFrame.insetBy(dx: 2, dy: 0)
-            icon.frame = chipFrame
+            // 字和圖示放在臉的中間（上面留給耳朵）
+            let face = CGRect(x: capFrame.minX + capFrame.width * 0.14, y: capFrame.minY + capFrame.height * 0.26,
+                              width: capFrame.width * 0.72, height: capFrame.height * 0.46)
+            label.font = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, face.height * 0.9), weight: .semibold)
+            label.frame = face
+            icon.frame = face
             hintLabel.frame = .zero
             if case .symbol(let name) = spec.face {
                 icon.image = UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(
-                    pointSize: min(18 * style.fontScale, chipFrame.height * 0.6), weight: .semibold))
+                    pointSize: min(18 * style.fontScale, face.height * 0.75), weight: .semibold))
             }
             return
         }

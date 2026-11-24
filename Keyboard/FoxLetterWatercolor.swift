@@ -73,7 +73,8 @@ final class FoxLetterWatercolorKeyView: UIView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    // 設計圖鑑的主題：圖集上面一排三顆鍵帽、下面一條寬鍵；功能鍵是素色的圓角方塊
+    // 設計圖鑑的主題：圖集上面一排三顆鍵帽、下面一條寬鍵。
+    // 功能鍵（123、英、☺、刪除、換行）也用鍵帽，固定用第三顆（柿子貓是青瓷綠的那隻），看得出是同一組
     private var packImage: CGImage?
     private var packCap = 0
     private var packKind = 0   // 0 鍵帽、1 寬鍵、2 功能鍵
@@ -82,8 +83,8 @@ final class FoxLetterWatercolorKeyView: UIView {
     func configure(look: ThemeLook, index: Int, action: KeyAction) {
         packImage = FoxLetterWatercolor.image("theme-" + look.theme.id)?.cgImage
         let position = max(0, index)
-        packCap = (position + position / 4) % 3
-        packKind = action == .space ? 1 : (action.isCharacter ? 0 : 2)
+        packCap = action.isCharacter ? (position + position / 4) % 3 : 2
+        packKind = action == .space ? 1 : 0
         chip.backgroundColor = look.theme.specialKey.cgColor
         chip.borderColor = look.theme.specialText.withAlphaComponent(0.25).cgColor
         chip.borderWidth = 0.5

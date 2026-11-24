@@ -586,7 +586,11 @@ final class KeyboardViewController: UIInputViewController {
             self.updateCandidates()
         }
         topBar.onToolbar = { [weak self] item in self?.toolbarTapped(item) }
-        topBar.onCandidate = { [weak self] i in self?.selectCandidate(at: i, learn: true) }
+        // 點選字也有按鍵聲和震動
+        topBar.onCandidate = { [weak self] i in
+            self?.feedback()
+            self?.selectCandidate(at: i, learn: true)
+        }
         topBar.candidateFontSize = CGFloat(CandidateBarMetrics.fontSize(barHeight: settings.candidateBarHeight))
         topBar.onHeightDrag = { [weak self] dy in
             guard let self = self else { return }
@@ -1170,7 +1174,6 @@ final class KeyboardViewController: UIInputViewController {
             let text = clipResults[i].text
             endEditor()
             textDocumentProxy.insertText(text)
-            feedback()
             return
         }
         if let r = editorResult {
@@ -1431,7 +1434,10 @@ final class KeyboardViewController: UIInputViewController {
             return
         }
         let p = CandidatePanelView(style: style)
-        p.onSelect = { [weak self] i in self?.selectCandidate(at: i, learn: true) }
+        p.onSelect = { [weak self] i in
+            self?.feedback()
+            self?.selectCandidate(at: i, learn: true)
+        }
         p.onBack = { [weak self] in self?.closeCandidatePanel() }
         p.onBackspace = { [weak self] in self?.backspace() }
         p.radicalOf = { [weak self] c in self?.radicals[c] }
