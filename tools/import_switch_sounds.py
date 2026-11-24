@@ -5,8 +5,8 @@
   git clone --depth 1 https://github.com/tplai/kbsim /tmp/kbsim
   python3 tools/import_switch_sounds.py /tmp/kbsim
 
-需要 ffmpeg 和 numpy。輸出到 iPhone 的 Keyboard/Resources/Sounds、Android 的 res/raw，
-網站試聽用的放 docs/assets/sounds（每種一個）。
+需要 ffmpeg 和 numpy。輸出到 SoundPack/（不放進 App，打包時上傳到 sound-pack 發佈，
+鍵盤選到哪個軸才下載），網站試聽用的放 docs/assets/sounds（每種一個）。
 
 每種軸：
 - 按下去：一般鍵 5 個（kbsim 鍵盤每一排的錄音，輪流播），大鍵 1 個（空白鍵的錄音）
@@ -25,26 +25,26 @@ import numpy as np
 
 RATE = 44100
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-OUT_DIRS = [os.path.join(ROOT, "Keyboard/Resources/Sounds"), os.path.join(ROOT, "android/app/src/main/res/raw")]
+OUT_DIRS = [os.path.join(ROOT, "SoundPack")]
 WEB_DIR = os.path.join(ROOT, "docs/assets/sounds")
 
 # 鍵盤裡的名字 → kbsim 的資料夾、音量（最大值）、要不要悶住（靜音軸）
 SWITCHES = {
-    # 音量（最大值）：0.8 在 iPhone 喇叭上太炸、會破音，降到 0.35 左右
-    "red": ("redink", 0.35, None),          # Gateron 紅墨軸（線性）
-    "brown": ("mxbrown", 0.35, None),       # Cherry MX 茶軸
-    "blue": ("mxblue", 0.32, None),         # Cherry MX 青軸（本來就響，再小一點）
-    "black": ("mxblack", 0.35, None),       # Cherry MX 黑軸
-    "silent": ("mxblack", 0.18, 900),       # 靜音軸：黑軸錄音悶住、調小聲（kbsim 沒有靜音軸）
-    "cream": ("cream", 0.35, None),         # NovelKeys 奶油軸
-    "holypanda": ("holypanda", 0.35, None), # 熊貓軸
-    "topre": ("topre", 0.35, None),         # 靜電容
-    "buckling": ("buckling", 0.3, None),    # IBM 彈簧老鍵盤（很響）
-    "alpaca": ("alpaca", 0.35, None),       # 羊駝軸（線性）
-    "blackink": ("blackink", 0.35, None),   # Gateron 黑墨軸（線性、偏低沉）
-    "turquoise": ("turquoise", 0.35, None), # Tealios 湖水綠軸（線性）
-    "boxnavy": ("boxnavy", 0.3, None),      # Kailh BOX 海軍軸（很響的有聲軸）
-    "bluealps": ("bluealps", 0.32, None),   # SKCM 藍色 Alps（老式有聲軸）
+    # 音量（最大值）：手機直接用系統音量播，0.8 太炸、0.35 還是太大聲，使用者說留大約 2 成就好
+    "red": ("redink", 0.2, None),          # Gateron 紅墨軸（線性）
+    "brown": ("mxbrown", 0.2, None),       # Cherry MX 茶軸
+    "blue": ("mxblue", 0.18, None),        # Cherry MX 青軸（本來就響，再小一點）
+    "black": ("mxblack", 0.2, None),       # Cherry MX 黑軸
+    "silent": ("mxblack", 0.1, 900),       # 靜音軸：黑軸錄音悶住、調小聲（kbsim 沒有靜音軸）
+    "cream": ("cream", 0.2, None),         # NovelKeys 奶油軸
+    "holypanda": ("holypanda", 0.2, None), # 熊貓軸
+    "topre": ("topre", 0.2, None),         # 靜電容
+    "buckling": ("buckling", 0.17, None),  # IBM 彈簧老鍵盤（很響）
+    "alpaca": ("alpaca", 0.2, None),       # 羊駝軸（線性）
+    "blackink": ("blackink", 0.2, None),   # Gateron 黑墨軸（線性、偏低沉）
+    "turquoise": ("turquoise", 0.2, None), # Tealios 湖水綠軸（線性）
+    "boxnavy": ("boxnavy", 0.17, None),    # Kailh BOX 海軍軸（很響的有聲軸）
+    "bluealps": ("bluealps", 0.18, None),  # SKCM 藍色 Alps（老式有聲軸）
 }
 
 
@@ -59,7 +59,10 @@ def biquad(x, kind, f, gain_db=0.0, q=0.707):
     A = 10 ** (gain_db / 40)
     w = 2 * np.pi * f / RATE
     cos, alpha = np.cos(w), np.sin(w) / (2 * q)
-    if kind == "hp":
+    if kind == "lp":
+        b = [(1 - cos) / 2, 1 - cos, (1 - cos) / 2]
+        a = [1 + alpha, -2 * cos, 1 - alpha]
+    elif kind == "hp":
         b = [(1 + cos) / 2, -(1 + cos), (1 + cos) / 2]
         a = [1 + alpha, -2 * cos, 1 - alpha]
     elif kind == "peak":
@@ -109,15 +112,33 @@ def lowpass(x, cutoff):
 
 
 def clean(x, peak, muffle):
+    """去開頭空白、調聲音、去雜音，最後統一音量。
+
+    雜音：錄音（mp3）在聲音結束後還有一層沙沙的底噪，高頻也有壓縮留下的嘶嘶聲。
+    - 8 kHz 以上切掉（嘶嘶聲，按鍵聲本身用不到）
+    - 聲音變得很小之後（比最大聲小 30 dB）就收尾淡出，不讓底噪跟著播
+    - 開頭 1 毫秒淡入、結尾淡出到 0：一開始和結束時不會「啪」一聲（聽起來像破音）
+    """
     top = np.max(np.abs(x)) or 1
     onset = int(np.argmax(np.abs(x) > top * 0.08))
     x = x[max(0, onset - int(RATE * 0.001)):]          # 留 1 毫秒，聲音一按就出來
-    x = x[: int(RATE * 0.18)]                            # 最長 0.18 秒
+    x = x[: int(RATE * 0.18)].copy()                     # 最長 0.18 秒
+    x = x - np.mean(x[: int(RATE * 0.001)] if len(x) > 44 else 0)  # 去掉直流偏移
     x = warm(x)
+    x = biquad(x, "lp", 8000)
     if muffle:
         x = lowpass(x, muffle)
-    fade = min(len(x), int(RATE * 0.012))
-    x[-fade:] *= np.linspace(1, 0, fade)
+    # 噪音閘：5 毫秒包絡，最大聲之後第一次掉到 -30 dB 以下的地方收尾
+    w = int(RATE * 0.005)
+    env = np.sqrt(np.convolve(x * x, np.ones(w) / w, mode="same"))
+    peak_at = int(np.argmax(env))
+    quiet = np.nonzero(env[peak_at:] < env[peak_at] * 0.0316)[0]
+    if len(quiet):
+        x = x[: min(len(x), peak_at + quiet[0] + int(RATE * 0.01))]
+    fade_in = min(len(x), int(RATE * 0.001))
+    x[:fade_in] *= np.linspace(0, 1, fade_in)
+    fade = min(len(x), int(RATE * 0.015))
+    x[-fade:] *= np.linspace(1, 0, fade) ** 2
     return x / (np.max(np.abs(x)) or 1) * peak
 
 
@@ -157,8 +178,12 @@ def main(kbsim):
         write_wav(os.path.join(WEB_DIR, name + ".wav"), np.concatenate([normal[0], gap, up]))
         print(name, "←", folder, "重心 %d Hz" % centroid(normal[0]))
     # MIT 授權要附上原本的版權聲明
-    shutil.copy(os.path.join(kbsim, "LICENSE.md"), os.path.join(OUT_DIRS[0], "kbsim-LICENSE.txt"))
-    shutil.copy(os.path.join(kbsim, "LICENSE.md"), os.path.join(OUT_DIRS[1], "kbsim_license.txt"))
+    # 聲音包的發佈、App（設定裡的來源說明）、網站都附上授權全文
+    for path in [os.path.join(OUT_DIRS[0], "kbsim-LICENSE.txt"),
+                 os.path.join(ROOT, "Keyboard/Resources/Sounds/kbsim-LICENSE.txt"),
+                 os.path.join(ROOT, "android/app/src/main/res/raw/kbsim_license.txt"),
+                 os.path.join(WEB_DIR, "kbsim-LICENSE.txt")]:
+        shutil.copy(os.path.join(kbsim, "LICENSE.md"), path)
 
 
 if __name__ == "__main__":

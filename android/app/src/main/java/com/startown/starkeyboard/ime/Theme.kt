@@ -463,17 +463,16 @@ enum class KeyEffect(val id: String, val title: String, val glyphs: List<String>
 }
 
 /** 按鍵音：系統的喀喀聲、App 附的合成音（tools/make_sounds.js），或機械鍵盤軸的真實錄音（kbsim，MIT，tools/import_switch_sounds.py）。
- *  mechanical＝有 5 個輪流播的版本和大鍵用的版本 */
+ *  mechanical＝機械軸：要用時才下載（SoundPacks），有 5 個輪流播的版本、大鍵用的版本和放開的聲音 */
 enum class KeySound(val id: String, val title: String, val mechanical: Boolean = false) {
     SYSTEM("system", "系統"), BUBBLE("bubble", "泡泡"), MARIMBA("marimba", "木琴"), BELL("bell", "叮鈴"), POP("pop", "啵啵"),
     RED("red", "紅軸", true), BROWN("brown", "茶軸", true), BLUE("blue", "青軸", true), BLACK("black", "黑軸", true),
     SILENT("silent", "靜音軸", true), CREAM("cream", "奶油軸", true), HOLYPANDA("holypanda", "熊貓軸", true),
     TOPRE("topre", "靜電容", true), BUCKLING("buckling", "IBM 老鍵盤", true),
     ALPACA("alpaca", "羊駝軸", true), BLACKINK("blackink", "黑墨軸", true), TURQUOISE("turquoise", "湖水綠軸", true),
-    BOXNAVY("boxnavy", "BOX 海軍軸", true), BLUEALPS("bluealps", "藍色 Alps", true),
-    MAHJONG("mahjong", "麻將", true), WOODFISH("woodfish", "木魚", true);
+    BOXNAVY("boxnavy", "BOX 海軍軸", true), BLUEALPS("bluealps", "藍色 Alps", true);
 
-    /** 一般鍵輪流播的檔名（res/raw，不含副檔名） */
+    /** 一般鍵輪流播的檔名（不含副檔名） */
     val normalFiles: List<String> get() = when {
         this == SYSTEM -> emptyList()
         mechanical -> (1..5).map { "key_${id}_$it" }
@@ -483,12 +482,45 @@ enum class KeySound(val id: String, val title: String, val mechanical: Boolean =
     /** 空白、換行、刪除、Shift 用的檔名 */
     val bigFile: String? get() = if (mechanical) "key_${id}_big" else null
 
-    /** 放開按鍵的聲音（真的機械鍵盤彈回來還有一聲）；只有真實錄音的軸有 */
-    fun releaseFile(big: Boolean): String? =
-        if (!mechanical || this == MAHJONG || this == WOODFISH) null else if (big) "key_${id}_up_big" else "key_${id}_up"
+    /** 放開按鍵的聲音（真的機械鍵盤彈回來還有一聲） */
+    fun releaseFile(big: Boolean): String? = if (!mechanical) null else if (big) "key_${id}_up_big" else "key_${id}_up"
+
+    /** 這個音效全部的檔名（下載、載入用） */
+    val allFiles: List<String> get() = normalFiles + listOfNotNull(bigFile, releaseFile(false), releaseFile(true))
 
     companion object {
         fun from(id: String) = values().firstOrNull { it.id == id } ?: SYSTEM
+    }
+}
+
+/** 要用再下載的機械軸聲音：放在 GitHub 的 sound-pack 發佈（每個檔案一個），下載後存在 App 自己的空間 */
+object SoundPacks {
+    fun remote(name: String) = "https://github.com/z3332111-cloud/nuonuo-keyboard/releases/download/sound-pack/$name.wav"
+    fun file(context: Context, name: String) = java.io.File(java.io.File(context.filesDir, "soundpack").apply { mkdirs() }, "$name.wav")
+
+    /** 這個軸的檔案都在了（不是機械軸的一律算好了） */
+    fun isReady(context: Context, sound: KeySound) = !sound.mechanical || sound.allFiles.all { file(context, it).exists() }
+
+    /** 在背景下載缺的檔案（每個只有幾 KB），全部成功才回報 true，在主執行緒回報 */
+    fun download(context: Context, sound: KeySound, done: (Boolean) -> Unit) {
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        Thread {
+            val ok = sound.allFiles.filter { !file(context, it).exists() }.all { name ->
+                runCatching {
+                    val conn = java.net.URL(remote(name)).openConnection() as java.net.HttpURLConnection
+                    conn.connectTimeout = 15000; conn.readTimeout = 30000; conn.instanceFollowRedirects = true
+                    require(conn.responseCode == 200)
+                    val bytes = conn.inputStream.use { it.readBytes() }
+                    require(bytes.size > 44 && String(bytes, 0, 4, Charsets.US_ASCII) == "RIFF")
+                    val tmp = java.io.File(context.cacheDir, "$name.part")
+                    tmp.writeBytes(bytes)
+                    val target = file(context, name)
+                    target.delete()
+                    require(tmp.renameTo(target))
+                }.isSuccess
+            }
+            main.post { done(ok) }
+        }.start()
     }
 }
 

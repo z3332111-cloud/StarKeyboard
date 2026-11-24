@@ -1,0 +1,40 @@
+name: 上傳機械軸聲音包
+
+# 機械軸的聲音不放進 App，鍵盤選到哪個軸才從公開的 nuonuo-keyboard 下載（sound-pack 發佈，每個檔案一個）。
+# SoundPack/ 的檔案由 tools/import_switch_sounds.py 產生；改了就重新上傳（同名覆蓋）。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "SoundPack/**"
+      - ".github/workflows/sound-pack.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sound-pack
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: 上傳到公開的 nuonuo-keyboard
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: z3332111-cloud/nuonuo-keyboard
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          target_commitish: main
+          tag_name: sound-pack
+          name: 糯糯鍵盤 機械軸聲音包
+          body: 鍵盤裡選到機械軸時才會下載的聲音（真實錄音，來自 kbsim，Copyright (c) Thomas Lai，MIT 授權，見 kbsim-LICENSE.txt）。不用手動下載。
+          files: |
+            SoundPack/*.wav
+            SoundPack/kbsim-LICENSE.txt
+          prerelease: true
+          make_latest: "false"
+          overwrite_files: true

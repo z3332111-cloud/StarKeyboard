@@ -2107,9 +2107,16 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 if (sample == pendingSample) pendingSample = -1
             }
         }
+        // 機械軸的聲音包還沒下載：先下載，好了再播
+        if (!SoundPacks.isReady(this, style)) {
+            downloadSound(style)
+            return
+        }
         var justLoaded = false
-        for (name in style.normalFiles + listOfNotNull(style.bigFile, style.releaseFile(false), style.releaseFile(true))) {
+        for (name in style.allFiles) {
             if (name in soundIds) continue
+            val f = SoundPacks.file(this, name)
+            if (style.mechanical && f.exists()) { soundIds[name] = pool.load(f.path, 1); justLoaded = true; continue }
             val res = resources.getIdentifier(name, "raw", packageName)
             if (res != 0) { soundIds[name] = pool.load(this, res, 1); justLoaded = true }
         }
@@ -2128,6 +2135,22 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         // 機械軸的錄音本身已經調好音量，照原本大小播；可愛音效維持小聲一點
         val vol = if (style.mechanical) 1f else 0.6f
         pool.play(id, vol, vol, 1, 0, rate)
+    }
+
+    /** 同一個軸只下載一次（失敗了下次再試） */
+    private val soundDownloads = HashSet<KeySound>()
+    private fun downloadSound(sound: KeySound) {
+        if (!soundDownloads.add(sound)) return
+        toast("正在下載「${sound.title}」的聲音…")
+        SoundPacks.download(this, sound) { ok ->
+            if (!ok) {
+                soundDownloads.remove(sound)
+                toast("「${sound.title}」下載失敗，檢查一下網路再試")
+                return@download
+            }
+            toast("「${sound.title}」下載好了")
+            if (settings.keySound && settings.keySoundStyle == sound.id) playKeySound()
+        }
     }
 
     /** 放開按鍵：機械軸再播一聲小小的彈回聲（檔案在按下去時已經一起載入） */

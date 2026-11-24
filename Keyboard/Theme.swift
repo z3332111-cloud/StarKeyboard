@@ -667,13 +667,12 @@ enum KeyEffect: String, CaseIterable {
     }
 }
 
-/// 系統鍵盤聲、短促柔和的叮叮聲、機械鍵盤軸的真實錄音（kbsim，MIT，tools/import_switch_sounds.py），
-/// 和麻將、木魚兩個合成的趣味音（tools/make_sounds.js）；舊音效選項會回到系統聲。
+/// 系統鍵盤聲、短促柔和的叮叮聲（App 內建），和機械鍵盤軸的真實錄音（kbsim，MIT，tools/import_switch_sounds.py）。
+/// 機械軸要用時才下載（SoundPacks），App 比較小。舊音效選項會回到系統聲。
 enum KeySound: String, CaseIterable {
     case system, tink
     case red, brown, blue, black, silent, cream, holypanda, topre, buckling
     case alpaca, blackink, turquoise, boxnavy, bluealps
-    case mahjong, woodfish
 
     var title: String {
         switch self {
@@ -693,10 +692,11 @@ enum KeySound: String, CaseIterable {
         case .turquoise: return "湖水綠軸"
         case .boxnavy: return "BOX 海軍軸"
         case .bluealps: return "藍色 Alps"
-        case .mahjong: return "麻將"
-        case .woodfish: return "木魚"
         }
     }
+
+    /// 機械軸：要下載的聲音包
+    var downloadable: Bool { self != .system && self != .tink }
 
     /// 這個音效用到的檔名（不含 .wav）。機械軸有 5 個輪流播的版本，加上大鍵（空白、換行、刪除）用的版本。
     var normalFiles: [String] {
@@ -707,19 +707,67 @@ enum KeySound: String, CaseIterable {
         }
     }
 
-    var bigFile: String? {
-        switch self {
-        case .system, .tink: return nil
-        default: return "key_\(rawValue)_big"
-        }
+    var bigFile: String? { downloadable ? "key_\(rawValue)_big" : nil }
+
+    /// 放開按鍵的聲音（真的機械鍵盤彈回來還有一聲）
+    func releaseFile(big: Bool) -> String? {
+        guard downloadable else { return nil }
+        return big ? "key_\(rawValue)_up_big" : "key_\(rawValue)_up"
     }
 
-    /// 放開按鍵的聲音（真的機械鍵盤彈回來還有一聲）；只有真實錄音的軸有
-    func releaseFile(big: Bool) -> String? {
-        switch self {
-        case .system, .tink, .mahjong, .woodfish: return nil
-        default: return big ? "key_\(rawValue)_up_big" : "key_\(rawValue)_up"
+    /// 這個音效全部的檔名（下載、載入用）
+    var allFiles: [String] {
+        normalFiles + [bigFile, releaseFile(big: false), releaseFile(big: true)].compactMap { $0 }
+    }
+}
+
+/// 要用再下載的機械軸聲音：放在 GitHub 的 sound-pack 發佈（每個檔案一個），下載後存在鍵盤自己的空間
+enum SoundPacks {
+    static func remote(_ name: String) -> URL {
+        URL(string: "https://github.com/z3332111-cloud/nuonuo-keyboard/releases/download/sound-pack/\(name).wav")!
+    }
+
+    private static var dir: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let d = base.appendingPathComponent("SoundPack", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }
+
+    /// 已經下載好的聲音檔
+    static func url(_ name: String) -> URL? {
+        let u = dir.appendingPathComponent(name + ".wav")
+        return FileManager.default.fileExists(atPath: u.path) ? u : nil
+    }
+
+    /// 這個軸的檔案都在了
+    static func isReady(_ sound: KeySound) -> Bool {
+        !sound.downloadable || sound.allFiles.allSatisfy { url($0) != nil }
+    }
+
+    /// 下載這個軸缺的檔案（每個只有幾 KB），全部成功才回報 true
+    static func download(_ sound: KeySound, done: @escaping (Bool) -> Void) {
+        let missing = sound.allFiles.filter { url($0) == nil }
+        let group = DispatchGroup()
+        let lock = NSLock()
+        var ok = true
+        for name in missing {
+            group.enter()
+            URLSession.shared.downloadTask(with: remote(name)) { tmp, response, _ in
+                var good = false
+                if let tmp = tmp, (response as? HTTPURLResponse)?.statusCode == 200,
+                   let data = try? Data(contentsOf: tmp, options: .mappedIfSafe), data.prefix(4) == Data("RIFF".utf8) {
+                    let target = dir.appendingPathComponent(name + ".wav")
+                    try? FileManager.default.removeItem(at: target)
+                    good = (try? FileManager.default.moveItem(at: tmp, to: target)) != nil
+                }
+                lock.lock()
+                if !good { ok = false }
+                lock.unlock()
+                group.leave()
+            }.resume()
         }
+        group.notify(queue: .main) { done(ok) }
     }
 }
 

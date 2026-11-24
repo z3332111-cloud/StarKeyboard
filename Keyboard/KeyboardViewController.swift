@@ -2579,18 +2579,40 @@ final class KeyboardViewController: UIInputViewController {
     private var lastSoundVariant = -1
 
     private func soundURL(_ name: String) -> URL? {
-        Bundle.main.url(forResource: name, withExtension: "wav")
+        SoundPacks.url(name) ?? Bundle.main.url(forResource: name, withExtension: "wav")
             ?? Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "Sounds")
     }
 
     private func prepareKeySound() {
         guard hasFullAccess, settings.keySound,
               let sound = KeySound(rawValue: settings.keySoundStyle) else { return }
-        let release = [sound.releaseFile(big: false), sound.releaseFile(big: true)].compactMap { $0 }
-        for name in sound.normalFiles + [sound.bigFile].compactMap({ $0 }) + release where soundIDs[name] == nil {
+        if !SoundPacks.isReady(sound) {
+            downloadSound(sound)
+            return
+        }
+        for name in sound.allFiles where soundIDs[name] == nil {
             guard let url = soundURL(name) else { continue }
             var id: SystemSoundID = 0
             if AudioServicesCreateSystemSoundID(url as CFURL, &id) == noErr { soundIDs[name] = id }
+        }
+    }
+
+    /// 機械軸的聲音包還沒下載：在背景下載，好了播一聲給你聽（同一個軸只試一次，下次打開鍵盤再試）
+    private var soundDownloads: Set<KeySound> = []
+    private func downloadSound(_ sound: KeySound) {
+        guard !soundDownloads.contains(sound) else { return }
+        soundDownloads.insert(sound)
+        toast("正在下載「\(sound.title)」的聲音…")
+        SoundPacks.download(sound) { [weak self] ok in
+            guard let self = self else { return }
+            guard ok else {
+                self.soundDownloads.remove(sound)
+                self.toast("「\(sound.title)」下載失敗，檢查一下網路再試")
+                return
+            }
+            self.prepareKeySound()
+            if self.settings.keySoundStyle == sound.rawValue && self.settings.keySound { self.playKeySound() }
+            self.toast("「\(sound.title)」下載好了")
         }
     }
 

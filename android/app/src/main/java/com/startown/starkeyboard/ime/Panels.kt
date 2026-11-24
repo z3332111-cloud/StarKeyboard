@@ -948,10 +948,11 @@ class SettingsPanel(
 
         header("聲音與震動")
         toggle("按鍵聲音", settings.keySound) { settings.keySound = it }
-        choices(KeySound.values().map { it.title }, KeySound.values().indexOfFirst { it.id == settings.keySoundStyle }) {
+        // 還沒下載的機械軸標一個 ⬇︎，點了會自動下載（每種只有幾十 KB）
+        choices(KeySound.values().map { if (SoundPacks.isReady(context, it)) it.title else it.title + " ⬇︎" }, KeySound.values().indexOfFirst { it.id == settings.keySoundStyle }) {
             settings.keySoundStyle = KeySound.values()[it].id; settings.keySound = true; onChange()
         }
-        note("點一下就會播放聽聽看。")
+        note("點一下就會播放聽聽看。標 ⬇︎ 的機械軸是真實錄音，第一次點會先下載，每種只有幾十 KB。")
         toggle("按鍵震動", settings.haptics) { settings.haptics = it }
 
         header("選字列高度")

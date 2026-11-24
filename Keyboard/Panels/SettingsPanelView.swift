@@ -391,13 +391,14 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         stack.addArrangedSubview(switchRow("按鍵聲音", on: settings.keySound) { [weak self] on in
             self?.settings.keySound = on
         })
-        stack.addArrangedSubview(choiceRow(KeySound.allCases.map { $0.title },
+        // 還沒下載的機械軸標一個 ⬇︎，點了會自動下載（每種只有幾十 KB）
+        stack.addArrangedSubview(choiceRow(KeySound.allCases.map { SoundPacks.isReady($0) ? $0.title : $0.title + " ⬇︎" },
                                            selected: KeySound.allCases.firstIndex { $0.rawValue == settings.keySoundStyle } ?? 0) { [weak self] i in
             self?.settings.keySoundStyle = KeySound.allCases[i].rawValue
             self?.settings.keySound = true
             self?.onChange?()
         })
-        stack.addArrangedSubview(note("點一下就會播放聽聽看（要打開「允許完整取用」）。"))
+        stack.addArrangedSubview(note("點一下就會播放聽聽看（要打開「允許完整取用」）。標 ⬇︎ 的機械軸是真實錄音，第一次點會先下載，每種只有幾十 KB。"))
         stack.addArrangedSubview(switchRow("按鍵震動", on: settings.haptics) { [weak self] on in
             self?.settings.haptics = on
         })
