@@ -25,6 +25,9 @@ sealed class KeyAction {
 
     /** 一般打字的鍵：可以滑動修正、快速連打 */
     val isCharacter get() = this is Text || this is Zhuyin || this is Jamo || this is Romaji || this is Pinyin
+
+    /** 大鍵：機械鍵盤上有衛星軸的那幾顆，按鍵聲比較低沉 */
+    val isBig get() = this == Space || this == Return || this == Backspace || this == Shift
 }
 
 enum class KeyKind { NORMAL, SPECIAL, ACCENT }

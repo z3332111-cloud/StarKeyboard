@@ -48,6 +48,14 @@ enum KeyAction: Equatable {
         default: return false
         }
     }
+
+    /// 大鍵：機械鍵盤上有衛星軸的那幾顆，按鍵聲比較低沉
+    var isBig: Bool {
+        switch self {
+        case .space, .returnKey, .backspace, .shift: return true
+        default: return false
+        }
+    }
 }
 
 enum KeyFace: Equatable {

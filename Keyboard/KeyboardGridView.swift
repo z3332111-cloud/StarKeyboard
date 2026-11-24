@@ -776,7 +776,8 @@ final class KeyboardGridView: UIView {
         }
     }
     /// 手指按下去的那一刻（震動、按鍵聲）
-    var onPress: (() -> Void)?
+    /// 手指按下去（參數：是不是空白、換行、刪除、Shift 這類大鍵，機械軸聲音會不一樣）
+    var onPress: ((Bool) -> Void)?
     /// 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去
     var glideEnabled = false
     var onGlide: (([CGPoint], [Character: CGPoint], CGFloat) -> Void)?
@@ -997,7 +998,7 @@ final class KeyboardGridView: UIView {
         }
         addSubview(v)
         popup = p
-        onPress?()
+        onPress?(false)
         selectPopup(at: touch.location(in: self))
     }
 
@@ -1019,7 +1020,7 @@ final class KeyboardGridView: UIView {
             c.backgroundColor = i == best ? style.theme.accent : .clear
             c.textColor = i == best ? style.theme.accentText : .white
         }
-        if best >= 0 { onPress?() }
+        if best >= 0 { onPress?(false) }
     }
 
     private func closePopup(commit: Bool) {
@@ -1072,7 +1073,7 @@ final class KeyboardGridView: UIView {
             fire(track.key)
         }
         for (touch, key) in fresh {
-            onPress?()
+            onPress?(key.spec.action.isBig)
             let p = touch.location(in: self)
             var track = Track(key: key, action: key.spec.action, origin: p)
             if glideEnabled && isLetter(key) { track.points.append(p) }

@@ -46,7 +46,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         }
     }
     /** 手指按下去的那一刻（震動、按鍵聲） */
-    var onPress: (() -> Unit)? = null
+    /** 手指按下去（參數：是不是空白、換行、刪除、Shift 這類大鍵，機械軸聲音會不一樣） */
+    var onPress: ((Boolean) -> Unit)? = null
     /** 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去 */
     var glideEnabled = false
     var onGlide: ((List<Pt>, Map<Char, Pt>, Float) -> Unit)? = null
@@ -790,7 +791,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
             RectF(cx, cy, cx + cw, cy + ch)
         }
         popup = Popup(pointer, items, box, cells)
-        onPress?.invoke()
+        onPress?.invoke(false)
         selectPopup(track.startX, track.startY)
         invalidate()
     }
@@ -809,7 +810,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         }
         if (best == p.selected) return
         p.selected = best
-        if (best >= 0) onPress?.invoke()
+        if (best >= 0) onPress?.invoke(false)
         invalidate()
     }
 
@@ -852,7 +853,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 val key = keyAt(e.getX(i), e.getY(i)) ?: return true
                 // 先亮起這顆鍵，再送出上一拍還沒放開的字。選字不能擋住按鍵變色。
                 setPressed(key, true)
-                onPress?.invoke()
+                onPress?.invoke(key.spec.action.isBig)
                 val track = Track(key, key.spec.action, e.getX(i), e.getY(i))
                 previewKey = previewFor(key)
                 if (glideEnabled && key.isLetter) track.points.add(Pt(e.getX(i), e.getY(i)))

@@ -329,7 +329,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun wire() {
         keyboard.onKey = { handle(it) }
         // 手指一按下去就震動、出聲（不用等放開）
-        keyboard.onPress = { feedback() }
+        keyboard.onPress = { big -> feedback(big) }
         keyboard.onLongPress = { showImePicker() }
         keyboard.onCursorMove = { steps -> moveCursor(steps); cursorTick() }   // 注音中間、編輯框的游標都在 moveCursor 裡處理
         keyboard.onCursorMode = { on -> if (on) cursorTick() }
@@ -2081,36 +2081,55 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     // ===== 回饋、提醒 =====
 
-    // 可愛按鍵音：第一次用到時才載入
+    // 可愛按鍵音、機械軸聲音：選到哪一種才載入那一種
     private var soundPool: android.media.SoundPool? = null
     private val soundIds = HashMap<String, Int>()
     private var lastSoundStyle = ""
+    private var lastSoundVariant = -1
+    private var pendingSample = -1
 
-    private fun playKeySound() {
+    private fun playKeySound(big: Boolean = false) {
         val style = KeySound.from(settings.keySoundStyle)
         if (style == KeySound.SYSTEM) {
             (getSystemService(Context.AUDIO_SERVICE) as AudioManager).playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, -1f)
             return
         }
-        val pool = soundPool ?: android.media.SoundPool.Builder().setMaxStreams(4).setAudioAttributes(
+        val pool = soundPool ?: android.media.SoundPool.Builder().setMaxStreams(6).setAudioAttributes(
             android.media.AudioAttributes.Builder()
                 .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
                 .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build(),
         ).build().also { p ->
             soundPool = p
-            for (s in KeySound.values()) {
-                if (s == KeySound.SYSTEM) continue
-                val res = resources.getIdentifier("key_" + s.id, "raw", packageName)
-                if (res != 0) soundIds[s.id] = p.load(this, res, 1)
+            // 剛換音效時檔案還在載入：載好再補播那一聲，換的時候才聽得到
+            p.setOnLoadCompleteListener { sp, sample, status ->
+                if (status == 0 && sample == pendingSample) sp.play(sample, 0.6f, 0.6f, 1, 0, 1f)
+                if (sample == pendingSample) pendingSample = -1
             }
         }
-        val id = soundIds[style.id] ?: return
-        // 每次音高差一點點，連打時比較不單調
-        pool.play(id, 0.6f, 0.6f, 1, 0, 0.94f + Math.random().toFloat() * 0.12f)
+        var justLoaded = false
+        for (name in style.normalFiles + listOfNotNull(style.bigFile)) {
+            if (name in soundIds) continue
+            val res = resources.getIdentifier(name, "raw", packageName)
+            if (res != 0) { soundIds[name] = pool.load(this, res, 1); justLoaded = true }
+        }
+        val name = (if (big) style.bigFile else null) ?: run {
+            val files = style.normalFiles
+            if (files.isEmpty()) return
+            var i = (Math.random() * files.size).toInt().coerceIn(0, files.size - 1)
+            if (files.size > 1 && i == lastSoundVariant) i = (i + 1) % files.size
+            lastSoundVariant = i
+            files[i]
+        }
+        val id = soundIds[name] ?: return
+        if (justLoaded) { pendingSample = id; return }
+        // 可愛音效每次音高差一點點；機械軸本來就有好幾個版本，只差一點點就好
+        val rate = if (style.mechanical) 0.98f + Math.random().toFloat() * 0.04f else 0.94f + Math.random().toFloat() * 0.12f
+        pool.play(id, 0.6f, 0.6f, 1, 0, rate)
     }
 
-    private fun feedback() {
-        if (settings.keySound) playKeySound()
+    /** big：空白、換行、刪除這類大鍵，機械軸會用比較低沉的聲音 */
+    private fun feedback(big: Boolean = false) {
+        if (settings.keySound) playKeySound(big)
         if (settings.haptics) buzz()
     }
 

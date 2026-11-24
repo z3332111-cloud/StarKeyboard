@@ -122,7 +122,7 @@
   // ===== 狀態 =====
   var S = {
     theme: 'lavender', shape: 'bunny', finish: 'puffy', artFinish: 'flat', effect: 'stars', font: 'system',
-    height: 1, fontScale: 1, gap: 1, sound: false,
+    height: 1, fontScale: 1, gap: 1, sound: false, soundStyle: 'tink',
     modes: ['zhuyin', 'english', 'pinyin', 'japanese', 'korean', 'handwriting'], mode: 'zhuyin', layer: 'letters', shift: 'off', fullWidth: true,
     text: '', caret: 0,
     zy: '', py: '', romaji: '', simplified: false, hangul: null,
@@ -1012,7 +1012,7 @@
     group('按鍵質感', isArtTheme() ? FINISHES.filter(function (f) { return ART_FINISHES.indexOf(f[0]) >= 0; }) : FINISHES, isArtTheme() ? S.artFinish : S.finish, setFinish);
     group('按鍵特效', EFFECTS, S.effect, setEffect);
     group('字體', FONTS, S.font, setFont);
-    group('按鍵聲', [['off', '關'], ['on', '叮叮']], S.sound ? 'on' : 'off', function (v) { S.sound = v === 'on'; $('sim-sound').checked = S.sound; render(); });
+    group('按鍵聲', [['off', '關']].concat(SOUNDS), S.sound ? S.soundStyle : 'off', function (v) { S.sound = v !== 'off'; if (S.sound) S.soundStyle = v; $('sim-sound').checked = S.sound; render(); sound(); });
     return s;
   }
 
@@ -1119,10 +1119,13 @@
   }
 
   // ===== 觸控：按下去的樣子、特效、刪除鍵連續刪、空白鍵拖曳移動游標 =====
-  var audio = null, repeatTimer = null, drag = null;
+  // 按鍵聲：叮叮和各種機械軸（tools/make_sounds.js 合成，網站只放每種的第一個版本）
+  var SOUNDS = [['tink', '叮叮'], ['red', '紅軸'], ['brown', '茶軸'], ['blue', '青軸'], ['black', '黑軸'], ['silent', '靜音軸'], ['cream', '奶油軸'], ['typewriter', '打字機'], ['mahjong', '麻將'], ['woodfish', '木魚']];
+  var audios = {}, repeatTimer = null, drag = null;
   function sound() {
     if (!S.sound) return;
-    if (!audio) { audio = new Audio('assets/preview-tink.wav'); audio.volume = .5; }
+    var st = S.soundStyle, audio = audios[st];
+    if (!audio) { audio = audios[st] = new Audio(st === 'tink' ? 'assets/preview-tink.wav' : 'assets/sounds/' + st + '.wav'); audio.volume = .5; }
     try { audio.currentTime = 0; audio.play().catch(function () {}); } catch (e) {}
   }
   function spawnFx(b) {

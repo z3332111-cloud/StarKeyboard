@@ -540,7 +540,7 @@ final class KeyboardViewController: UIInputViewController {
     private func wireCallbacks() {
         grid.onKey = { [weak self] spec in self?.handle(spec) }
         // 手指一按下去就震動、出聲（不用等放開）
-        grid.onPress = { [weak self] in self?.feedback() }
+        grid.onPress = { [weak self] big in self?.feedback(big: big) }
         grid.onGlobe = { [weak self] view, event in
             guard let event = event else { return }
             self?.handleInputModeList(from: view, with: event)
@@ -2557,32 +2557,55 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: - 回饋
 
-    // 可愛按鍵音：第一次用到時才載入
+    // 可愛按鍵音、機械軸聲音：選到哪一種才載入那一種
     private var soundIDs: [String: SystemSoundID] = [:]
     private lazy var lastSoundStyle = settings.keySoundStyle
+    private var lastSoundVariant = -1
+
+    private func soundURL(_ name: String) -> URL? {
+        Bundle.main.url(forResource: name, withExtension: "wav")
+            ?? Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "Sounds")
+    }
 
     private func prepareKeySound() {
         guard hasFullAccess, settings.keySound,
-              KeySound(rawValue: settings.keySoundStyle) == .tink,
-              soundIDs["tink"] == nil,
-              let url = Bundle.main.url(forResource: "key_tink", withExtension: "wav")
-                ?? Bundle.main.url(forResource: "key_tink", withExtension: "wav", subdirectory: "Sounds") else { return }
-        var id: SystemSoundID = 0
-        if AudioServicesCreateSystemSoundID(url as CFURL, &id) == noErr { soundIDs["tink"] = id }
+              let sound = KeySound(rawValue: settings.keySoundStyle) else { return }
+        for name in sound.normalFiles + [sound.bigFile].compactMap({ $0 }) where soundIDs[name] == nil {
+            guard let url = soundURL(name) else { continue }
+            var id: SystemSoundID = 0
+            if AudioServicesCreateSystemSoundID(url as CFURL, &id) == noErr { soundIDs[name] = id }
+        }
     }
 
-    private func playKeySound() {
-        if KeySound(rawValue: settings.keySoundStyle) == .tink, let id = soundIDs["tink"] {
+    private func playKeySound(big: Bool = false) {
+        guard let sound = KeySound(rawValue: settings.keySoundStyle), sound != .system else {
+            // 使用公開的鍵盤音效 API，跟隨系統鍵盤聲音設定。
+            UIDevice.current.playInputClick()
+            return
+        }
+        let name: String
+        if big, let b = sound.bigFile {
+            name = b
+        } else {
+            // 機械軸有好幾個版本：每次換一個，連打才不會一模一樣
+            let files = sound.normalFiles
+            guard !files.isEmpty else { return }
+            var i = Int.random(in: 0..<files.count)
+            if files.count > 1 && i == lastSoundVariant { i = (i + 1) % files.count }
+            lastSoundVariant = i
+            name = files[i]
+        }
+        if let id = soundIDs[name] {
             AudioServicesPlaySystemSound(id)
         } else {
-            // 使用公開的鍵盤音效 API，跟隨系統鍵盤聲音設定。
             UIDevice.current.playInputClick()
         }
     }
 
-    private func feedback() {
+    /// big：空白、換行、刪除這類大鍵，機械軸會用比較低沉的聲音
+    private func feedback(big: Bool = false) {
         guard hasFullAccess else { return }
-        if settings.keySound { playKeySound() }
+        if settings.keySound { playKeySound(big: big) }
         if settings.haptics {
             haptic.impactOccurred()
             haptic.prepare()   // 先暖機，下一次按才不會慢半拍

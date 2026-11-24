@@ -455,9 +455,22 @@ enum class KeyEffect(val id: String, val title: String, val glyphs: List<String>
     }
 }
 
-/** 按鍵音：系統的喀喀聲，或 App 附的合成音（tools/make_sounds.js） */
-enum class KeySound(val id: String, val title: String) {
-    SYSTEM("system", "系統"), BUBBLE("bubble", "泡泡"), MARIMBA("marimba", "木琴"), BELL("bell", "叮鈴"), POP("pop", "啵啵");
+/** 按鍵音：系統的喀喀聲，或 App 附的合成音（tools/make_sounds.js）。mechanical＝機械軸，有 3 個輪流播的版本和大鍵用的低沉版 */
+enum class KeySound(val id: String, val title: String, val mechanical: Boolean = false) {
+    SYSTEM("system", "系統"), BUBBLE("bubble", "泡泡"), MARIMBA("marimba", "木琴"), BELL("bell", "叮鈴"), POP("pop", "啵啵"),
+    RED("red", "紅軸", true), BROWN("brown", "茶軸", true), BLUE("blue", "青軸", true), BLACK("black", "黑軸", true),
+    SILENT("silent", "靜音軸", true), CREAM("cream", "奶油軸", true), TYPEWRITER("typewriter", "打字機", true),
+    MAHJONG("mahjong", "麻將", true), WOODFISH("woodfish", "木魚", true);
+
+    /** 一般鍵輪流播的檔名（res/raw，不含副檔名） */
+    val normalFiles: List<String> get() = when {
+        this == SYSTEM -> emptyList()
+        mechanical -> (1..3).map { "key_${id}_$it" }
+        else -> listOf("key_$id")
+    }
+
+    /** 空白、換行、刪除、Shift 用的檔名 */
+    val bigFile: String? get() = if (mechanical) "key_${id}_big" else null
 
     companion object {
         fun from(id: String) = values().firstOrNull { it.id == id } ?: SYSTEM
