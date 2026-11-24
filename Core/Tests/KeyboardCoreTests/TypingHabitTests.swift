@@ -31,6 +31,21 @@ final class TypingHabitTests: XCTestCase {
         XCTAssertTrue(trap.isEmpty, "\(trap)")
     }
 
+    /// 打完整的 ㄉㄧ 後面接單獨的 ㄧ（一）：是「第一個」，不是把 ㄉㄧ 拆成 ㄉ＋ㄧ 的「都有一個」
+    func testFullSyllableNotSplitBeforeBareMedial() throws {
+        let e = try engine()
+        let s = session(e, "ㄉㄧㄧㄍㄜㄔㄨㄒ")
+        let first = s.candidates.first?.text ?? ""
+        XCTAssertTrue(first.hasPrefix("第一個"), "\(s.composer.readings) \(s.candidates.prefix(5).map { $0.text })")
+    }
+
+    /// 前面打的是完整音節，後面只打聲母：中間的 ㄔㄨ 不拆成 ㄔ＋ㄨ（個出現，不是個吃完）
+    func testFullSyllableNotSplitAfterFullSyllable() throws {
+        XCTAssertEqual(ZhuyinEngine.settleSplits(["ㄍㄜ*~", "ㄔㄨ*~", "ㄒ*"]), ["ㄍㄜ*", "ㄔㄨ*", "ㄒ*"])
+        // 全都是簡拼時照樣可以拆（ㄋ ㄏ ㄎㄞ：你好可愛）
+        XCTAssertEqual(ZhuyinEngine.settleSplits(["ㄋ*", "ㄏ*", "ㄎㄞ*~"]), ["ㄋ*", "ㄏ*", "ㄎㄞ*~"])
+    }
+
     /// 同一個音連打好幾次是故意重複：晚安安安安不會被換成晚安按
     func testRepeatedSyllablesStayRepeated() throws {
         let e = try engine()

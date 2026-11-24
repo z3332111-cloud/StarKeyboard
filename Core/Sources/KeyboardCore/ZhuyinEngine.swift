@@ -133,14 +133,19 @@ final class ZhuyinEngine {
         return [String(body[0]) + "*", String(body[1]) + "*"]
     }
 
-    /// 後面接的是打完整的音節（不是只打聲母）：使用者回到完整打法，前面那個就不拆（ㄏ ㄎㄞ ㄒㄧㄣ 是好開心，不是好可愛心）
+    /// 可能是兩個簡拼字的音節（ㄎㄞ），只有前後都是「只打聲母」的簡拼時才拆。
+    /// - 後面接打完整的音節：使用者回到完整打法，不拆（ㄏ ㄎㄞ ㄒㄧㄣ 是好開心，不是好可愛心）
+    /// - 前面是打完整的音節：使用者正在打完整的字，不拆（ㄍㄜ ㄔㄨ ㄒ 是個出現，不是個吃完…）
+    /// - 單獨的 ㄧ、ㄨ、ㄩ 本身就是完整的字（一、無、魚），不算簡拼的證據（ㄉㄧ ㄧ ㄍㄜ 是第一個，不是都有一個）
     static func settleSplits(_ readings: [String]) -> [String] {
+        func isBareInitial(_ r: String) -> Bool {
+            r.count == 2 && r.hasSuffix("*") && r.first.flatMap { Bopomofo.kind(of: $0) } == .initial
+        }
         var out = readings
-        for j in out.indices.dropLast() where out[j].hasSuffix("~") {
-            let next = out[j + 1]   // 只打一個注音的寫法是「ㄏ*」「ㄧ*」；只打韻母（ㄢ*）是完整的字「安」，不算簡拼
-            let lead = next.first.flatMap { Bopomofo.kind(of: $0) }
-            let nextIsBare = next.count == 2 && next.hasSuffix("*") && (lead == .initial || lead == .medial)
-            if !nextIsBare { out[j].removeLast() }
+        for j in out.indices where out[j].hasSuffix("~") {
+            let nextOK = j == out.count - 1 || isBareInitial(readings[j + 1])
+            let prevOK = j == 0 || isBareInitial(readings[j - 1])
+            if !(nextOK && prevOK) { out[j].removeLast() }
         }
         return out
     }
