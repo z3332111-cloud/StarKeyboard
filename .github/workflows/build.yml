@@ -20,23 +20,14 @@ concurrency:
   group: build-${{ github.ref_name }}
   cancel-in-progress: true
 
+# 為了快一點：先在 Linux 準備字典和字體（約 2 分鐘），
+# 再同時開三台 Mac：核心測試、角色主題測試、編譯 IPA；三個都過了才發佈。
 jobs:
-  build:
-    # ARM runners have repeatedly timed out while waiting for capacity.
-    runs-on: macos-15-intel
-    timeout-minutes: 45
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 選用 Xcode 26（原生 Liquid Glass 需要 iOS 26 SDK）
-        run: |
-          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
-          xcodebuild -version
-
-      - name: 讀取公開版本
-        run: echo "APP_VERSION=$(cat VERSION)" >> "$GITHUB_ENV"
 
       - name: 字體下載重試與備援測試（本機 HTTP，不連外）
         run: python3 -m unittest discover -s tools/tests -p 'test_download_font.py' -v
@@ -89,6 +80,36 @@ jobs:
           curl -sSfL -o "$RUNNER_TEMP/en_50k.txt" https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/en/en_50k.txt
           python3 tools/build_words.py "$RUNNER_TEMP/en_50k.txt" Keyboard/Resources/glide_words.txt
 
+      - name: 保存準備好的字典、字體、字表
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-resources
+          retention-days: 3
+          if-no-files-found: error
+          path: |
+            Keyboard/Resources/zhuyin.sqlite
+            Keyboard/Resources/McBopomofo-LICENSE.txt
+            Keyboard/Resources/Fonts/
+            Keyboard/Resources/glide_words.txt
+            FontPack/
+
+  core-tests:
+    needs: prepare
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 選用 Xcode 26（原生 Liquid Glass 需要 iOS 26 SDK）
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+
+      - name: 拿準備好的字典、字體、字表
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-resources
+
       - name: 核心邏輯測試（注音組字、選字、剪貼簿）
         run: swift test --package-path Core
 
@@ -100,9 +121,26 @@ jobs:
           node tools/build_fox_letter_prototype.js --check
           node tools/build_fox_letter_theme.js --check
 
+
+  theme-tests:
+    needs: prepare
+    runs-on: macos-15-intel
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 選用 Xcode 26（原生 Liquid Glass 需要 iOS 26 SDK）
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+
+      - name: 拿準備好的字典、字體、字表
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-resources
+
       - name: 產生 Xcode 專案
         run: |
-          xcodebuild -version
           brew install xcodegen
           xcodegen generate
 
@@ -127,6 +165,33 @@ jobs:
             ${{ runner.temp }}/fox-letter-tests.log
           if-no-files-found: ignore
 
+
+  build:
+    needs: prepare
+    # ARM runners have repeatedly timed out while waiting for capacity.
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 選用 Xcode 26（原生 Liquid Glass 需要 iOS 26 SDK）
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+
+      - name: 讀取公開版本
+        run: echo "APP_VERSION=$(cat VERSION)" >> "$GITHUB_ENV"
+
+      - name: 拿準備好的字典、字體、字表
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-resources
+
+      - name: 產生 Xcode 專案
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
       - name: 編譯
         run: |
           xcodebuild -project StarKeyboard.xcodeproj -scheme StarKeyboard -configuration Release \
@@ -149,6 +214,37 @@ jobs:
         with:
           name: StarKeyboard-ipa
           path: StarKeyboard.ipa
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
+
+  release:
+    # 測試和編譯都過了才發佈；拉取請求只跑到上面為止
+    needs: [core-tests, theme-tests, build]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 讀取公開版本
+        run: echo "APP_VERSION=$(cat VERSION)" >> "$GITHUB_ENV"
+
+      - name: 拿打包好的 IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: StarKeyboard-ipa
+
+      - name: 拿字體包
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-resources
 
       - name: 整理這次更新了什麼
         run: |
@@ -206,10 +302,3 @@ jobs:
         run: |
           gh release view font-pack --repo "$PUBLIC_REPO" >/dev/null 2>&1 || gh release create font-pack --repo "$PUBLIC_REPO" --target main --title "糯糯鍵盤 字體包" --notes "鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。" --prerelease --latest=false
           gh release upload font-pack FontPack/*.ttf --repo "$PUBLIC_REPO" --clobber
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: build-log
-          path: build.log
-          if-no-files-found: ignore
