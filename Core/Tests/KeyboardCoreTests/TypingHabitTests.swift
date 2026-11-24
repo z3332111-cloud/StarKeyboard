@@ -46,6 +46,21 @@ final class TypingHabitTests: XCTestCase {
         XCTAssertEqual(ZhuyinEngine.settleSplits(["ㄋ*", "ㄏ*", "ㄎㄞ*~"]), ["ㄋ*", "ㄏ*", "ㄎㄞ*~"])
     }
 
+    /// 使用者回報：沒打聲調的「回房間」變成「會房間」、「閃退」變成「閃推」。
+    /// 就算常選「會」（學過很多次），整個詞還是贏
+    func testReportedPhrasesWithoutTones() throws {
+        let e = try engine()
+        for _ in 0..<5 {
+            e.learn(readings: ["ㄏㄨㄟˋ"], text: "會")
+            e.learn(readings: ["ㄏㄨㄟ*"], text: "會")
+        }
+        XCTAssertEqual(session(e, "ㄏㄨㄟㄈㄤㄐㄧㄢ").candidates.first?.text, "回房間")
+        XCTAssertEqual(session(e, "ㄕㄢㄊㄨㄟ").candidates.first?.text, "閃退")
+        XCTAssertEqual(session(e, "ㄕㄨㄚㄈㄟ").candidates.first?.text, "耍廢")
+        // 只打「ㄏㄨㄟ」還是學過的「會」
+        XCTAssertEqual(session(e, "ㄏㄨㄟ").candidates.first?.text, "會")
+    }
+
     /// 同一個音連打好幾次是故意重複：晚安安安安不會被換成晚安按
     func testRepeatedSyllablesStayRepeated() throws {
         let e = try engine()
