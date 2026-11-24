@@ -811,6 +811,8 @@ final class KeyboardGridView: UIView {
     }
     /// 手指按下去的那一刻（震動、按鍵聲；參數：是不是空白、換行、刪除、Shift 這類大鍵，機械軸聲音會不一樣）
     var onPress: ((Bool) -> Void)?
+    /// 手指放開（機械軸的「放開」聲；參數同 onPress）
+    var onRelease: ((Bool) -> Void)?
     /// 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去
     var glideEnabled = false
     var onGlide: (([CGPoint], [Character: CGPoint], CGFloat) -> Void)?
@@ -1192,6 +1194,7 @@ final class KeyboardGridView: UIView {
             }
             guard let track = tracks.removeValue(forKey: touch) else { continue }
             track.key.isPressed = false
+            if !track.cursorMode && !track.gliding { onRelease?(track.action.isBig) }
             switch track.action {
             case .backspace:
                 stopRepeat()

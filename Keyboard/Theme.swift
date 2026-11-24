@@ -707,6 +707,14 @@ enum KeySound: String, CaseIterable {
         default: return "key_\(rawValue)_big"
         }
     }
+
+    /// 放開按鍵的聲音（真的機械鍵盤彈回來還有一聲）；只有真實錄音的軸有
+    func releaseFile(big: Bool) -> String? {
+        switch self {
+        case .system, .tink, .mahjong, .woodfish: return nil
+        default: return big ? "key_\(rawValue)_up_big" : "key_\(rawValue)_up"
+        }
+    }
 }
 
 /// 按鍵和候選字用的字體（App 裡附的免費字體，SIL OFL 1.1）

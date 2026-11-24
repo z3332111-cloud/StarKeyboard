@@ -541,6 +541,7 @@ final class KeyboardViewController: UIInputViewController {
         grid.onKey = { [weak self] spec in self?.handle(spec) }
         // 手指一按下去就震動、出聲（不用等放開）
         grid.onPress = { [weak self] big in self?.feedback(big: big) }
+        grid.onRelease = { [weak self] big in self?.playReleaseSound(big: big) }
         grid.onGlobe = { [weak self] view, event in
             guard let event = event else { return }
             self?.handleInputModeList(from: view, with: event)
@@ -2570,7 +2571,8 @@ final class KeyboardViewController: UIInputViewController {
     private func prepareKeySound() {
         guard hasFullAccess, settings.keySound,
               let sound = KeySound(rawValue: settings.keySoundStyle) else { return }
-        for name in sound.normalFiles + [sound.bigFile].compactMap({ $0 }) where soundIDs[name] == nil {
+        let release = [sound.releaseFile(big: false), sound.releaseFile(big: true)].compactMap { $0 }
+        for name in sound.normalFiles + [sound.bigFile].compactMap({ $0 }) + release where soundIDs[name] == nil {
             guard let url = soundURL(name) else { continue }
             var id: SystemSoundID = 0
             if AudioServicesCreateSystemSoundID(url as CFURL, &id) == noErr { soundIDs[name] = id }
@@ -2600,6 +2602,14 @@ final class KeyboardViewController: UIInputViewController {
         } else {
             UIDevice.current.playInputClick()
         }
+    }
+
+    /// 放開按鍵：機械軸再播一聲小小的彈回聲（不震動）
+    private func playReleaseSound(big: Bool) {
+        guard hasFullAccess, settings.keySound,
+              let name = KeySound(rawValue: settings.keySoundStyle)?.releaseFile(big: big),
+              let id = soundIDs[name] else { return }
+        AudioServicesPlaySystemSound(id)
     }
 
     /// big：空白、換行、刪除這類大鍵，機械軸會用比較低沉的聲音

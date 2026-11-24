@@ -48,6 +48,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     /** 手指按下去的那一刻（震動、按鍵聲） */
     /** 手指按下去（參數：是不是空白、換行、刪除、Shift 這類大鍵，機械軸聲音會不一樣） */
     var onPress: ((Boolean) -> Unit)? = null
+    /** 手指放開（機械軸的「放開」聲；參數同 onPress） */
+    var onRelease: ((Boolean) -> Unit)? = null
     /** 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去 */
     var glideEnabled = false
     var onGlide: ((List<Pt>, Map<Char, Pt>, Float) -> Unit)? = null
@@ -971,6 +973,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 }
                 val t = tracks.remove(e.getPointerId(e.actionIndex)) ?: return true
                 setPressed(t.key, false)
+                if (!t.cursorMode && !t.gliding) onRelease?.invoke(t.action.isBig)
                 if (tracks.isEmpty() || previewKey === t.key) { previewKey = null; invalidate() }
                 if (t.action == KeyAction.Backspace) stopRepeat()
                 if (t.action == KeyAction.NextMode) longPressRunnable?.let { mainHandler.removeCallbacks(it) }

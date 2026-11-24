@@ -330,6 +330,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         keyboard.onKey = { handle(it) }
         // 手指一按下去就震動、出聲（不用等放開）
         keyboard.onPress = { big -> feedback(big) }
+        keyboard.onRelease = { big -> if (settings.keySound) playReleaseSound(big) }
         keyboard.onLongPress = { showImePicker() }
         keyboard.onCursorMove = { steps -> moveCursor(steps); cursorTick() }   // 注音中間、編輯框的游標都在 moveCursor 裡處理
         keyboard.onCursorMode = { on -> if (on) cursorTick() }
@@ -2107,7 +2108,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             }
         }
         var justLoaded = false
-        for (name in style.normalFiles + listOfNotNull(style.bigFile)) {
+        for (name in style.normalFiles + listOfNotNull(style.bigFile, style.releaseFile(false), style.releaseFile(true))) {
             if (name in soundIds) continue
             val res = resources.getIdentifier(name, "raw", packageName)
             if (res != 0) { soundIds[name] = pool.load(this, res, 1); justLoaded = true }
@@ -2124,7 +2125,16 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         if (justLoaded) { pendingSample = id; return }
         // 可愛音效每次音高差一點點；機械軸本來就有好幾個版本，只差一點點就好
         val rate = if (style.mechanical) 0.98f + Math.random().toFloat() * 0.04f else 0.94f + Math.random().toFloat() * 0.12f
-        pool.play(id, 0.6f, 0.6f, 1, 0, rate)
+        // 機械軸的錄音本身已經調好音量，照原本大小播；可愛音效維持小聲一點
+        val vol = if (style.mechanical) 1f else 0.6f
+        pool.play(id, vol, vol, 1, 0, rate)
+    }
+
+    /** 放開按鍵：機械軸再播一聲小小的彈回聲（檔案在按下去時已經一起載入） */
+    private fun playReleaseSound(big: Boolean) {
+        val name = KeySound.from(settings.keySoundStyle).releaseFile(big) ?: return
+        val id = soundIds[name] ?: return
+        soundPool?.play(id, 1f, 1f, 1, 0, 0.98f + Math.random().toFloat() * 0.04f)
     }
 
     /** big：空白、換行、刪除這類大鍵，機械軸會用比較低沉的聲音 */

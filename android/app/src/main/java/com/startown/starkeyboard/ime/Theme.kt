@@ -481,6 +481,10 @@ enum class KeySound(val id: String, val title: String, val mechanical: Boolean =
     /** 空白、換行、刪除、Shift 用的檔名 */
     val bigFile: String? get() = if (mechanical) "key_${id}_big" else null
 
+    /** 放開按鍵的聲音（真的機械鍵盤彈回來還有一聲）；只有真實錄音的軸有 */
+    fun releaseFile(big: Boolean): String? =
+        if (!mechanical || this == MAHJONG || this == WOODFISH) null else if (big) "key_${id}_up_big" else "key_${id}_up"
+
     companion object {
         fun from(id: String) = values().firstOrNull { it.id == id } ?: SYSTEM
     }
