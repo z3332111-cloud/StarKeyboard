@@ -391,6 +391,7 @@ final class KeyboardViewController: UIInputViewController {
             foxFellBack = nil
             toast(message)
         }
+        restoreMissingFont()
         clearFoxLaunchSoon()
         layoutDiagnostics.record("viewDidAppear.beforeExistingHeightReset", force: true)
         // 鍵盤剛載入時設的高度有時會被系統忽略：出現後重新套一次
@@ -2290,6 +2291,20 @@ final class KeyboardViewController: UIInputViewController {
             } else {
                 self.toast("下載失敗，檢查一下網路再試")
             }
+        }
+    }
+
+    /// 選了要下載的字體、但檔案不在（例如粉圓以前內建、現在改成要用再下載）：自動在背景補下載一次
+    private var triedRestoringFont = false
+    private func restoreMissingFont() {
+        let id = settings.fontID
+        guard !triedRestoringFont, hasFullAccess, let f = KeyFont(rawValue: id), !f.bundled,
+              !FontPacks.isReady(id) else { return }
+        triedRestoringFont = true
+        FontPacks.download(id) { [weak self] ok in
+            guard ok, let self = self else { return }
+            self.settingsChanged()
+            self.toast("「\(f.title)」字體下載好了")
         }
     }
 

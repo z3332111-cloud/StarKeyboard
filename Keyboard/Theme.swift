@@ -739,8 +739,8 @@ enum KeyFont: String, CaseIterable {
         }
     }
 
-    /// 放在 App 裡的字體；其他的要用時才下載（FontPacks）
-    var bundled: Bool { self == .system || self == .huninn }
+    /// 放在 App 裡的字體；其他的要用時才下載（FontPacks）。粉圓 3MB 也改成要用再下載，App 比較小
+    var bundled: Bool { self == .system }
 }
 
 /// 要用再下載的字體：放在 GitHub 的 font-pack 發佈，下載後存在鍵盤自己的空間，可以移除、之後再下載

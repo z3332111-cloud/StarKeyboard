@@ -72,9 +72,9 @@ jobs:
           download_font naikai.ttf https://raw.githubusercontent.com/max32002/naikaifont/master/tw/NaikaiFont-Regular-Lite.ttf
           download_font cubic.ttf https://raw.githubusercontent.com/ACh-K/Cubic-11/main/fonts/ttf/Cubic_11.ttf
           "$RUNNER_TEMP/venv/bin/python" tools/build_fonts.py Keyboard/Resources/zhuyin.sqlite Keyboard/Resources/Fonts huninn="$RUNNER_TEMP/huninn.ttf" iansui="$IANSUI" wenkai="$RUNNER_TEMP/wenkai.ttf" gensen="$GENSEN" naikai="$RUNNER_TEMP/naikai.ttf" cubic="$RUNNER_TEMP/cubic.ttf"
-          # 只有粉圓放進 App，其他字體做成「要用再下載」的字體包，鍵盤才不會越來越大
+          # 字體都做成「要用再下載」的字體包（粉圓也是），App 才不會越來越大
           mkdir -p FontPack
-          for f in iansui wenkai gensen naikai cubic; do mv "Keyboard/Resources/Fonts/$f.ttf" FontPack/ 2>/dev/null || true; done
+          for f in huninn iansui wenkai gensen naikai cubic; do mv "Keyboard/Resources/Fonts/$f.ttf" FontPack/ 2>/dev/null || true; done
           ls -la Keyboard/Resources/Fonts FontPack
 
       - name: 下載英文常用字表（滑行輸入用；FrequencyWords，CC BY-SA 4.0）
