@@ -133,6 +133,43 @@
   dd { margin: 2px 0 0; color: var(--muted); }
   footer { color: var(--muted); font-size: 13px; }
 
+  /* 最上面的下載按鈕：大顆、一眼看到 */
+  .hero-dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+  .hero-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 52px;
+    border-radius: 16px; text-decoration: none; font: 700 16px var(--display, inherit);
+    background: var(--card); color: var(--accent); border: 2px solid var(--accent);
+  }
+  .hero-btn.primary { background: var(--accent); color: var(--card); box-shadow: 0 6px 16px rgba(0,0,0,.12); }
+  .hero-btn:active { transform: scale(.98); }
+  .hero-help { grid-column: 1 / -1; margin: 2px 0 0; font-size: 14px; }
+  .hero-help a { font-weight: 700; margin-right: 10px; }
+  @media (max-width: 360px) { .hero-dl { grid-template-columns: 1fr; } }
+
+  /* 黏在最上面的快速選單（可以左右滑） */
+  .quick-nav {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 6; display: flex; gap: 6px; overflow-x: auto;
+    padding: 8px 0; margin: 10px 0; background: var(--bg); scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .quick-nav::-webkit-scrollbar { display: none; }
+  .quick-nav a {
+    flex: none; text-decoration: none; color: var(--fg); background: var(--card); border: 1.5px solid var(--line);
+    border-radius: 999px; padding: 8px 14px; font-weight: 600; font-size: 14px; white-space: nowrap;
+  }
+  .quick-nav a:active { background: var(--soft); }
+  /* iPhone／Android 切換黏在快速選單下面，不會疊在一起 */
+  .switch { top: calc(env(safe-area-inset-top, 0px) + 52px) !important; }
+  html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 110px) !important; }
+
+  /* 回到最上面 */
+  .to-top {
+    position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 8;
+    width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; text-decoration: none;
+    background: var(--accent); color: var(--card); font-size: 22px; font-weight: 700; box-shadow: 0 6px 16px rgba(0,0,0,.18);
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .to-top.show { opacity: 1; pointer-events: auto; }
+
   /* 更新紀錄：最新一版展開，其他摺起來 */
   .changelog { margin: 28px 0; }
   .changelog .log-item, .changelog .log-more { border: 1px solid rgba(0,0,0,.08); border-radius: 12px; margin: 8px 0; background: rgba(255,255,255,.6); }
@@ -146,14 +183,24 @@
   .changelog .log-more .log-item { margin: 6px 10px; }
 </style>
 
-<div class="wrap">
+<div class="wrap" id="top">
   <header style="display:flex;flex-direction:column;gap:8px">
     <div class="brand"><img src="assets/app-icon.png?v=4" alt="深色底紫色透視線條鍵盤" width="76" height="76"><div><h1>糯糯鍵盤</h1><small>軟軟的按鍵，記住你的每一句。</small></div></div>
     <p class="note">原「星星鍵盤」・下載與安裝說明</p>
     <p class="lead">把喜歡的造型、顏色和常說的話，放進每天用的手機鍵盤。支援 iPhone 與 Android，目前提供自行安裝版本。</p>
-    <nav class="preview-jump" aria-label="頁面導覽"><a href="#features" class="catalog-nav">完整功能一覽 ↓</a>
-      <a href="#preview">看看外觀與功能 ↓</a><a href="#install">前往下載與安裝 ↓</a></nav>
+    <!-- 最重要的兩顆：一打開就看得到的下載按鈕（用哪種手機的那顆會排前面、比較顯眼） -->
+    <div class="hero-dl" id="download">
+      <a class="hero-btn" id="hero-iphone" data-platform="iphone" href="https://github.com/z3332111-cloud/nuonuo-keyboard/releases/latest/download/StarKeyboard.ipa"><span aria-hidden="true">⬇</span> 下載 iPhone 版</a>
+      <a class="hero-btn" id="hero-android" data-platform="android" href="https://github.com/z3332111-cloud/nuonuo-keyboard/releases/download/android-latest/StarKeyboard.apk"><span aria-hidden="true">⬇</span> 下載 Android 版</a>
+      <p class="hero-help">第一次裝？👉 <a href="#install" data-phone="iphone">iPhone 安裝教學</a>　<a href="#install" data-phone="android">Android 安裝教學</a></p>
+    </div>
   </header>
+
+  <!-- 一直黏在最上面的快速選單：任何位置都能一下跳到想去的地方 -->
+  <nav class="quick-nav" aria-label="快速前往">
+    <a href="#download">⬇ 下載</a><a href="#install">📖 安裝教學</a><a href="#preview">⌨️ 試玩</a><a href="#features">✨ 功能</a><a href="#changelog">🆕 更新紀錄</a><a href="#faq">❓ 常見問題</a>
+  </nav>
+  <a class="to-top" href="#top" aria-label="回到最上面">↑</a>
 
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden"><defs><linearGradient id="sim-shade-metal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".8"/><stop offset=".3" stop-color="#fff" stop-opacity=".35"/><stop offset=".5" stop-color="#000" stop-opacity=".38"/><stop offset=".62" stop-color="#fff" stop-opacity=".45"/><stop offset=".82" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".45"/></linearGradient><linearGradient id="sim-shade-liquid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset=".8" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".55"/></linearGradient><linearGradient id="sim-shade-flat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".3"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".04"/></linearGradient><linearGradient id="sim-shade-puffy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".13"/></linearGradient><linearGradient id="sim-shade-raised" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".12"/></linearGradient><symbol id="preview-shape-rounded" viewBox="0 0 100 100"><rect width="100" height="100" rx="23" ry="17.5" fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke"/></symbol><symbol id="preview-shape-jelly" viewBox="0 0 100 100"><rect width="100" height="100" rx="42" ry="31.5" fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke"/></symbol><symbol id="preview-shape-catEar" viewBox="0 0 100 100"><rect y="11" width="100" height="89" rx="34" ry="25.5" fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke"/><path d="M5 30 L11 0 L41 17 Z M59 17 L89 0 L95 30 Z" fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke"/></symbol><symbol id="preview-shape-cloud" viewBox="0 0 100 100"><rect y="15" width="100" height="85" rx="38" ry="28.5" fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke"/><ellipse cx="33" cy="22" rx="30" ry="22.5" fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke"/><ellipse cx="67" cy="22" rx="30" ry="22.5" fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke"/></symbol><symbol id="preview-shape-bunny" viewBox="0 0 100 100"><path fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke" d="M20 32 C13 15 13 3 23 3 C33 3 34 19 37 28 Q50 24 63 28 C66 19 67 3 77 3 C87 3 87 15 80 32 C96 37 98 51 97 67 C97 91 83 97 50 97 C17 97 3 91 3 67 C2 51 4 37 20 32 Z"/><path fill="var(--detail)" opacity=".48" d="M22 11 C18 14 24 29 28 30 C32 30 27 10 22 11 Z M78 11 C73 10 68 30 72 30 C76 29 82 14 78 11 Z"/></symbol><symbol id="preview-shape-puppy" viewBox="0 0 100 100"><path fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke" d="M24 21 C35 9 66 9 77 21 C90 16 96 25 98 39 C100 55 95 69 86 67 L83 66 C82 88 73 96 50 96 C27 96 18 88 17 66 L14 67 C5 69 0 55 2 39 C4 25 10 16 24 21 Z"/><path fill="var(--detail)" opacity=".48" d="M17 27 C10 28 6 49 12 57 C17 61 21 48 22 37 Q23 25 17 27 Z M83 27 Q77 25 78 37 C79 48 83 61 88 57 C94 49 90 28 83 27 Z"/></symbol><symbol id="preview-shape-pudding" viewBox="0 0 100 100"><path fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke" d="M24 13 Q50 6 76 13 C86 16 86 28 89 45 L96 77 C100 94 79 97 50 97 C21 97 0 94 4 77 L11 45 C14 28 14 16 24 13 Z"/><path fill="var(--detail)" opacity=".48" d="M24 14 Q50 8 76 14 Q83 16 85 29 C77 35 69 24 60 29 C43 38 34 27 15 30 Q17 16 24 14 Z"/></symbol><symbol id="preview-shape-jellyfish" viewBox="0 0 100 100"><path fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke" d="M7 67 C3 35 19 8 50 8 C81 8 97 35 93 67 Q94 77 82 77 C82 83 89 89 83 94 C74 100 69 88 69 79 L58 80 C57 88 60 98 50 98 C40 98 43 88 42 80 L31 79 C31 88 26 100 17 94 C11 89 18 83 18 77 Q6 77 7 67 Z"/><path fill="var(--detail)" opacity=".48" d="M22 26 C32 11 65 10 78 26 C56 20 43 20 22 26 Z"/></symbol><symbol id="preview-shape-flame" viewBox="0 0 100 100"><path fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke" d="M60 5 C65 4 63 17 70 23 C77 31 81 34 82 43 Q90 32 92 41 C100 63 97 81 83 90 C68 100 31 100 16 90 C2 81 0 63 9 43 Q13 35 16 43 Q19 48 24 48 C37 47 35 21 47 16 Q54 13 60 5 Z"/><path fill="var(--detail)" opacity=".48" d="M18 59 C11 67 14 80 23 84 Q27 84 23 78 Q17 70 18 59 Z M84 61 Q85 73 78 81 Q75 86 80 84 C90 79 90 67 84 61 Z"/></symbol><symbol id="preview-shape-droplet" viewBox="0 0 100 100"><path fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke" d="M58 6 C63 3 60 14 70 24 C79 33 95 42 95 63 C98 88 78 97 50 97 C22 97 2 88 5 63 C6 41 24 30 38 22 Q50 16 58 6 Z"/><path fill="var(--detail)" opacity=".48" d="M24 40 C13 47 13 66 21 72 Q25 74 23 67 C19 55 22 47 27 42 Q29 38 24 40 Z"/></symbol><symbol id="preview-shape-duck" viewBox="0 0 100 100"><path fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke" d="M32 43 C26 32 30 14 44 10 C59 4 79 12 80 25 Q98 25 98 31 Q98 38 80 38 L78 47 C93 53 98 68 91 82 C84 97 64 98 45 97 C19 97 5 84 4 66 Q2 54 10 57 Q23 64 32 43 Z"/><path fill="var(--detail)" opacity=".48" d="M78 26 Q96 25 97 31 Q96 36 79 36 Q74 31 78 26 Z M64 22 C64 19 70 19 70 22 C70 25 64 25 64 22 Z"/></symbol><symbol id="preview-shape-mochi" viewBox="0 0 100 100"><path fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke" d="M50 3 C86 2 98.5 20 98.5 52 C99 88 84 99 50 99 C16 99 1 88 1.5 52 C1.5 20 14 2 50 3 Z"/></symbol><symbol id="preview-shape-bubble" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" ry="50" fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke"/><ellipse cx="25" cy="24" rx="8" ry="8" fill="var(--detail)" opacity=".8"/></symbol><symbol id="preview-shape-wide" viewBox="0 0 100 100"><rect width="100" height="100" rx="18" ry="36" fill="var(--key)" style="fill:var(--key);stroke:var(--body-stroke,none);stroke-width:var(--body-sw,0);stroke-linejoin:round;vector-effect:non-scaling-stroke"/></symbol></defs></svg>
   <section class="sim-section" id="preview" aria-labelledby="preview-heading">
@@ -203,7 +250,7 @@
           <label class="sim-slider">字的大小<input type="range" id="sim-fontsize" min="0.8" max="1.4" step="0.05" value="1"></label>
           <label class="sim-slider">按鍵間距<input type="range" id="sim-gap" min="0.3" max="1.6" step="0.1" value="1"></label>
           <label class="sim-slider">造型大小<input type="range" id="sim-shapesize" min="0.9" max="1.6" step="0.05" value="1.15"></label>
-          <label class="sim-check"><input type="checkbox" id="sim-sound"> 按鍵聲（在鍵盤裡的 ⚙ 可以換紅軸、青軸、麻將…）</label>
+          <label class="sim-check"><input type="checkbox" id="sim-sound"> 按鍵聲（在鍵盤裡的 ⚙ 可以換紅軸、茶軸、青軸…）</label>
         </fieldset>
       </div>
     </div>
@@ -280,6 +327,8 @@
 </div></details>
 <p class="tip">先從最常用的開始：切換輸入法看「01」，打字選字看「02」，聊天小工具看「03」，換外觀看「04」，搬剪貼簿看「05」。</p></section>
 
+  <!-- 安裝區：iPhone／Android 切換只在這一區黏在上面 -->
+  <div class="install-area">
   <div class="switch" id="install">
     <div class="tabs big" role="tablist" aria-label="手機種類">
       <button class="tab" role="tab" id="tab-iphone" aria-controls="panel-iphone" aria-selected="true">iPhone</button>
@@ -511,6 +560,7 @@
       <p class="note">這次之後的每一次更新，都可以直接蓋過舊版。</p>
     </section>
   </div>
+  </div>
 
   <section aria-labelledby="feature-return">
     <h2 id="feature-return">裝好了，開始試試</h2>
@@ -579,7 +629,7 @@
     </details>
   </section>
 
-  <section>
+  <section id="faq">
     <h2>常見問題</h2>
     <dl>
       <div><dt>iPhone：App 一打開就閃退，或說「無法驗證 App」</dt>
@@ -634,7 +684,22 @@
 
     var ua = navigator.userAgent || "";
     var hash = (location.hash || "").replace("#", "");
-    if (hash === "android" || (hash !== "iphone" && /Android/i.test(ua))) phone("android");
+    var android = hash === "android" || (hash !== "iphone" && /Android/i.test(ua));
+    if (android) phone("android");
+    // 最上面的下載按鈕：用哪種手機，那顆排前面、比較顯眼
+    var mine = $(android ? "hero-android" : "hero-iphone");
+    if (mine) { mine.classList.add("primary"); mine.parentNode.insertBefore(mine, mine.parentNode.firstChild); }
+    // 「iPhone／Android 安裝教學」連結：跳過去時順便切到那一邊
+    Array.prototype.forEach.call(document.querySelectorAll("[data-phone]"), function (a) {
+      a.addEventListener("click", function () { phone(a.getAttribute("data-phone")); });
+    });
+    // 往下捲一段才出現「回到最上面」
+    var top = document.querySelector(".to-top");
+    if (top) {
+      var onScroll = function () { top.classList.toggle("show", window.scrollY > 600); };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+    }
     if (hash === "mac" || /Macintosh/.test(ua)) computer("mac");
   })();
 </script>

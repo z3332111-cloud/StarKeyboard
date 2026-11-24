@@ -18,6 +18,8 @@
     var release = pick(releases, prefix, filename);
     if (!release) return;
     document.getElementById("download-" + platform).href = base + "download/" + release.tag_name + "/" + filename;
+    var hero = document.getElementById("hero-" + platform);
+    if (hero) hero.href = base + "download/" + release.tag_name + "/" + filename;
     document.getElementById("release-" + platform).href = base + "tag/" + release.tag_name;
     var version = String(release.name || "").match(/\bv(\d+\.\d+\.\d+)\b/);
     document.getElementById("version-" + platform).textContent = version ? "最新已發布：v" + version[1] : "最新版本已發布";
