@@ -137,12 +137,12 @@ function render(ms, peak, events, seed) {
 // 機械鍵盤軸改用真實錄音（tools/import_switch_sounds.py，kbsim，MIT）；這裡只剩不是鍵盤的趣味音
 const switches = {
   // 麻將：兩張牌碰在一起「喀喀」，硬硬的高音
-  mahjong: { ms: 120, peak: 0.5, make: (j) => [
+  mahjong: { ms: 120, peak: 0.3, make: (j) => [
     { amp: 1 * j.a, noise: ["hp", 2200 * j.f, 0.8, 0.0015], modes: [[2380 * j.f, 0.6, 0.014], [3950 * j.f, 0.45, 0.01], [5620 * j.f, 0.3, 0.008], [7400 * j.f, 0.15, 0.005]] },
     { at: 24 + j.t * 3, amp: 0.5 * j.a, noise: ["hp", 2400 * j.f, 0.8, 0.0012], modes: [[2450 * j.f, 0.5, 0.012], [4080 * j.f, 0.35, 0.008], [5800 * j.f, 0.2, 0.006]] },
   ] },
   // 木魚：空心木頭「叩」
-  woodfish: { ms: 200, peak: 0.5, make: (j) => [
+  woodfish: { ms: 200, peak: 0.3, make: (j) => [
     { amp: 1 * j.a, noise: ["bp", 1800 * j.f, 1.2, 0.0015], modes: [[480 * j.f, 1, 0.045 * j.l], [1290 * j.f, 0.35, 0.016], [2410 * j.f, 0.15, 0.008]] },
   ] },
 };
@@ -165,7 +165,7 @@ for (const [id, sw] of Object.entries(switches)) {
   });
   // 大鍵：多一點長度、加一下衛星軸的喀啦
   const bigEvents = sw.make(BIG).concat([{ at: 7, amp: 0.18, noise: ["bp", 1700, 1.4, 0.003] }]);
-  mech[`key_${id}_big`] = render(Math.round(sw.ms * 1.25), Math.min(0.6, sw.peak * 1.1), bigEvents, seed++);
+  mech[`key_${id}_big`] = render(Math.round(sw.ms * 1.25), sw.peak * 1.05, bigEvents, seed++);
 }
 
 const root = path.join(__dirname, "..");

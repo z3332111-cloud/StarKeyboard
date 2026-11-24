@@ -30,20 +30,21 @@ WEB_DIR = os.path.join(ROOT, "docs/assets/sounds")
 
 # 鍵盤裡的名字 → kbsim 的資料夾、音量（最大值）、要不要悶住（靜音軸）
 SWITCHES = {
-    "red": ("redink", 0.8, None),          # Gateron 紅墨軸（線性）
-    "brown": ("mxbrown", 0.8, None),       # Cherry MX 茶軸
-    "blue": ("mxblue", 0.85, None),        # Cherry MX 青軸
-    "black": ("mxblack", 0.8, None),       # Cherry MX 黑軸
-    "silent": ("mxblack", 0.4, 900),       # 靜音軸：黑軸錄音悶住、調小聲（kbsim 沒有靜音軸）
-    "cream": ("cream", 0.8, None),         # NovelKeys 奶油軸
-    "holypanda": ("holypanda", 0.8, None), # 熊貓軸
-    "topre": ("topre", 0.8, None),         # 靜電容
-    "buckling": ("buckling", 0.85, None),  # IBM 彈簧老鍵盤
-    "alpaca": ("alpaca", 0.8, None),       # 羊駝軸（線性）
-    "blackink": ("blackink", 0.8, None),   # Gateron 黑墨軸（線性、偏低沉）
-    "turquoise": ("turquoise", 0.8, None), # Tealios 湖水綠軸（線性）
-    "boxnavy": ("boxnavy", 0.85, None),    # Kailh BOX 海軍軸（很響的有聲軸）
-    "bluealps": ("bluealps", 0.85, None),  # SKCM 藍色 Alps（老式有聲軸）
+    # 音量（最大值）：0.8 在 iPhone 喇叭上太炸、會破音，降到 0.35 左右
+    "red": ("redink", 0.35, None),          # Gateron 紅墨軸（線性）
+    "brown": ("mxbrown", 0.35, None),       # Cherry MX 茶軸
+    "blue": ("mxblue", 0.32, None),         # Cherry MX 青軸（本來就響，再小一點）
+    "black": ("mxblack", 0.35, None),       # Cherry MX 黑軸
+    "silent": ("mxblack", 0.18, 900),       # 靜音軸：黑軸錄音悶住、調小聲（kbsim 沒有靜音軸）
+    "cream": ("cream", 0.35, None),         # NovelKeys 奶油軸
+    "holypanda": ("holypanda", 0.35, None), # 熊貓軸
+    "topre": ("topre", 0.35, None),         # 靜電容
+    "buckling": ("buckling", 0.3, None),    # IBM 彈簧老鍵盤（很響）
+    "alpaca": ("alpaca", 0.35, None),       # 羊駝軸（線性）
+    "blackink": ("blackink", 0.35, None),   # Gateron 黑墨軸（線性、偏低沉）
+    "turquoise": ("turquoise", 0.35, None), # Tealios 湖水綠軸（線性）
+    "boxnavy": ("boxnavy", 0.3, None),      # Kailh BOX 海軍軸（很響的有聲軸）
+    "bluealps": ("bluealps", 0.32, None),   # SKCM 藍色 Alps（老式有聲軸）
 }
 
 
@@ -58,7 +59,10 @@ def biquad(x, kind, f, gain_db=0.0, q=0.707):
     A = 10 ** (gain_db / 40)
     w = 2 * np.pi * f / RATE
     cos, alpha = np.cos(w), np.sin(w) / (2 * q)
-    if kind == "peak":
+    if kind == "hp":
+        b = [(1 + cos) / 2, -(1 + cos), (1 + cos) / 2]
+        a = [1 + alpha, -2 * cos, 1 - alpha]
+    elif kind == "peak":
         b = [1 + alpha * A, -2 * cos, 1 - alpha * A]
         a = [1 + alpha / A, -2 * cos, 1 - alpha / A]
     else:  # shelf_hi
@@ -77,10 +81,12 @@ def biquad(x, kind, f, gain_db=0.0, q=0.707):
 
 
 def warm(x):
-    """壓掉尖的高頻、加厚中低頻（像實體鍵盤的外殼共鳴）"""
-    x = biquad(x, "shelf_hi", 3000, -9)
-    x = biquad(x, "peak", 420, 5, 0.9)
-    return biquad(x, "peak", 1300, 2, 1.0)
+    """壓掉尖的高頻、中低頻稍微加厚（像實體鍵盤的外殼共鳴）。
+    手機小喇叭放不出 150 Hz 以下，硬推會破音，所以先切掉；中低頻也只加一點點。"""
+    x = biquad(x, "hp", 150)
+    x = biquad(x, "shelf_hi", 3000, -8)
+    x = biquad(x, "peak", 450, 2.5, 0.9)
+    return biquad(x, "peak", 1300, 1.5, 1.0)
 
 
 def centroid(x):
@@ -134,7 +140,7 @@ def main(kbsim):
         normal = [clean(decode(os.path.join(press, "GENERIC_R%d.mp3" % i)), peak, muffle) for i in range(5)]
         # 空白鍵的錄音當大鍵；青軸沒有，就用中間那排的一般鍵
         space = os.path.join(press, "SPACE.mp3")
-        big = clean(decode(space), min(0.9, peak * 1.1), muffle) if os.path.exists(space) else normal[2]
+        big = clean(decode(space), peak * 1.05, muffle) if os.path.exists(space) else normal[2]
         # 放開：音量大約是按下去的三分之一（照實體鍵盤錄音量的比例）
         release = os.path.join(audio, folder, "release")
         up = clean(decode(os.path.join(release, "GENERIC.mp3")), peak * 0.35, muffle)
