@@ -672,6 +672,7 @@ enum KeyEffect: String, CaseIterable {
 enum KeySound: String, CaseIterable {
     case system, tink
     case red, brown, blue, black, silent, cream, holypanda, topre, buckling
+    case alpaca, blackink, turquoise, boxnavy, bluealps
     case mahjong, woodfish
 
     var title: String {
@@ -687,6 +688,11 @@ enum KeySound: String, CaseIterable {
         case .holypanda: return "熊貓軸"
         case .topre: return "靜電容"
         case .buckling: return "IBM 老鍵盤"
+        case .alpaca: return "羊駝軸"
+        case .blackink: return "黑墨軸"
+        case .turquoise: return "湖水綠軸"
+        case .boxnavy: return "BOX 海軍軸"
+        case .bluealps: return "藍色 Alps"
         case .mahjong: return "麻將"
         case .woodfish: return "木魚"
         }

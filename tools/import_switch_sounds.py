@@ -39,6 +39,11 @@ SWITCHES = {
     "holypanda": ("holypanda", 0.8, None), # 熊貓軸
     "topre": ("topre", 0.8, None),         # 靜電容
     "buckling": ("buckling", 0.85, None),  # IBM 彈簧老鍵盤
+    "alpaca": ("alpaca", 0.8, None),       # 羊駝軸（線性）
+    "blackink": ("blackink", 0.8, None),   # Gateron 黑墨軸（線性、偏低沉）
+    "turquoise": ("turquoise", 0.8, None), # Tealios 湖水綠軸（線性）
+    "boxnavy": ("boxnavy", 0.85, None),    # Kailh BOX 海軍軸（很響的有聲軸）
+    "bluealps": ("bluealps", 0.85, None),  # SKCM 藍色 Alps（老式有聲軸）
 }
 
 

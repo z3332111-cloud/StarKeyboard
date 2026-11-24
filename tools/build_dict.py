@@ -151,10 +151,10 @@ def main(src, dst, opencc):
     db.execute("CREATE INDEX idx_plain ON phrases(plain, score DESC)")
     db.execute("CREATE INDEX idx_abbr ON phrases(abbr, score DESC)")
     db.execute("CREATE INDEX idx_phrase ON phrases(phrase)")
-    db.execute("CREATE TABLE pinyin(py TEXT PRIMARY KEY, bpmf TEXT NOT NULL)")
+    db.execute("CREATE TABLE pinyin(py TEXT PRIMARY KEY, bpmf TEXT NOT NULL) WITHOUT ROWID")
     db.executemany("INSERT INTO pinyin VALUES (?, ?)", sorted(pinyin.items()))
     t2s = load_opencc(opencc) if opencc else {}
-    db.execute("CREATE TABLE t2s(trad TEXT PRIMARY KEY, simp TEXT NOT NULL)")
+    db.execute("CREATE TABLE t2s(trad TEXT PRIMARY KEY, simp TEXT NOT NULL) WITHOUT ROWID")
     db.executemany("INSERT INTO t2s VALUES (?, ?)", sorted(t2s.items()))
     ngram_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "context_ngrams.txt")
     ngrams = []
@@ -172,7 +172,7 @@ def main(src, dst, opencc):
                     ngrams.append((gram, n))
     # 部首（打注音後用部首找字）：Unicode 的 Unihan 字表 kRSUnicode（Unicode 授權，可自由使用）。
     # 環境變數 UNIHAN 指到 Unihan_IRGSources.txt；沒有就不建這張表，鍵盤會把部首按鈕藏起來。
-    db.execute("CREATE TABLE radicals(ch TEXT PRIMARY KEY, rad TEXT NOT NULL)")
+    db.execute("CREATE TABLE radicals(ch TEXT PRIMARY KEY, rad TEXT NOT NULL) WITHOUT ROWID")
     unihan = os.environ.get("UNIHAN")
     if unihan and os.path.exists(unihan):
         singles_set = {p for (r, p) in best if len(p) == 1}
@@ -191,7 +191,7 @@ def main(src, dst, opencc):
                     rows.append((ch, unicodedata.normalize("NFKC", chr(0x2F00 + num - 1))))
         db.executemany("INSERT OR REPLACE INTO radicals VALUES (?, ?)", rows)
         print("部首 %d 字" % len(rows))
-    db.execute("CREATE TABLE ngrams(gram TEXT PRIMARY KEY, n INTEGER NOT NULL)")
+    db.execute("CREATE TABLE ngrams(gram TEXT PRIMARY KEY, n INTEGER NOT NULL) WITHOUT ROWID")
     db.executemany("INSERT INTO ngrams VALUES (?, ?)", ngrams)
     db.commit()
     db.execute("VACUUM")

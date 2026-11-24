@@ -469,6 +469,8 @@ enum class KeySound(val id: String, val title: String, val mechanical: Boolean =
     RED("red", "紅軸", true), BROWN("brown", "茶軸", true), BLUE("blue", "青軸", true), BLACK("black", "黑軸", true),
     SILENT("silent", "靜音軸", true), CREAM("cream", "奶油軸", true), HOLYPANDA("holypanda", "熊貓軸", true),
     TOPRE("topre", "靜電容", true), BUCKLING("buckling", "IBM 老鍵盤", true),
+    ALPACA("alpaca", "羊駝軸", true), BLACKINK("blackink", "黑墨軸", true), TURQUOISE("turquoise", "湖水綠軸", true),
+    BOXNAVY("boxnavy", "BOX 海軍軸", true), BLUEALPS("bluealps", "藍色 Alps", true),
     MAHJONG("mahjong", "麻將", true), WOODFISH("woodfish", "木魚", true);
 
     /** 一般鍵輪流播的檔名（res/raw，不含副檔名） */
