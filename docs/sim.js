@@ -1119,8 +1119,8 @@
   }
 
   // ===== 觸控：按下去的樣子、特效、刪除鍵連續刪、空白鍵拖曳移動游標 =====
-  // 按鍵聲：叮叮和各種機械軸（tools/make_sounds.js 合成，網站只放每種的第一個版本）
-  var SOUNDS = [['tink', '叮叮'], ['red', '紅軸'], ['brown', '茶軸'], ['blue', '青軸'], ['black', '黑軸'], ['silent', '靜音軸'], ['cream', '奶油軸'], ['typewriter', '打字機'], ['mahjong', '麻將'], ['woodfish', '木魚']];
+  // 按鍵聲：叮叮、機械軸的真實錄音（kbsim，MIT）、麻將和木魚（合成）；網站只放每種的第一個版本
+  var SOUNDS = [['tink', '叮叮'], ['red', '紅軸'], ['brown', '茶軸'], ['blue', '青軸'], ['black', '黑軸'], ['silent', '靜音軸'], ['cream', '奶油軸'], ['holypanda', '熊貓軸'], ['topre', '靜電容'], ['buckling', 'IBM 老鍵盤'], ['mahjong', '麻將'], ['woodfish', '木魚']];
   var audios = {}, repeatTimer = null, drag = null;
   function sound() {
     if (!S.sound) return;

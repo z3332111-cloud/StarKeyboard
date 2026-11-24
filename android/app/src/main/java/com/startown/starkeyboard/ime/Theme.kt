@@ -462,17 +462,19 @@ enum class KeyEffect(val id: String, val title: String, val glyphs: List<String>
     }
 }
 
-/** 按鍵音：系統的喀喀聲，或 App 附的合成音（tools/make_sounds.js）。mechanical＝機械軸，有 3 個輪流播的版本和大鍵用的低沉版 */
+/** 按鍵音：系統的喀喀聲、App 附的合成音（tools/make_sounds.js），或機械鍵盤軸的真實錄音（kbsim，MIT，tools/import_switch_sounds.py）。
+ *  mechanical＝有 5 個輪流播的版本和大鍵用的版本 */
 enum class KeySound(val id: String, val title: String, val mechanical: Boolean = false) {
     SYSTEM("system", "系統"), BUBBLE("bubble", "泡泡"), MARIMBA("marimba", "木琴"), BELL("bell", "叮鈴"), POP("pop", "啵啵"),
     RED("red", "紅軸", true), BROWN("brown", "茶軸", true), BLUE("blue", "青軸", true), BLACK("black", "黑軸", true),
-    SILENT("silent", "靜音軸", true), CREAM("cream", "奶油軸", true), TYPEWRITER("typewriter", "打字機", true),
+    SILENT("silent", "靜音軸", true), CREAM("cream", "奶油軸", true), HOLYPANDA("holypanda", "熊貓軸", true),
+    TOPRE("topre", "靜電容", true), BUCKLING("buckling", "IBM 老鍵盤", true),
     MAHJONG("mahjong", "麻將", true), WOODFISH("woodfish", "木魚", true);
 
     /** 一般鍵輪流播的檔名（res/raw，不含副檔名） */
     val normalFiles: List<String> get() = when {
         this == SYSTEM -> emptyList()
-        mechanical -> (1..3).map { "key_${id}_$it" }
+        mechanical -> (1..5).map { "key_${id}_$it" }
         else -> listOf("key_$id")
     }
 

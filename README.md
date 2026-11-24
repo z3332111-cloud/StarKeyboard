@@ -24,7 +24,7 @@
 | 剪貼簿 📋 | 自動記錄（最多 50～500 筆）、釘選、左右滑動刪除／釘選、只看釘選 |
 | 主題 ⚙️ | 8 種配色、11 種按鍵造型（圓角／果凍／貓耳／雲朵／兔兔／狗狗／布丁／水母／火焰／水滴／鴨鴨）、自訂背景照片、淡化、按鍵透明度（可以全透明，只看得到字和照片） |
 | 大小 ⚙️ | 鍵盤高度（80%～130%）、字的大小、按鍵間距都能用滑桿調，邊拖邊看 |
-| 按鍵聲 ⚙️ | iPhone 原本／叮叮（Android 另有泡泡、木琴、叮鈴、啵啵）；機械鍵盤聲：紅軸、茶軸、青軸、黑軸、靜音軸、奶油軸、打字機、麻將、木魚，大鍵比較低沉、連打每一下有一點不同 |
+| 按鍵聲 ⚙️ | iPhone 原本／叮叮（Android 另有泡泡、木琴、叮鈴、啵啵）；機械鍵盤聲（真實錄音）：紅軸、茶軸、青軸、黑軸、靜音軸、奶油軸、熊貓軸、靜電容、IBM 老鍵盤；趣味音：麻將、木魚。大鍵用空白鍵的錄音、連打每一下有一點不同 |
 | 其他 | 按住空白鍵左右滑移動游標、按鍵震動 |
 
 ## iOS 的限制（不是 bug）
@@ -62,5 +62,6 @@ project.yml  XcodeGen 專案設定（雲端打包時產生 Xcode 專案）
 - 表情符號是系統字型顯示；顏文字是常見的文字組合。
 - 字體（打包時下載、只留常用字）：jf open 粉圓（justfont）、芫荽 Iansui（But Ko）、霞鶩文楷 TC（LXGW）、源泉圓體 TW（ButTaiwan）、內海字體（max32002）、俐方體11號 Cubic 11（ACh-K），都是 SIL Open Font License 1.1。
 - 繁簡對照：OpenCC，Apache 2.0。
-- 按鍵音（含機械軸、打字機、麻將、木魚）：tools/make_sounds.js 用程式合成，原創。
+- 按鍵音：叮叮、泡泡、木琴、叮鈴、啵啵、麻將、木魚是 tools/make_sounds.js 用程式合成，原創。
+- 機械鍵盤軸的錄音：[kbsim](https://github.com/tplai/kbsim)（Copyright (c) Thomas Lai，MIT 授權），用 tools/import_switch_sounds.py 轉檔；授權全文附在 Keyboard/Resources/Sounds/kbsim-LICENSE.txt 和 Android 的 res/raw/kbsim_license.txt。
 - 英文滑行輸入的字表：hermitdave/FrequencyWords（OpenSubtitles 2018），CC BY-SA 4.0，打包時下載。

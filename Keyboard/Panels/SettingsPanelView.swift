@@ -426,7 +426,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         if settings.latestBuild > current {
             stack.addArrangedSubview(note("🎉 有新版：打開「糯糯鍵盤」App 看更新內容和下載方法"))
         }
-        stack.addArrangedSubview(note("糯糯鍵盤 v\(ReleaseChecker.currentVersion) ・ 注音字典來自小麥注音（MIT 授權）"))
+        stack.addArrangedSubview(note("糯糯鍵盤 v\(ReleaseChecker.currentVersion) ・ 注音字典來自小麥注音（MIT 授權）・ 機械軸錄音來自 kbsim（Thomas Lai，MIT 授權）"))
 
         jumpButton.menu = UIMenu(title: "跳到…", children: sections.map { s in
             UIAction(title: s.name) { [weak self] _ in self?.jump(to: s.view) }

@@ -667,10 +667,12 @@ enum KeyEffect: String, CaseIterable {
     }
 }
 
-/// 系統鍵盤聲、短促柔和的叮叮聲，和各種機械鍵盤軸／敲擊聲（tools/make_sounds.js 合成）；舊音效選項會回到系統聲。
+/// 系統鍵盤聲、短促柔和的叮叮聲、機械鍵盤軸的真實錄音（kbsim，MIT，tools/import_switch_sounds.py），
+/// 和麻將、木魚兩個合成的趣味音（tools/make_sounds.js）；舊音效選項會回到系統聲。
 enum KeySound: String, CaseIterable {
     case system, tink
-    case red, brown, blue, black, silent, cream, typewriter, mahjong, woodfish
+    case red, brown, blue, black, silent, cream, holypanda, topre, buckling
+    case mahjong, woodfish
 
     var title: String {
         switch self {
@@ -682,18 +684,20 @@ enum KeySound: String, CaseIterable {
         case .black: return "黑軸"
         case .silent: return "靜音軸"
         case .cream: return "奶油軸"
-        case .typewriter: return "打字機"
+        case .holypanda: return "熊貓軸"
+        case .topre: return "靜電容"
+        case .buckling: return "IBM 老鍵盤"
         case .mahjong: return "麻將"
         case .woodfish: return "木魚"
         }
     }
 
-    /// 這個音效用到的檔名（不含 .wav）。機械軸有 3 個輪流播的版本，加上大鍵（空白、換行、刪除）用的低沉版。
+    /// 這個音效用到的檔名（不含 .wav）。機械軸有 5 個輪流播的版本，加上大鍵（空白、換行、刪除）用的版本。
     var normalFiles: [String] {
         switch self {
         case .system: return []
         case .tink: return ["key_tink"]
-        default: return (1...3).map { "key_\(rawValue)_\($0)" }
+        default: return (1...5).map { "key_\(rawValue)_\($0)" }
         }
     }
 

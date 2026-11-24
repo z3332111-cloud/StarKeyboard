@@ -992,7 +992,7 @@ class SettingsPanel(
         if (settings.latestBuild > BuildInfo.current(context)) {
             note("🎉 有新版：打開「糯糯鍵盤」App 下載安裝，直接蓋過去就好")
         }
-        note("糯糯鍵盤 Android v${BuildInfo.version(context)} ・ 注音字典來自小麥注音（MIT 授權）")
+        note("糯糯鍵盤 Android v${BuildInfo.version(context)} ・ 注音字典來自小麥注音（MIT 授權）・ 機械軸錄音來自 kbsim（Thomas Lai，MIT 授權）")
     }
 }
 
