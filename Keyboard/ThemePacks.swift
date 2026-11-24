@@ -53,7 +53,7 @@ extension KeyboardStyle {
 
 /// 主題圖要用才下載（和字體一樣，放在 GitHub Pages），不用可以移除
 enum ThemePacks {
-    private static let base = "https://z3332111-cloud.github.io/StarKeyboard/theme-packs/"
+    private static let base = "https://z3332111-cloud.github.io/nuonuo-keyboard/theme-packs/"
 
     private static var dir: URL {
         let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

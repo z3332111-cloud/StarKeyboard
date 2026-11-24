@@ -278,8 +278,8 @@ class EmoticonStore(private val directory: File?) {
 data class ReleaseInfo(val build: Int, val title: String, val notes: String, val apkUrl: String?, val pageUrl: String)
 
 object ReleaseChecker {
-    const val API = "https://api.github.com/repos/z3332111-cloud/StarKeyboard/releases?per_page=30"
-    const val PAGE = "https://github.com/z3332111-cloud/StarKeyboard/releases"
+    const val API = "https://api.github.com/repos/z3332111-cloud/nuonuo-keyboard/releases?per_page=30"
+    const val PAGE = "https://github.com/z3332111-cloud/nuonuo-keyboard/releases"
 
     fun buildNumber(tag: String): Int? = if (tag.startsWith("android-")) tag.removePrefix("android-").toIntOrNull() else null
 

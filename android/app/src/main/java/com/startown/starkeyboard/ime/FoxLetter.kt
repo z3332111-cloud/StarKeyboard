@@ -50,7 +50,7 @@ val KeyboardStyle.isIllustrated get() = isFoxLetter || themeLook?.hasArt == true
 
 /** 主題圖要用才下載（和字體一樣，放在 GitHub Pages），不用可以移除 */
 object ThemePacks {
-    private const val BASE = "https://z3332111-cloud.github.io/StarKeyboard/theme-packs/"
+    private const val BASE = "https://z3332111-cloud.github.io/nuonuo-keyboard/theme-packs/"
 
     fun files(id: String): List<String> = when {
         id == FoxLetter.ID -> listOf("keycaps-watercolor-v2", "wide-keycaps-watercolor-v2", "background-watercolor-v2")

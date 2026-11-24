@@ -1,7 +1,7 @@
 /* Only published releases with a real installer can become download buttons. */
 (function () {
   "use strict";
-  var base = "https://github.com/z3332111-cloud/StarKeyboard/releases/";
+  var base = "https://github.com/z3332111-cloud/nuonuo-keyboard/releases/";
   function pick(releases, prefix, filename) {
     return releases.filter(function (release) {
       return !release.draft && !release.prerelease &&
@@ -22,7 +22,7 @@
     var version = String(release.name || "").match(/\bv(\d+\.\d+\.\d+)\b/);
     document.getElementById("version-" + platform).textContent = version ? "最新已發布：v" + version[1] : "最新版本已發布";
   }
-  fetch("https://api.github.com/repos/z3332111-cloud/StarKeyboard/releases?per_page=100", {
+  fetch("https://api.github.com/repos/z3332111-cloud/nuonuo-keyboard/releases?per_page=100", {
     headers: { Accept: "application/vnd.github+json" }, cache: "no-store"
   }).then(function (response) {
     if (!response.ok) throw new Error("Release lookup unavailable");

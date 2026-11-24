@@ -728,7 +728,7 @@ enum KeyFont: String, CaseIterable {
 /// 要用再下載的字體：放在 GitHub 的 font-pack 發佈，下載後存在鍵盤自己的空間，可以移除、之後再下載
 enum FontPacks {
     static func remote(_ id: String) -> URL {
-        URL(string: "https://github.com/z3332111-cloud/StarKeyboard/releases/download/font-pack/\(id).ttf")!
+        URL(string: "https://github.com/z3332111-cloud/nuonuo-keyboard/releases/download/font-pack/\(id).ttf")!
     }
 
     private static var dir: URL {

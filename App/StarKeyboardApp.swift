@@ -176,7 +176,7 @@ struct ContentView: View {
                     tip("空白鍵", "按住空白鍵左右滑，可以移動游標。")
                     tip("7 天續簽", "免費 Apple ID 的簽章 7 天到期。SideStore 會自己續，也可以在背景續；快到期時打開 LocalDevVPN，SideStore 的 My Apps 會看到剩幾天。不用再接電腦。")
                     tip("怎麼更新", "1. 用 iPhone 打開安裝網站，下載新的 .ipa\n2. 打開 LocalDevVPN，確認已連上\n3. 打開 SideStore，左上角 ＋，選剛下載的檔案，蓋過舊的糯糯鍵盤（延伸功能選 Keep App Extensions）\n不要先刪掉舊 App，設定和資料會保留。")
-                    Link("查看更新步驟（安裝網站）", destination: URL(string: "https://z3332111-cloud.github.io/StarKeyboard/#wifi-refresh")!)
+                    Link("查看更新步驟（安裝網站）", destination: URL(string: "https://z3332111-cloud.github.io/nuonuo-keyboard/#wifi-refresh")!)
                 }
             }
             .navigationTitle("糯糯鍵盤")

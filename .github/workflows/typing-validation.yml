@@ -14,8 +14,10 @@ jobs:
         with:
           fetch-depth: 0
       - name: 使用既有公開版的字典
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -fLsS --retry 3 -o "$RUNNER_TEMP/keyboard.ipa" https://github.com/z3332111-cloud/StarKeyboard/releases/download/build-41/StarKeyboard.ipa
+          gh release download build-41 --repo "$GITHUB_REPOSITORY" --pattern StarKeyboard.ipa --output "$RUNNER_TEMP/keyboard.ipa"
           unzip -p "$RUNNER_TEMP/keyboard.ipa" Payload/StarKeyboard.app/PlugIns/StarKeyboardExtension.appex/zhuyin.sqlite > "$RUNNER_TEMP/typing.sqlite"
           echo "TYPING_DICTIONARY=$RUNNER_TEMP/typing.sqlite" >> "$GITHUB_ENV"
       - name: 新版核心回歸與效能

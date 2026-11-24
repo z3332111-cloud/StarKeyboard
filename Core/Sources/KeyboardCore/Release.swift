@@ -10,8 +10,8 @@ struct ReleaseInfo: Equatable {
 
 /// 檢查有沒有新版（App 和鍵盤都會用）
 enum ReleaseChecker {
-    static let apiURL = URL(string: "https://api.github.com/repos/z3332111-cloud/StarKeyboard/releases/latest")!
-    static let downloadPage = URL(string: "https://github.com/z3332111-cloud/StarKeyboard/releases/latest")!
+    static let apiURL = URL(string: "https://api.github.com/repos/z3332111-cloud/nuonuo-keyboard/releases/latest")!
+    static let downloadPage = URL(string: "https://github.com/z3332111-cloud/nuonuo-keyboard/releases/latest")!
 
     /// 雲端打包時把第幾版寫進 CFBundleVersion；自己在電腦上編的是 1
     static var currentVersion: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.2.0" }

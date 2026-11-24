@@ -495,7 +495,7 @@ enum class KeyFont(val id: String, val title: String) {
 
 /** 要用再下載的字體：放在 GitHub 的 font-pack 發佈，下載後存在 App 自己的空間，可以移除、之後再下載 */
 object FontPacks {
-    fun remote(id: String) = "https://github.com/z3332111-cloud/StarKeyboard/releases/download/font-pack/$id.ttf"
+    fun remote(id: String) = "https://github.com/z3332111-cloud/nuonuo-keyboard/releases/download/font-pack/$id.ttf"
     fun file(context: Context, id: String) = java.io.File(java.io.File(context.filesDir, "fontpack").apply { mkdirs() }, "$id.ttf")
 
     /** 可以直接用（內建、已下載、或自己匯入的） */

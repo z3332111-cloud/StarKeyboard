@@ -137,6 +137,29 @@ jobs:
           gh release edit android-latest --title "糯糯鍵盤 Android 最新版（固定網址）"
           gh release upload android-latest StarKeyboard.apk --clobber
 
+      # 公開的 nuonuo-keyboard：大家從安裝網站下載的地方
+      - name: 發佈到公開的 nuonuo-keyboard
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: z3332111-cloud/nuonuo-keyboard
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          target_commitish: main
+          tag_name: android-${{ github.run_number }}
+          name: 糯糯鍵盤 Android v${{ env.APP_VERSION }}
+          body_path: release_notes.md
+          files: StarKeyboard.apk
+          make_latest: "false"
+
+      - name: 公開倉庫的固定下載網址（android-latest）
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          PUBLIC_REPO: z3332111-cloud/nuonuo-keyboard
+        run: |
+          gh release view android-latest --repo "$PUBLIC_REPO" >/dev/null 2>&1 || gh release create android-latest --repo "$PUBLIC_REPO" --target main --title "糯糯鍵盤 Android 最新版（固定網址）" --notes "這裡永遠是最新的 Android 安裝檔，每次打包會自動換新。各版本的更新內容請看 android-數字 的版本。" --prerelease --latest=false
+          gh release upload android-latest StarKeyboard.apk --repo "$PUBLIC_REPO" --clobber
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

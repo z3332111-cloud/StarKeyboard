@@ -175,6 +175,20 @@ jobs:
           prerelease: ${{ github.ref_name != 'main' }}
           make_latest: ${{ github.ref_name == 'main' }}
 
+      # 公開的 nuonuo-keyboard：大家從安裝網站下載的地方（原始碼倉庫之後改成私人，別人只看得到這裡）
+      - name: 發佈到公開的 nuonuo-keyboard
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: z3332111-cloud/nuonuo-keyboard
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          target_commitish: main
+          tag_name: build-${{ github.run_number }}
+          name: 糯糯鍵盤 v${{ env.APP_VERSION }}
+          body_path: release_notes.md
+          files: StarKeyboard.ipa
+          make_latest: true
+
       # 字體包：放在固定的 font-pack 發佈裡（預發佈，不會變成最新版），鍵盤按「下載」時從這裡拿
       - name: 上傳可下載的字體包
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -183,6 +197,15 @@ jobs:
         run: |
           gh release view font-pack >/dev/null 2>&1 || gh release create font-pack --title "糯糯鍵盤 字體包" --notes "鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。" --prerelease --latest=false
           gh release upload font-pack FontPack/*.ttf --clobber
+
+      - name: 字體包也放到公開的 nuonuo-keyboard（新版鍵盤從這裡下載）
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          PUBLIC_REPO: z3332111-cloud/nuonuo-keyboard
+        run: |
+          gh release view font-pack --repo "$PUBLIC_REPO" >/dev/null 2>&1 || gh release create font-pack --repo "$PUBLIC_REPO" --target main --title "糯糯鍵盤 字體包" --notes "鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。" --prerelease --latest=false
+          gh release upload font-pack FontPack/*.ttf --repo "$PUBLIC_REPO" --clobber
 
       - uses: actions/upload-artifact@v4
         if: always()
