@@ -347,6 +347,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             }
         }
         keyboard.onGlide = { path, centers, kw -> glideTyped(path, centers, kw) }
+        keyboard.onDeleteWord = { deleteWordBackward() }
         // 鍵盤大小變了，液態玻璃透出來的照片位置要跟著重算
         keyboard.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob -> if (r - l != or - ol || b - t != ob - ot) updateGlass() }
         topBar.onScriptToggle = {
@@ -625,6 +626,16 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         }
         hangul.reset()
         hangulComposing = false
+    }
+
+    /** 長按刪除久了：注音還在組字就照常一個一個刪；沒有在組字就一次刪一段（英文一個字、中文最多四個字、連續的空白） */
+    private fun deleteWordBackward() {
+        val ic = currentInputConnection
+        if (isComposing || editorText != null || ic == null) { backspace(); return }
+        val before = ic.getTextBeforeCursor(64, 0)?.toString().orEmpty()
+        if (before.isEmpty()) { backspace(); return }
+        val n = DeleteChunk.length(before)
+        ic.deleteSurroundingText(n, 0)
     }
 
     private fun backspace() {
@@ -2230,5 +2241,26 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         if (latest <= BuildInfo.current(this) || latest <= settings.notifiedBuild) return
         settings.notifiedBuild = latest
         toast("有新版！打開糯糯鍵盤 App 就能更新")
+    }
+}
+
+/** 長按刪除時，一次要刪多少個 UTF-16 字元（給 deleteSurroundingText 用） */
+object DeleteChunk {
+    private fun isCJK(cp: Int) = cp in 0x3100..0x312F || cp in 0x3400..0x9FFF || cp in 0xF900..0xFAFF || cp in 0x20000..0x2FFFF
+
+    fun length(text: String): Int {
+        val cps = text.codePoints().toArray()
+        var i = cps.size
+        var units = 0
+        fun take() { i--; units += Character.charCount(cps[i]) }
+        while (i > 0 && Character.isWhitespace(cps[i - 1])) take()
+        if (i == 0) return maxOf(units, 1)
+        val last = cps[i - 1]
+        when {
+            isCJK(last) -> { var k = 0; while (i > 0 && isCJK(cps[i - 1]) && k < 4) { take(); k++ } }
+            Character.isLetterOrDigit(last) -> while (i > 0 && Character.isLetterOrDigit(cps[i - 1]) && !isCJK(cps[i - 1])) take()
+            else -> take()
+        }
+        return maxOf(units, 1)
     }
 }

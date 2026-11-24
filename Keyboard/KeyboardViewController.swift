@@ -548,6 +548,7 @@ final class KeyboardViewController: UIInputViewController {
             self?.handleInputModeList(from: view, with: event)
         }
         grid.onGlide = { [weak self] path, centers, kw in self?.glideTyped(path: path, centers: centers, keyWidth: kw) }
+        grid.onDeleteWord = { [weak self] in self?.deleteWordBackward() }
         grid.onCursorMode = { [weak self] on in
             guard let self = self else { return }
             self.goalColumn = nil
@@ -844,6 +845,14 @@ final class KeyboardViewController: UIInputViewController {
     private func finishHangul() {
         hangul.reset()
         hangulShown = ""
+    }
+
+    /// 長按刪除久了：注音還在組字就照常一個一個刪；沒有在組字就一次刪一段（英文一個字、中文最多四個字、連續的空白）
+    private func deleteWordBackward() {
+        guard !isComposing, editorText == nil else { backspace(); return }
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        guard !before.isEmpty else { backspace(); return }
+        for _ in 0..<DeleteChunk.length(before) { textDocumentProxy.deleteBackward() }
     }
 
     private func backspace() {
@@ -2731,5 +2740,32 @@ final class KeyboardViewController: UIInputViewController {
             guard let self = self, self.toastToken == token else { return }
             UIView.animate(withDuration: 0.3) { self.toastLabel.alpha = 0 }
         }
+    }
+}
+
+/// 長按刪除時，一次要刪多少字
+enum DeleteChunk {
+    static func isCJK(_ c: Character) -> Bool {
+        guard let v = c.unicodeScalars.first?.value else { return false }
+        return (0x3100...0x312F).contains(v) || (0x3400...0x9FFF).contains(v) || (0xF900...0xFAFF).contains(v)
+            || (0x20000...0x2FFFF).contains(v)
+    }
+
+    static func length(_ text: String) -> Int {
+        let chars = Array(text)
+        var i = chars.count
+        var n = 0
+        while i > 0 && chars[i - 1].isWhitespace { i -= 1; n += 1 }
+        guard i > 0 else { return max(n, 1) }
+        let last = chars[i - 1]
+        if isCJK(last) {
+            var k = 0
+            while i > 0 && isCJK(chars[i - 1]) && k < 4 { i -= 1; n += 1; k += 1 }
+        } else if last.isLetter || last.isNumber {
+            while i > 0 && (chars[i - 1].isLetter || chars[i - 1].isNumber) && !isCJK(chars[i - 1]) { i -= 1; n += 1 }
+        } else {
+            n += 1
+        }
+        return max(n, 1)
     }
 }

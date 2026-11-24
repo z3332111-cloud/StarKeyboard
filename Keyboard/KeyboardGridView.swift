@@ -815,6 +815,8 @@ final class KeyboardGridView: UIView {
     }
     /// 手指按下去的那一刻（震動、按鍵聲；參數：是不是空白、換行、刪除、Shift 這類大鍵，機械軸聲音會不一樣）
     var onPress: ((Bool) -> Void)?
+    /// 長按刪除鍵久了：一次刪一段
+    var onDeleteWord: (() -> Void)?
     /// 手指放開（機械軸的「放開」聲；參數同 onPress）
     var onRelease: ((Bool) -> Void)?
     /// 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去
@@ -1234,12 +1236,22 @@ final class KeyboardGridView: UIView {
         updateCursorLook()
     }
 
+    /// 長按刪除：先一個字一個字刪，按超過大約 1 秒（12 個字）就改成一次刪一段（像 iPhone 原本的鍵盤）
     private func startRepeat(_ key: KeyButton) {
         stopRepeat()
         repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
             guard let self = self else { return }
+            var ticks = 0
             self.repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
-                self?.fire(key)
+                guard let self = self else { return }
+                ticks += 1
+                if ticks <= 12 {
+                    self.fire(key)
+                } else if ticks % 2 == 1, let deleteWord = self.onDeleteWord {
+                    deleteWord()   // 一段一段刪：0.16 秒一段
+                } else if self.onDeleteWord == nil {
+                    self.fire(key)
+                }
             }
         }
     }

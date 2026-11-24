@@ -48,6 +48,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
     /** 手指按下去的那一刻（震動、按鍵聲） */
     /** 手指按下去（參數：是不是空白、換行、刪除、Shift 這類大鍵，機械軸聲音會不一樣） */
     var onPress: ((Boolean) -> Unit)? = null
+    /** 長按刪除鍵久了：一次刪一段 */
+    var onDeleteWord: (() -> Unit)? = null
     /** 手指放開（機械軸的「放開」聲；參數同 onPress） */
     var onRelease: ((Boolean) -> Unit)? = null
     /** 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去 */
@@ -1005,12 +1007,21 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         return true
     }
 
+    /** 長按刪除：先一個字一個字刪，按超過大約 1 秒（12 個字）就改成一次刪一段（像 iPhone 原本的鍵盤） */
     private fun startRepeat(k: Key) {
         stopRepeat()
         val r = object : Runnable {
+            var ticks = 0
             override fun run() {
-                fire(k)
-                mainHandler.postDelayed(this, 80)
+                ticks++
+                val word = onDeleteWord
+                if (ticks <= 12 || word == null) {
+                    fire(k)
+                    mainHandler.postDelayed(this, 80)
+                } else {
+                    word()
+                    mainHandler.postDelayed(this, 160)
+                }
             }
         }
         repeatRunnable = r
