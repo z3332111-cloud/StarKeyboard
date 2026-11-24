@@ -496,7 +496,7 @@ enum class KeySound(val id: String, val title: String, val mechanical: Boolean =
 /** 要用再下載的機械軸聲音：放在 GitHub 的 sound-pack 發佈（每個檔案一個），下載後存在 App 自己的空間 */
 object SoundPacks {
     fun remote(name: String) = "https://github.com/z3332111-cloud/nuonuo-keyboard/releases/download/sound-pack/$name.wav"
-    fun file(context: Context, name: String) = java.io.File(java.io.File(context.filesDir, "soundpack-2").apply { mkdirs() }, "$name.wav")
+    fun file(context: Context, name: String) = java.io.File(java.io.File(context.filesDir, "soundpack-3").apply { mkdirs() }, "$name.wav")
 
     /** 這個軸的檔案都在了（不是機械軸的一律算好了） */
     fun isReady(context: Context, sound: KeySound) = !sound.mechanical || sound.allFiles.all { file(context, it).exists() }

@@ -730,7 +730,7 @@ enum SoundPacks {
     private static var dir: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         // 聲音檔改過（例如調小聲）就換資料夾名字，舊的下載會重新抓
-        let d = base.appendingPathComponent("SoundPack-2", isDirectory: true)
+        let d = base.appendingPathComponent("SoundPack-3", isDirectory: true)
         try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
         return d
     }
