@@ -20,8 +20,10 @@ concurrency:
   group: build-${{ github.ref_name }}
   cancel-in-progress: true
 
-# 為了快一點：先在 Linux 準備字典和字體（約 2 分鐘），
-# 再同時開三台 Mac：核心測試、角色主題測試、編譯 IPA；三個都過了才發佈。
+# 原始碼倉庫是私人的：Mac 的打包時間每分鐘算 10 分鐘，每月只有 2000 分鐘，所以分兩種：
+# - 平常推程式（push、拉取請求）：只準備字典＋跑核心測試（選字、注音），確認沒有改壞
+# - 要發新版時手動按「Run workflow」（或叫 Claude 打包）：再加角色主題測試、編譯 IPA，都過了才發佈
+# 先在 Linux 準備字典和字體（約 2 分鐘），Mac 的工作同時跑。
 jobs:
   prepare:
     runs-on: ubuntu-latest
@@ -124,6 +126,7 @@ jobs:
 
   theme-tests:
     needs: prepare
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15-intel
     timeout-minutes: 40
     steps:
@@ -159,6 +162,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
+          retention-days: 3
           name: fox-letter-tests
           path: |
             ${{ runner.temp }}/fox-letter-tests.xcresult
@@ -168,6 +172,7 @@ jobs:
 
   build:
     needs: prepare
+    if: github.event_name == 'workflow_dispatch'
     # ARM runners have repeatedly timed out while waiting for capacity.
     runs-on: macos-15-intel
     timeout-minutes: 30
@@ -212,20 +217,22 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 3
           name: StarKeyboard-ipa
           path: StarKeyboard.ipa
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          retention-days: 3
           name: build-log
           path: build.log
           if-no-files-found: ignore
 
   release:
-    # 測試和編譯都過了才發佈；拉取請求只跑到上面為止
+    # 手動打包時，測試和編譯都過了才發佈
     needs: [core-tests, theme-tests, build]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -261,7 +268,6 @@ jobs:
       # develop 發成「預發佈」的 dev-數字，不會變成 latest，App 的新版提醒只看 main 的 build-數字。
       # 拉取請求只上傳 IPA 成品，不發佈，避免蓋掉正式版。
       - name: 發佈到 Releases（方便下載）
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name == 'main' && 'build' || 'dev' }}-${{ github.run_number }}
@@ -273,7 +279,7 @@ jobs:
 
       # 公開的 nuonuo-keyboard：大家從安裝網站下載的地方（原始碼倉庫之後改成私人，別人只看得到這裡）
       - name: 發佈到公開的 nuonuo-keyboard
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           repository: z3332111-cloud/nuonuo-keyboard
@@ -287,7 +293,7 @@ jobs:
 
       # 字體包：放在固定的 font-pack 發佈裡（預發佈，不會變成最新版），鍵盤按「下載」時從這裡拿
       - name: 上傳可下載的字體包
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -296,7 +302,7 @@ jobs:
 
       # 用 action 上傳（同名檔案自動覆蓋）；gh release upload 在連線慢時會重試，第二次碰到「檔名已存在」就失敗
       - name: 字體包也放到公開的 nuonuo-keyboard（新版鍵盤從這裡下載）
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           repository: z3332111-cloud/nuonuo-keyboard
