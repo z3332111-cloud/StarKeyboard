@@ -177,7 +177,7 @@ class MainActivity : Activity() {
             lookSlider("字的大小", ks.fontScale, 0.8f, 1.4f) { ks.fontScale = it },
             lookSlider("按鍵間距", ks.gapScale, 0.3f, 1.6f) { ks.gapScale = it },
             lookSlider("造型大小", ks.shapeScale, 0.9f, 1.6f) { ks.shapeScale = it },
-            lookSlider("按鍵透明度", ks.keyAlpha, 0.35f, 1f) { ks.keyAlpha = it },
+            lookSlider("按鍵透明度", ks.keyAlpha, 0f, 1f) { ks.keyAlpha = it },
             lookSlider("照片淡化", ks.backgroundFade, 0f, 0.9f) { ks.backgroundFade = it },
         )
         button("大小恢復預設") {

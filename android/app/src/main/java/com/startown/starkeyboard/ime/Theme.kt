@@ -425,7 +425,14 @@ data class KeyboardStyle(
     val shapeScale: Float = 1.15f,
     /** 按下去的動作：jelly 果凍彈彈、hop 跳跳、wiggle 搖搖、pop 放大、none 無（只有字的按鍵會動） */
     val motion: String = "jelly",
-)
+) {
+    /** 按鍵透明度拉到最左邊（全透明）：按鍵還在、照常能按，只是不畫按鍵本身，只看得到字和背景照片 */
+    val invisibleKeys get() = keyAlpha < INVISIBLE_ALPHA && !isIllustrated
+
+    companion object {
+        const val INVISIBLE_ALPHA = 0.03f
+    }
+}
 
 /** 按下去的動作 */
 enum class KeyMotion(val id: String, val title: String) {

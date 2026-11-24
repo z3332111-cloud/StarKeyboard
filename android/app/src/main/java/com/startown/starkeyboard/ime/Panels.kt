@@ -893,7 +893,7 @@ class SettingsPanel(
             button("調整照片位置和大小（拖拉、兩指縮放）") { onAdjustPhoto() }
         }
         slider("照片淡化", settings.backgroundFade, 0f, 0.9f) { settings.backgroundFade = it }
-        slider("按鍵透明度", settings.keyAlpha, 0.35f, 1f) { settings.keyAlpha = it }
+        slider("按鍵透明度", settings.keyAlpha, 0f, 1f) { settings.keyAlpha = it }
 
         header("快捷片語（打縮寫就跳出整段話）")
         button("＋ 新增快捷片語") { onAddShortcut() }

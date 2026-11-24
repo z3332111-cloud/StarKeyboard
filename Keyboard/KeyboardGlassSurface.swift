@@ -55,6 +55,6 @@ extension KeyboardStyle {
 
     var usesNativeGlassKeys: Bool {
         // 不規則造型需要路徑遮罩，沿用既有畫法，保留耳朵、肉球等輪廓。
-        usesNativeGlassBar && (shape == .rounded || shape == .jelly)
+        usesNativeGlassBar && (shape == .rounded || shape == .jelly) && !invisibleKeys
     }
 }

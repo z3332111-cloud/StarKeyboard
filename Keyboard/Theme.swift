@@ -587,6 +587,10 @@ struct KeyboardStyle {
     /// 按下去的動作：jelly 果凍彈彈、hop 跳跳、wiggle 搖搖、pop 放大、none 無（只有字的按鍵會動）
     var motion = KeyMotion.jelly.rawValue
 
+    /// 按鍵透明度拉到最左邊（全透明）：按鍵還在、照常能按，只是不畫按鍵本身，只看得到字和背景照片
+    var invisibleKeys: Bool { keyAlpha < Self.invisibleAlpha && !isIllustrated }
+    static let invisibleAlpha: CGFloat = 0.03
+
     /// 線條的顏色：線稿質感的外框、貓咪的尾巴鬍鬚眼睛肉球
     var lineColor: UIColor {
         if finish == .outline {

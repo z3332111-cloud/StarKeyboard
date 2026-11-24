@@ -276,6 +276,12 @@ final class KeyButton: UIView {
             setPaintedLayersHidden(true)
             return
         }
+        if style.invisibleKeys {
+            glassVersion = GlassBackdrop.version
+            glassLayer.contents = nil
+            applyInvisibleSurface()
+            return
+        }
         let on = style.finish == .liquid
         let native = style.usesNativeGlassKeys
         let paintedShine = shiny && !native
@@ -453,7 +459,7 @@ final class KeyButton: UIView {
         let t = style.theme
         hintLabel.textAlignment = .right
         var fill: UIColor
-        let text: UIColor
+        var text: UIColor
         switch spec.kind {
         case .normal:
             fill = t.key
@@ -465,6 +471,8 @@ final class KeyButton: UIView {
             fill = t.accent
             text = t.accentText
         }
+        // 全透明時換行鍵沒有底色，字改用一般按鍵的顏色才看得到
+        if style.invisibleKeys { text = t.keyText }
         let native = style.usesNativeGlassKeys
         if native {
             // 原生材質即時取景，不能把它的父層快取成一張圖片。
@@ -557,6 +565,14 @@ final class KeyButton: UIView {
         linesLayer.strokeColor = style.lineColor.cgColor
         glossLayer.fillColor = UIColor.white.withAlphaComponent(style.finish == .puffy ? (t.isDark ? 0.3 : 0.75)
             : (style.finish == .liquid || style.finish == .metal) ? 0.9 : (t.isDark ? 0.18 : 0.55)).cgColor
+        if style.invisibleKeys {
+            applyInvisibleSurface()
+        } else if invisibleApplied {
+            // 從全透明調回來：收起來的圖層打開，再重新排一次（影子、反光照質感決定要不要顯示）
+            invisibleApplied = false
+            setPaintedLayersHidden(false)
+            setNeedsLayout()
+        }
         CATransaction.commit()
         label.textColor = text
         hintLabel.textColor = text.withAlphaComponent(0.6)
@@ -683,6 +699,24 @@ final class KeyButton: UIView {
         icon.alpha = native ? visualOpacity : 1
     }
 
+    /// 上一次畫的是不是全透明（調回來時要把收起來的圖層打開）
+    private var invisibleApplied = false
+
+    /// 全透明：按鍵還在、照常能按，只是不畫按鍵本身（影子、反光、造型細節都收起來）；按下去時淡淡亮一下
+    private func applyInvisibleSurface() {
+        invisibleApplied = true
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let layers: [CALayer] = [shadowLayer, glassLayer, glossLayer, cushionLayer, padShadow,
+                                detailLayer, padHi, padLo, linesLayer, rimLayer, edgeLayer, shineClip]
+        for layer in layers { layer.isHidden = true }
+        bodyLayer.isHidden = false
+        bodyLayer.strokeColor = nil
+        bodyLayer.fillColor = isPressed ? style.theme.keyText.withAlphaComponent(0.18).cgColor : UIColor.clear.cgColor
+        content.layer.shouldRasterize = false
+        CATransaction.commit()
+    }
+
     private func setPaintedLayersHidden(_ hidden: Bool) {
         let layers: [CALayer] = [shadowLayer, glassLayer, bodyLayer, glossLayer, cushionLayer, padShadow,
                                 detailLayer, padHi, padLo, linesLayer, rimLayer, edgeLayer, shineClip]
@@ -775,8 +809,7 @@ final class KeyboardGridView: UIView {
             onCursorMode?(on)
         }
     }
-    /// 手指按下去的那一刻（震動、按鍵聲）
-    /// 手指按下去（參數：是不是空白、換行、刪除、Shift 這類大鍵，機械軸聲音會不一樣）
+    /// 手指按下去的那一刻（震動、按鍵聲；參數：是不是空白、換行、刪除、Shift 這類大鍵，機械軸聲音會不一樣）
     var onPress: ((Bool) -> Void)?
     /// 英文滑行輸入：手指滑過三個以上字母鍵才放開時，把畫的線交出去
     var glideEnabled = false

@@ -106,7 +106,7 @@ struct ContentView: View {
                     lookSlider("字的大小", value: $look.fontScale, range: 0.8...1.4)
                     lookSlider("按鍵間距", value: $look.gapScale, range: 0.3...1.6)
                     lookSlider("造型大小", value: $look.shapeScale, range: 0.9...1.6)
-                    lookSlider("按鍵透明度", value: $look.keyAlpha, range: 0.35...1)
+                    lookSlider("按鍵透明度", value: $look.keyAlpha, range: 0...1)
                     lookSlider("照片淡化", value: $look.backgroundFade, range: 0...0.9)
                     Button("大小恢復預設") {
                         look.heightScale = 1; look.fontScale = 1; look.gapScale = 1; look.shapeScale = 1.15

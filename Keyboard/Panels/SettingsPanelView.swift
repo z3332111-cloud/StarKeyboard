@@ -310,7 +310,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             self?.settings.backgroundFade = CGFloat(v)
             self?.onChange?()
         })
-        stack.addArrangedSubview(sliderRow("按鍵透明度", value: Float(settings.keyAlpha), range: 0.35...1) { [weak self] v in
+        stack.addArrangedSubview(sliderRow("按鍵透明度", value: Float(settings.keyAlpha), range: 0...1) { [weak self] v in
             self?.settings.keyAlpha = CGFloat(v)
             self?.onChange?()
         })

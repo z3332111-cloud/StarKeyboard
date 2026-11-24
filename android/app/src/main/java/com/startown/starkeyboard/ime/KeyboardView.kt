@@ -304,6 +304,16 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 canvas.restore()
                 continue
             }
+            if (style.invisibleKeys) {
+                // 全透明：按鍵還在、照常能按，只是不畫按鍵本身；按下去時淡淡亮一下。換行鍵沒有底色，字用一般按鍵的顏色
+                if (k.pressed) {
+                    fillPaint.color = t.keyText.withAlpha(0.18f)
+                    canvas.drawPath(k.path, fillPaint)
+                }
+                drawLabel(canvas, k, t.keyText)
+                canvas.restore()
+                continue
+            }
             fillPaint.color = when (finish) {
                 KeyFinish.FLAT -> t.shadow.withAlpha(if (style.shape.isSoftShape) a * 0.32f else minOf(1f, a + 0.1f))
                 KeyFinish.PUFFY -> t.shadow.withAlpha(minOf(1f, a * 0.75f))
