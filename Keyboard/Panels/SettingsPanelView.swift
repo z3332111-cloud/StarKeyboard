@@ -54,6 +54,8 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
     private weak var themeScroll: UIScrollView?
     // 自訂配色：現在點色票是改主色還是第二色
     private var editingSecond = false
+    // 選字顏色：現在滑桿調的是底色還是字色
+    private var editingCandidateText = false
 
     init(settings: KeyboardSettings, hasFullAccess: Bool, style: KeyboardStyle, shortcuts: ShortcutStore) {
         self.settings = settings
@@ -383,9 +385,10 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         stack.addArrangedSubview(header("選字列高度"))
         stack.addArrangedSubview(note("也可以按住選字列左下角的小橫條往上或往下拖。字會跟著變大。"))
         stack.addArrangedSubview(candidateHeightRow())
-        stack.addArrangedSubview(header("選字底色"))
-        stack.addArrangedSubview(note("選字列第一個字（按空白鍵會送出的）後面那塊顏色。第一格是跟著主題。"))
+        stack.addArrangedSubview(header("選字顏色"))
+        stack.addArrangedSubview(note("選字列第一個字（按空白鍵會送出的）的底色和字色。點色票快速換底色（第一格跟主題），想要更深、更淺就用下面的滑桿自己調。"))
         stack.addArrangedSubview(candidateColorGrid())
+        stack.addArrangedSubview(candidateColorMixer())
 
         stack.addArrangedSubview(header("翻譯"))
         stack.addArrangedSubview(note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。iOS 26 以上且已下載語言時用 iPhone 內建翻譯，只有開啟「允許外部網路翻譯」後，才會在本機翻譯不可用時使用 MyMemory（原文會傳到該服務）。"))
@@ -994,6 +997,146 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         row.addArrangedSubview(l)
         row.addArrangedSubview(sw)
         return row
+    }
+
+    /// 選字顏色的調色盤：預覽＋色相、鮮豔、明暗三條漸層滑桿（底色和字色分開調）
+    private func candidateColorMixer() -> UIView {
+        let column = UIStackView()
+        column.axis = .vertical
+        column.spacing = 8
+        column.addArrangedSubview(choiceRow(["調底色", "調字色"], selected: editingCandidateText ? 1 : 0) { [weak self] i in
+            self?.editingCandidateText = i == 1
+            self?.rebuild()
+        })
+
+        // 底下的閉包會掛在滑桿上：只抓設定和主題，不抓 self，面板關掉才放得掉
+        let store = settings
+        let theme = style.theme
+        func current() -> (fill: UIColor, text: UIColor) {
+            KeyboardStyle.pill(fill: store.candidateColor >= 0 ? UIColor(hex: UInt32(store.candidateColor)) : nil,
+                               text: store.candidateTextColor >= 0 ? UIColor(hex: UInt32(store.candidateTextColor)) : nil,
+                               theme: theme)
+        }
+        // 預覽：和選字列上的膠囊一樣
+        let preview = UILabel()
+        preview.text = "選字 範例"
+        preview.font = KeyFonts.font(style.fontID, size: 20, weight: .heavy)
+        preview.textAlignment = .center
+        preview.layer.cornerRadius = 19
+        preview.clipsToBounds = true
+        preview.translatesAutoresizingMaskIntoConstraints = false
+        let previewBox = UIView()
+        previewBox.addSubview(preview)
+        NSLayoutConstraint.activate([
+            previewBox.heightAnchor.constraint(equalToConstant: 44),
+            preview.centerXAnchor.constraint(equalTo: previewBox.centerXAnchor),
+            preview.centerYAnchor.constraint(equalTo: previewBox.centerYAnchor),
+            preview.heightAnchor.constraint(equalToConstant: 38),
+            preview.widthAnchor.constraint(equalToConstant: 150),
+        ])
+        column.addArrangedSubview(previewBox)
+        func paintPreview() {
+            let pill = current()
+            preview.backgroundColor = pill.fill
+            preview.textColor = pill.text
+        }
+        paintPreview()
+
+        // 現在要調的顏色拆成色相、鮮豔、明暗
+        let start = editingCandidateText ? current().text : current().fill
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        start.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+        var hue = h, sat = s, bri = b
+
+        let hueRow = gradientSlider("色相", value: Float(hue))
+        let satRow = gradientSlider("鮮豔", value: Float(sat))
+        let briRow = gradientSlider("明暗", value: Float(bri))
+        func paintTracks() {
+            hueRow.track.image = trackImage((0...6).map { UIColor(hue: CGFloat($0) / 6, saturation: max(sat, 0.6), brightness: max(bri, 0.75), alpha: 1) })
+            satRow.track.image = trackImage([UIColor(hue: hue, saturation: 0, brightness: bri, alpha: 1), UIColor(hue: hue, saturation: 1, brightness: bri, alpha: 1)])
+            briRow.track.image = trackImage([.black, UIColor(hue: hue, saturation: sat, brightness: 1, alpha: 1)])
+        }
+        paintTracks()
+        let editingText = editingCandidateText
+        let changed: () -> Void = {
+            hue = CGFloat(hueRow.slider.value)
+            sat = CGFloat(satRow.slider.value)
+            bri = CGFloat(briRow.slider.value)
+            let value = KeyboardTheme.hex(UIColor(hue: hue, saturation: sat, brightness: bri, alpha: 1))
+            if editingText { store.candidateTextColor = value } else { store.candidateColor = value }
+            paintTracks()
+            paintPreview()
+        }
+        // 拖的時候只更新預覽；放開才通知鍵盤重畫選字列
+        for row in [hueRow, satRow, briRow] {
+            row.slider.addAction(UIAction { _ in changed() }, for: .valueChanged)
+            row.slider.addAction(UIAction { [weak self] _ in self?.onChange?() }, for: [.touchUpInside, .touchUpOutside, .touchCancel])
+            column.addArrangedSubview(row.view)
+        }
+
+        let reset = UIButton(type: .system)
+        reset.setTitle(editingText ? "字色改回自動（照底色挑黑或白）" : "底色改回跟著主題", for: .normal)
+        reset.titleLabel?.font = .rounded(14, .semibold)
+        reset.setTitleColor(style.theme.accent, for: .normal)
+        reset.contentHorizontalAlignment = .leading
+        reset.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            if editingText { self.settings.candidateTextColor = -1 } else { self.settings.candidateColor = -1 }
+            self.onChange?()
+            self.rebuild()
+        }, for: .touchUpInside)
+        column.addArrangedSubview(reset)
+        return column
+    }
+
+    /// 一條有漸層底的滑桿（滑桿本身的軌道透明，看到的是後面的漸層）
+    private func gradientSlider(_ title: String, value: Float) -> (view: UIView, slider: UISlider, track: UIImageView) {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = 10
+        row.alignment = .center
+        let l = UILabel()
+        l.text = title
+        l.font = .rounded(14)
+        l.textColor = textColor
+        l.widthAnchor.constraint(equalToConstant: 44).isActive = true
+        let box = UIView()
+        let track = UIImageView()
+        track.layer.cornerRadius = 7
+        track.clipsToBounds = true
+        track.layer.borderWidth = 1
+        track.layer.borderColor = UIColor.white.withAlphaComponent(0.7).cgColor
+        track.translatesAutoresizingMaskIntoConstraints = false
+        let slider = UISlider()
+        slider.minimumValue = 0
+        slider.maximumValue = 1
+        slider.value = value
+        slider.setMinimumTrackImage(UIImage(), for: .normal)
+        slider.setMaximumTrackImage(UIImage(), for: .normal)
+        slider.translatesAutoresizingMaskIntoConstraints = false
+        box.addSubview(track)
+        box.addSubview(slider)
+        NSLayoutConstraint.activate([
+            box.heightAnchor.constraint(equalToConstant: 36),
+            track.leadingAnchor.constraint(equalTo: box.leadingAnchor, constant: 2),
+            track.trailingAnchor.constraint(equalTo: box.trailingAnchor, constant: -2),
+            track.centerYAnchor.constraint(equalTo: box.centerYAnchor),
+            track.heightAnchor.constraint(equalToConstant: 14),
+            slider.leadingAnchor.constraint(equalTo: box.leadingAnchor),
+            slider.trailingAnchor.constraint(equalTo: box.trailingAnchor),
+            slider.centerYAnchor.constraint(equalTo: box.centerYAnchor),
+        ])
+        row.addArrangedSubview(l)
+        row.addArrangedSubview(box)
+        return (row, slider, track)
+    }
+
+    private func trackImage(_ colors: [UIColor]) -> UIImage {
+        let size = CGSize(width: 240, height: 14)
+        return UIGraphicsImageRenderer(size: size).image { ctx in
+            guard let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors.map { $0.cgColor } as CFArray, locations: nil) else { return }
+            ctx.cgContext.drawLinearGradient(g, start: .zero, end: CGPoint(x: size.width, y: 0), options: [])
+        }
     }
 
     /// 選字底色：第一格「跟主題」，後面是色票（選中的有粗框）

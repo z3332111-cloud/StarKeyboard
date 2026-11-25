@@ -601,13 +601,22 @@ struct KeyboardStyle {
     /// 選字膠囊的底色（使用者自己選的；nil 是跟著主題的強調色）
     var candidateColor: UIColor? = nil
 
-    /// 選字膠囊：底色和上面字的顏色（自己選的顏色照亮度挑黑字或白字）
+    /// 選字膠囊上字的顏色（使用者自己選的；nil 是自動）
+    var candidateTextColor: UIColor? = nil
+
+    /// 選字膠囊：底色和上面字的顏色
     var candidatePill: (fill: UIColor, text: UIColor) {
-        guard let c = candidateColor else { return (theme.accent, theme.accentText) }
+        Self.pill(fill: candidateColor, text: candidateTextColor, theme: theme)
+    }
+
+    /// 底色沒選就用主題強調色；字色沒選就自動：跟主題時用主題的字色，自己選的底色照亮度挑黑字或白字
+    static func pill(fill: UIColor?, text: UIColor?, theme: KeyboardTheme) -> (fill: UIColor, text: UIColor) {
+        let f = fill ?? theme.accent
+        if let text { return (f, text) }
+        guard fill != nil else { return (f, theme.accentText) }
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        c.getRed(&r, green: &g, blue: &b, alpha: &a)
-        let light = 0.299 * r + 0.587 * g + 0.114 * b > 0.62
-        return (c, light ? UIColor(hex: 0x2E2A28) : .white)
+        f.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return (f, 0.299 * r + 0.587 * g + 0.114 * b > 0.62 ? UIColor(hex: 0x2E2A28) : .white)
     }
 
     /// 按鍵透明度拉到最左邊（全透明）：按鍵還在、照常能按，只是不畫按鍵本身，只看得到字和背景照片
@@ -1358,6 +1367,12 @@ final class KeyboardSettings {
     var candidateColor: Int {
         get { d.object(forKey: "candidateColor") as? Int ?? -1 }
         set { d.set(newValue, forKey: "candidateColor") }
+    }
+
+    /// 選字膠囊上字的顏色。0xRRGGBB；-1 是自動（照底色亮度挑黑字或白字）
+    var candidateTextColor: Int {
+        get { d.object(forKey: "candidateTextColor") as? Int ?? -1 }
+        set { d.set(newValue, forKey: "candidateTextColor") }
     }
 
     var candidateBarHeight: Double {

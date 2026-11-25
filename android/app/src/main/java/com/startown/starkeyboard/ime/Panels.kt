@@ -486,6 +486,8 @@ class SettingsPanel(
     private var t = style.theme
     // 自訂配色：現在點色票是改主色還是第二色
     private var editingSecond = false
+    // 選字顏色：現在滑桿調的是底色還是字色
+    private var editingCandidateText = false
 
     /** 在原地重畫設定（捲動位置不變），用在點色票這種不換主題的改變 */
     private fun rebuildHere() {
@@ -614,6 +616,79 @@ class SettingsPanel(
             }, LayoutParams(0, dpi(40f), 1f).apply { rightMargin = dpi(6f); topMargin = dpi(4f) })
         }
         col.addView(row)
+    }
+
+    /** 選字顏色的調色盤：預覽＋色相、鮮豔、明暗三條漸層滑桿（底色和字色分開調） */
+    private fun candidateColorMixer() {
+        choices(listOf("調底色", "調字色"), if (editingCandidateText) 1 else 0) { editingCandidateText = it == 1; rebuildHere() }
+        val editingText = editingCandidateText
+        val preview = TextView(context).apply {
+            text = "選字 範例"; textSize = 18f; gravity = Gravity.CENTER
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        val previewBox = FrameLayout(context)
+        previewBox.addView(preview, FrameLayout.LayoutParams(dpi(150f), dpi(38f), Gravity.CENTER))
+        col.addView(previewBox, LayoutParams(LayoutParams.MATCH_PARENT, dpi(48f)))
+        fun paintPreview() {
+            val s = settings.style
+            preview.setTextColor(s.candidatePillText)
+            preview.background = roundRect(s.candidatePillFill, dp(19f))
+        }
+        paintPreview()
+
+        val s0 = settings.style
+        val start = if (editingText) s0.candidatePillText else s0.candidatePillFill
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(start, hsv)
+        var hue = hsv[0] / 360f; var sat = hsv[1]; var bri = hsv[2]
+        fun hsb(h: Float, s: Float, b: Float) = android.graphics.Color.HSVToColor(floatArrayOf(h.coerceIn(0f, 1f) * 360f, s.coerceIn(0f, 1f), b.coerceIn(0f, 1f)))
+        val bars = ArrayList<SeekBar>()
+        fun paintTracks() {
+            val tracks = listOf(
+                IntArray(7) { hsb(it / 6f, maxOf(sat, 0.6f), maxOf(bri, 0.75f)) },
+                intArrayOf(hsb(hue, 0f, bri), hsb(hue, 1f, bri)),
+                intArrayOf(android.graphics.Color.BLACK, hsb(hue, sat, 1f)),
+            )
+            for ((i, bar) in bars.withIndex()) {
+                bar.background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT, tracks[i]).apply {
+                    cornerRadius = dp(7f); setStroke(dpi(1f), android.graphics.Color.WHITE)
+                }
+            }
+        }
+        for ((title, value) in listOf("色相" to hue, "鮮豔" to sat, "明暗" to bri)) {
+            val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            row.addView(TextView(context).apply { text = title; textSize = 14f; setTextColor(t.keyText) }, LayoutParams(dpi(44f), LayoutParams.WRAP_CONTENT))
+            val bar = SeekBar(context).apply {
+                max = 1000
+                progress = (value * 1000).toInt().coerceIn(0, 1000)
+                progressDrawable = android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(s: SeekBar, p: Int, fromUser: Boolean) {
+                        if (!fromUser) return
+                        hue = bars[0].progress / 1000f; sat = bars[1].progress / 1000f; bri = bars[2].progress / 1000f
+                        val v = hsb(hue, sat, bri) and 0xFFFFFF
+                        if (editingText) settings.candidateTextColor = v else settings.candidateColor = v
+                        paintTracks(); paintPreview()
+                    }
+                    override fun onStartTrackingTouch(s: SeekBar) {}
+                    // 放開才通知鍵盤重畫選字列
+                    override fun onStopTrackingTouch(s: SeekBar) { onChange() }
+                })
+            }
+            bars.add(bar)
+            row.addView(bar, LayoutParams(0, dpi(32f), 1f).apply { topMargin = dpi(4f); bottomMargin = dpi(4f) })
+            col.addView(row)
+        }
+        paintTracks()
+        col.addView(TextView(context).apply {
+            text = if (editingText) "字色改回自動（照底色挑黑或白）" else "底色改回跟著主題"
+            textSize = 14f; setTextColor(t.accent); typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setPadding(0, dpi(8f), 0, dpi(8f))
+            setOnClickListener {
+                if (editingText) settings.candidateTextColor = -1 else settings.candidateColor = -1
+                onChange(); rebuildHere()
+            }
+        })
     }
 
     /** 選字底色：第一格「跟主題」，後面是色票（選中的有粗框） */
@@ -997,9 +1072,10 @@ class SettingsPanel(
             })
         }
         col.addView(height, LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
-        header("選字底色")
-        note("選字列第一個字（按空白鍵會送出的）後面那塊顏色。第一格是跟著主題。")
+        header("選字顏色")
+        note("選字列第一個字（按空白鍵會送出的）的底色和字色。點色票快速換底色（第一格跟主題），想要更深、更淺就用下面的滑桿自己調。")
         candidateColorGrid()
+        candidateColorMixer()
         header("隱私與安全")
         toggle("自動記錄剪貼簿", settings.clipboardHistoryEnabled) { settings.clipboardHistoryEnabled = it }
         note("預設關閉。開啟後會儲存複製的文字；會略過敏感標記，但無法辨識所有密碼。舊紀錄可在剪貼簿逐筆刪除。")

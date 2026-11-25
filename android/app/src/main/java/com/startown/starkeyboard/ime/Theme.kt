@@ -429,10 +429,13 @@ data class KeyboardStyle(
     val motion: String = "jelly",
     /** 選字膠囊的底色（0xRRGGBB）；-1 是跟著主題的強調色 */
     val candidateColor: Int = -1,
+    /** 選字膠囊上字的顏色（0xRRGGBB）；-1 是自動 */
+    val candidateTextColor: Int = -1,
 ) {
     /** 選字膠囊：底色和上面字的顏色（自己選的顏色照亮度挑黑字或白字） */
     val candidatePillFill: Int get() = if (candidateColor < 0) theme.accent else (0xFF000000.toInt() or candidateColor)
     val candidatePillText: Int get() {
+        if (candidateTextColor >= 0) return 0xFF000000.toInt() or candidateTextColor
         if (candidateColor < 0) return theme.accentText
         val r = (candidateColor shr 16) and 0xFF; val g = (candidateColor shr 8) and 0xFF; val b = candidateColor and 0xFF
         return if (0.299 * r + 0.587 * g + 0.114 * b > 0.62 * 255) 0xFF2E2A28.toInt() else Color.WHITE
@@ -932,6 +935,10 @@ class KeyboardSettings(context: Context) {
     var candidateColor: Int
         get() = p.getInt("candidateColor", -1)
         set(v) = p.edit().putInt("candidateColor", v).apply()
+    /** 選字膠囊上字的顏色，0xRRGGBB；-1 是自動（照底色亮度挑黑字或白字） */
+    var candidateTextColor: Int
+        get() = p.getInt("candidateTextColor", -1)
+        set(v) = p.edit().putInt("candidateTextColor", v).apply()
     var candidateBarHeight: Float
         get() = p.getFloat("candidateBarHeight", 50f).coerceIn(40f, 88f)
         set(v) = p.edit().putFloat("candidateBarHeight", v.coerceIn(40f, 88f)).apply()
@@ -977,7 +984,7 @@ class KeyboardSettings(context: Context) {
         set(v) = p.edit().putString("fontId", v).apply()
 
     val style get() = FoxLetter.resolved(KeyboardStyle(theme, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish, shapeScale, keyMotion,
-        candidateColor = candidateColor))
+        candidateColor = candidateColor, candidateTextColor = candidateTextColor))
 }
 
 /** 線條的顏色：線稿質感的外框、貓咪的尾巴鬍鬚眼睛肉球 */
