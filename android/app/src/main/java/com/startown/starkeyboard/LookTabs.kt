@@ -84,11 +84,11 @@ class LookTabs(private val activity: Activity, private val col: LinearLayout, pr
     private fun addCard(c: View) = col.addView(c, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = px(10f) })
 
     /** 卡片上面那一行：名字、副標題、右邊的狀態（✓、下載、下載中） */
-    private fun header(parent: LinearLayout, name: String, subtitle: String, status: String, typeface: Typeface? = null) {
+    private fun header(parent: LinearLayout, name: String, subtitle: String, status: String, face: Typeface? = null) {
         val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         val texts = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         texts.addView(TextView(activity).apply {
-            text = name; textSize = 16f; setTextColor(ink); this.typeface = typeface ?: Typeface.DEFAULT_BOLD
+            text = name; textSize = 16f; setTextColor(ink); typeface = face ?: Typeface.DEFAULT_BOLD
         })
         if (subtitle.isNotEmpty()) texts.addView(TextView(activity).apply { text = subtitle; textSize = 12f; setTextColor(soft) })
         row.addView(texts, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))

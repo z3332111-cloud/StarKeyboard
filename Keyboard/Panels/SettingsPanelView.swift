@@ -152,7 +152,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             })
         }
 
-        let current = settings.themeID
+        let currentTheme = settings.themeID
         if style.isIllustrated {
             stack.addArrangedSubview(switchRow("這個主題也放背景照片", on: settings.themePhoto) { [weak self] on in
                 self?.settings.themePhoto = on
@@ -162,11 +162,11 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
                 stack.addArrangedSubview(note("還沒有照片：到下面的「背景圖片」新增一張。"))
             }
         }
-        if !ThemePacks.files(current).isEmpty, ThemePacks.isReady(current) {
-            stack.addArrangedSubview(buttonRow([("移除「\(KeyboardTheme.named(current).name)」的圖（之後可以再下載）", { [weak self] in
+        if !ThemePacks.files(currentTheme).isEmpty, ThemePacks.isReady(currentTheme) {
+            stack.addArrangedSubview(buttonRow([("移除「\(KeyboardTheme.named(currentTheme).name)」的圖（之後可以再下載）", { [weak self] in
                 guard let self = self else { return }
                 self.settings.themeID = self.settings.themeBeforeFox
-                ThemePacks.remove(current)
+                ThemePacks.remove(currentTheme)
                 self.onChange?()
             })]))
         }
