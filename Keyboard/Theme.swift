@@ -604,6 +604,9 @@ struct KeyboardStyle {
     /// 選字膠囊上字的顏色（使用者自己選的；nil 是自動）
     var candidateTextColor: UIColor? = nil
 
+    /// 按鍵上的字（注音、英文、符號）的顏色（使用者自己選的；nil 是跟著主題）
+    var keyTextColor: UIColor? = nil
+
     /// 選字膠囊：底色和上面字的顏色
     var candidatePill: (fill: UIColor, text: UIColor) {
         Self.pill(fill: candidateColor, text: candidateTextColor, theme: theme)
@@ -1373,6 +1376,12 @@ final class KeyboardSettings {
     var candidateTextColor: Int {
         get { d.object(forKey: "candidateTextColor") as? Int ?? -1 }
         set { d.set(newValue, forKey: "candidateTextColor") }
+    }
+
+    /// 按鍵上的字的顏色（RGB；-1 = 跟著主題）
+    var keyTextColor: Int {
+        get { d.object(forKey: "keyTextColor") as? Int ?? -1 }
+        set { d.set(newValue, forKey: "keyTextColor") }
     }
 
     var candidateBarHeight: Double {

@@ -618,11 +618,29 @@ class SettingsPanel(
         col.addView(row)
     }
 
-    /** 選字顏色的調色盤：預覽＋色相、鮮豔、明暗三條漸層滑桿（底色和字色分開調） */
-    private fun candidateColorMixer() {
-        val editingText = editingCandidateText
+    /** 色票和調色盤要改的是哪一個顏色 */
+    private enum class ColorTarget { CANDIDATE_FILL, CANDIDATE_TEXT, KEY_TEXT }
+
+    private fun colorValue(target: ColorTarget) = when (target) {
+        ColorTarget.CANDIDATE_FILL -> settings.candidateColor
+        ColorTarget.CANDIDATE_TEXT -> settings.candidateTextColor
+        ColorTarget.KEY_TEXT -> settings.keyTextColor
+    }
+
+    private fun storeColor(target: ColorTarget, value: Int) {
+        when (target) {
+            ColorTarget.CANDIDATE_FILL -> settings.candidateColor = value
+            ColorTarget.CANDIDATE_TEXT -> settings.candidateTextColor = value
+            ColorTarget.KEY_TEXT -> settings.keyTextColor = value
+        }
+    }
+
+    /** 調色盤：預覽＋色相、鮮豔、明暗三條漸層滑桿（選字底色、選字字色、按鍵字色分開調） */
+    private fun candidateColorMixer(target: ColorTarget) {
+        val editingText = target != ColorTarget.CANDIDATE_FILL
+        val keyText = target == ColorTarget.KEY_TEXT
         val preview = TextView(context).apply {
-            text = "選字 範例"; textSize = 18f; gravity = Gravity.CENTER
+            text = if (keyText) "ㄅ ㄆ A b" else "選字 範例"; textSize = 18f; gravity = Gravity.CENTER
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
         val previewBox = FrameLayout(context)
@@ -630,13 +648,18 @@ class SettingsPanel(
         col.addView(previewBox, LayoutParams(LayoutParams.MATCH_PARENT, dpi(48f)))
         fun paintPreview() {
             val s = settings.style
-            preview.setTextColor(s.candidatePillText)
-            preview.background = roundRect(s.candidatePillFill, dp(19f))
+            if (keyText) {
+                preview.setTextColor(s.keyInk(s.theme.keyText))
+                preview.background = roundRect(s.theme.key, dp(19f))
+            } else {
+                preview.setTextColor(s.candidatePillText)
+                preview.background = roundRect(s.candidatePillFill, dp(19f))
+            }
         }
         paintPreview()
 
         val s0 = settings.style
-        val start = if (editingText) s0.candidatePillText else s0.candidatePillFill
+        val start = if (keyText) s0.keyInk(s0.theme.keyText) else if (editingText) s0.candidatePillText else s0.candidatePillFill
         val hsv = FloatArray(3)
         android.graphics.Color.colorToHSV(start, hsv)
         var hue = hsv[0] / 360f; var sat = hsv[1]; var bri = hsv[2]
@@ -666,7 +689,7 @@ class SettingsPanel(
                         if (!fromUser) return
                         hue = bars[0].progress / 1000f; sat = bars[1].progress / 1000f; bri = bars[2].progress / 1000f
                         val v = hsb(hue, sat, bri) and 0xFFFFFF
-                        if (editingText) settings.candidateTextColor = v else settings.candidateColor = v
+                        storeColor(target, v)
                         paintTracks(); paintPreview()
                     }
                     override fun onStartTrackingTouch(s: SeekBar) {}
@@ -681,20 +704,21 @@ class SettingsPanel(
         paintTracks()
         if (editingText) note("字的顏色太深時，色相看不太出來：先把「明暗」往右拉，再調色相和鮮豔。")
         col.addView(TextView(context).apply {
-            text = if (editingText) "字色改回自動（照底色挑黑或白）" else "底色改回跟著主題"
+            text = if (keyText) "按鍵字色改回跟著主題" else if (editingText) "字色改回自動（照底色挑黑或白）" else "底色改回跟著主題"
             textSize = 14f; setTextColor(t.accent); typeface = android.graphics.Typeface.DEFAULT_BOLD
             setPadding(0, dpi(8f), 0, dpi(8f))
             setOnClickListener {
-                if (editingText) settings.candidateTextColor = -1 else settings.candidateColor = -1
+                storeColor(target, -1)
                 onChange(); rebuildHere()
             }
         })
     }
 
     /** 選字顏色的色票：改底色時第一格是「主題」、改字色時第一格是「自動」；點了就改現在選的那一個（選中的有粗框） */
-    private fun candidateColorGrid() {
-        val editingText = editingCandidateText
-        val current = if (editingText) settings.candidateTextColor else settings.candidateColor
+    private fun candidateColorGrid(target: ColorTarget) {
+        val editingText = target == ColorTarget.CANDIDATE_TEXT
+        val keyText = target == ColorTarget.KEY_TEXT
+        val current = colorValue(target)
         // 第一格的樣子：主題的強調色，或自動挑的字色（字色先當沒選，算出自動的那個）
         val autoStyle = settings.style.copy(candidateTextColor = -1)
         val options = listOf(-1) + KeyboardTheme.candidateColors
@@ -707,17 +731,17 @@ class SettingsPanel(
                     gravity = Gravity.CENTER
                     if (value < 0) {
                         text = if (editingText) "自動" else "主題"; textSize = 10f; typeface = android.graphics.Typeface.DEFAULT_BOLD
-                        setTextColor(if (editingText) autoStyle.candidatePillText else t.accentText)
+                        setTextColor(if (keyText) t.keyText else if (editingText) autoStyle.candidatePillText else t.accentText)
                     }
                     background = android.graphics.drawable.GradientDrawable().apply {
                         shape = android.graphics.drawable.GradientDrawable.OVAL
-                        setColor(if (value < 0) (if (editingText) autoStyle.candidatePillFill else t.accent) else (0xFF000000.toInt() or value))
+                        setColor(if (value < 0) (if (keyText) t.key else if (editingText) autoStyle.candidatePillFill else t.accent) else (0xFF000000.toInt() or value))
                         setStroke(if (selected) dpi(3f) else dpi(1f), if (selected) t.keyText else android.graphics.Color.WHITE)
                     }
                 }, FrameLayout.LayoutParams(dpi(30f), dpi(30f), Gravity.CENTER))
-                cell.contentDescription = if (editingText) (if (value < 0) "選字字色自動" else "選字字色") else (if (value < 0) "選字底色跟主題" else "選字底色")
+                cell.contentDescription = if (keyText) (if (value < 0) "按鍵字色跟主題" else "按鍵字色") else if (editingText) (if (value < 0) "選字字色自動" else "選字字色") else (if (value < 0) "選字底色跟主題" else "選字底色")
                 cell.setOnClickListener {
-                    if (editingText) settings.candidateTextColor = value else settings.candidateColor = value
+                    storeColor(target, value)
                     onChange(); rebuildHere()
                 }
                 row.addView(cell, LayoutParams(0, dpi(38f), 1f))
@@ -1085,8 +1109,13 @@ class SettingsPanel(
         header("選字顏色")
         note("選字列第一個字（按空白鍵會送出的）的底色和字色。先選要改「底色」還是「字色」，再點色票，或用下面的滑桿自己調深淺。")
         choices(listOf("改底色", "改字色"), if (editingCandidateText) 1 else 0) { editingCandidateText = it == 1; rebuildHere() }
-        candidateColorGrid()
-        candidateColorMixer()
+        val candidateTarget = if (editingCandidateText) ColorTarget.CANDIDATE_TEXT else ColorTarget.CANDIDATE_FILL
+        candidateColorGrid(candidateTarget)
+        candidateColorMixer(candidateTarget)
+        header("按鍵字的顏色")
+        note("按鍵上的注音、英文、數字和符號的顏色。第一格「主題」是跟著主題走。")
+        candidateColorGrid(ColorTarget.KEY_TEXT)
+        candidateColorMixer(ColorTarget.KEY_TEXT)
         header("隱私與安全")
         toggle("自動記錄剪貼簿", settings.clipboardHistoryEnabled) { settings.clipboardHistoryEnabled = it }
         note("預設關閉。開啟後會儲存複製的文字；會略過敏感標記，但無法辨識所有密碼。舊紀錄可在剪貼簿逐筆刪除。")

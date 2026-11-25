@@ -315,7 +315,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                     fillPaint.color = t.keyText.withAlpha(0.18f)
                     canvas.drawPath(k.path, fillPaint)
                 }
-                drawLabel(canvas, k, t.keyText)
+                drawLabel(canvas, k, style.keyInk(t.keyText))
                 canvas.restore()
                 continue
             }
@@ -461,7 +461,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 linePaint.strokeWidth = k.lineWidth * 0.9f
                 canvas.drawPath(it, linePaint)
             }
-            drawLabel(canvas, k, text)
+            // 自己選的字色：一般鍵和功能鍵都換（強調色底的送出鍵維持原本，不然可能看不到）
+            drawLabel(canvas, k, if (k.spec.kind == KeyKind.ACCENT) text else style.keyInk(text))
             canvas.restore()
         }
         if (moving) postInvalidateOnAnimation()
@@ -497,19 +498,19 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         }
         val fm = textPaint.fontMetrics
         val baseline = rect.centerY() - (fm.ascent + fm.descent) / 2
-        ink.outline?.let { edge ->
+        ink.outline?.takeIf { style.keyTextColor < 0 }?.let { edge ->
             textPaint.style = Paint.Style.STROKE
             textPaint.strokeWidth = size * 0.03f
             textPaint.color = edge
             canvas.drawText(k.spec.label, rect.centerX(), baseline, textPaint)
             textPaint.style = Paint.Style.FILL
         }
-        textPaint.color = ink.color
+        textPaint.color = style.keyInk(ink.color)
         canvas.drawText(k.spec.label, rect.centerX(), baseline, textPaint)
         if (k.spec.hint.isNotEmpty()) {
             val h = FoxLetter.hintRect(frame, dp)
             hintPaint.textAlign = Paint.Align.CENTER
-            hintPaint.color = style.theme.keyText
+            hintPaint.color = style.keyInk(style.theme.keyText)
             hintPaint.textSize = minOf(9 * dp * style.fontScale, h.height())
             canvas.drawText(k.spec.hint, h.centerX(), h.top + hintPaint.textSize, hintPaint)
             hintPaint.textAlign = Paint.Align.RIGHT
@@ -541,13 +542,13 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         }
         if (k.spec.hint.isNotEmpty()) {
             hintPaint.textAlign = Paint.Align.RIGHT
-            hintPaint.color = look.hint
+            hintPaint.color = style.keyInk(look.hint)
             hintPaint.textSize = minOf(9 * dp * style.fontScale, maxOf(1f, frame.height() * 0.2f))
             canvas.drawText(k.spec.hint, k.frame.right - k.frame.width() * 0.02f, k.frame.top + hintPaint.textSize, hintPaint)
         }
         if (drawSpaceArt(canvas, k)) return
         textPaint.typeface = KeyFonts.get(context, style.fontId) ?: Typeface.DEFAULT_BOLD
-        textPaint.color = if (action == KeyAction.Space) look.spaceInk else look.ink
+        textPaint.color = style.keyInk(if (action == KeyAction.Space) look.spaceInk else look.ink)
         var size = minOf(k.spec.fontSize * dp * style.fontScale, frame.height() * 0.55f)
         textPaint.textSize = size
         val w = textPaint.measureText(k.spec.label)
@@ -590,7 +591,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 if (k.spec.hint.isNotEmpty()) {
                     val h = FoxLetter.hintRect(frame, dp)
                     hintPaint.textAlign = Paint.Align.CENTER
-                    hintPaint.color = look.hint
+                    hintPaint.color = style.keyInk(look.hint)
                     hintPaint.textSize = minOf(9 * dp * style.fontScale, h.height())
                     canvas.drawText(k.spec.hint, h.centerX(), h.top + hintPaint.textSize, hintPaint)
                     hintPaint.textAlign = Paint.Align.RIGHT
@@ -600,7 +601,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         }
         if (drawSpaceArt(canvas, k)) return
         textPaint.typeface = KeyFonts.get(context, style.fontId) ?: Typeface.DEFAULT_BOLD
-        textPaint.color = color
+        textPaint.color = style.keyInk(color)
         var size = minOf(k.spec.fontSize * dp * style.fontScale, maxOf(rect.height(), k.frame.height() * 0.75f))
         textPaint.textSize = size
         val w = textPaint.measureText(k.spec.label)

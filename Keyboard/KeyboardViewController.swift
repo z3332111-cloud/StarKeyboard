@@ -165,6 +165,7 @@ final class KeyboardViewController: UIInputViewController {
                       keyEffect: settings.keyEffect, finish: settings.keyFinish, shapeScale: settings.shapeScale, motion: settings.keyMotion))
         if settings.candidateColor >= 0 { s.candidateColor = UIColor(hex: UInt32(settings.candidateColor)) }
         if settings.candidateTextColor >= 0 { s.candidateTextColor = UIColor(hex: UInt32(settings.candidateTextColor)) }
+        if settings.keyTextColor >= 0 { s.keyTextColor = UIColor(hex: UInt32(settings.keyTextColor)) }
         return s
     }
 

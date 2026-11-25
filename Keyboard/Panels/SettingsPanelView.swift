@@ -391,8 +391,12 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             self?.editingCandidateText = i == 1
             self?.rebuild()
         })
-        stack.addArrangedSubview(candidateColorGrid())
-        stack.addArrangedSubview(candidateColorMixer())
+        stack.addArrangedSubview(candidateColorGrid(editingCandidateText ? .candidateText : .candidateFill))
+        stack.addArrangedSubview(candidateColorMixer(editingCandidateText ? .candidateText : .candidateFill))
+        stack.addArrangedSubview(header("按鍵字的顏色"))
+        stack.addArrangedSubview(note("按鍵上的注音、英文、數字和符號的顏色。第一格「主題」是跟著主題走。"))
+        stack.addArrangedSubview(candidateColorGrid(.keyText))
+        stack.addArrangedSubview(candidateColorMixer(.keyText))
 
         stack.addArrangedSubview(header("翻譯"))
         stack.addArrangedSubview(note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。iOS 26 以上且已下載語言時用 iPhone 內建翻譯，只有開啟「允許外部網路翻譯」後，才會在本機翻譯不可用時使用 MyMemory（原文會傳到該服務）。"))
@@ -1003,8 +1007,27 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         return row
     }
 
-    /// 選字顏色的調色盤：預覽＋色相、鮮豔、明暗三條漸層滑桿（底色和字色分開調）
-    private func candidateColorMixer() -> UIView {
+    /// 色票和調色盤要改的是哪一個顏色
+    private enum ColorTarget { case candidateFill, candidateText, keyText }
+
+    private func colorValue(_ target: ColorTarget) -> Int {
+        switch target {
+        case .candidateFill: return settings.candidateColor
+        case .candidateText: return settings.candidateTextColor
+        case .keyText: return settings.keyTextColor
+        }
+    }
+
+    private static func setColor(_ value: Int, _ target: ColorTarget, in store: KeyboardSettings) {
+        switch target {
+        case .candidateFill: store.candidateColor = value
+        case .candidateText: store.candidateTextColor = value
+        case .keyText: store.keyTextColor = value
+        }
+    }
+
+    /// 調色盤：預覽＋色相、鮮豔、明暗三條漸層滑桿（選字底色、選字字色、按鍵字色分開調）
+    private func candidateColorMixer(_ target: ColorTarget) -> UIView {
         let column = UIStackView()
         column.axis = .vertical
         column.spacing = 8
@@ -1016,9 +1039,10 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
                                text: store.candidateTextColor >= 0 ? UIColor(hex: UInt32(store.candidateTextColor)) : nil,
                                theme: theme)
         }
-        // 預覽：和選字列上的膠囊一樣
+        func keyInk() -> UIColor { store.keyTextColor >= 0 ? UIColor(hex: UInt32(store.keyTextColor)) : theme.keyText }
+        // 預覽：和選字列上的膠囊一樣（按鍵字色時是一顆按鍵）
         let preview = UILabel()
-        preview.text = "選字 範例"
+        preview.text = target == .keyText ? "ㄅ ㄆ A b" : "選字 範例"
         preview.font = KeyFonts.font(style.fontID, size: 20, weight: .heavy)
         preview.textAlignment = .center
         preview.layer.cornerRadius = 19
@@ -1036,13 +1060,18 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         column.addArrangedSubview(previewBox)
         func paintPreview() {
             let pill = current()
-            preview.backgroundColor = pill.fill
-            preview.textColor = pill.text
+            if target == .keyText {
+                preview.backgroundColor = theme.key
+                preview.textColor = keyInk()
+            } else {
+                preview.backgroundColor = pill.fill
+                preview.textColor = pill.text
+            }
         }
         paintPreview()
 
         // 現在要調的顏色拆成色相、鮮豔、明暗
-        let start = editingCandidateText ? current().text : current().fill
+        let start = target == .keyText ? keyInk() : target == .candidateText ? current().text : current().fill
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         start.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
         var hue = h, sat = s, bri = b
@@ -1056,13 +1085,13 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             briRow.track.image = trackImage([.black, UIColor(hue: hue, saturation: sat, brightness: 1, alpha: 1)])
         }
         paintTracks()
-        let editingText = editingCandidateText
+        let editingText = target != .candidateFill
         let changed: () -> Void = {
             hue = CGFloat(hueRow.slider.value)
             sat = CGFloat(satRow.slider.value)
             bri = CGFloat(briRow.slider.value)
             let value = KeyboardTheme.hex(UIColor(hue: hue, saturation: sat, brightness: bri, alpha: 1))
-            if editingText { store.candidateTextColor = value } else { store.candidateColor = value }
+            Self.setColor(value, target, in: store)
             paintTracks()
             paintPreview()
         }
@@ -1077,13 +1106,13 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             column.addArrangedSubview(note("字的顏色太深時，色相看不太出來：先把「明暗」往右拉，再調色相和鮮豔。"))
         }
         let reset = UIButton(type: .system)
-        reset.setTitle(editingText ? "字色改回自動（照底色挑黑或白）" : "底色改回跟著主題", for: .normal)
+        reset.setTitle(target == .keyText ? "按鍵字色改回跟著主題" : editingText ? "字色改回自動（照底色挑黑或白）" : "底色改回跟著主題", for: .normal)
         reset.titleLabel?.font = .rounded(14, .semibold)
         reset.setTitleColor(style.theme.accent, for: .normal)
         reset.contentHorizontalAlignment = .leading
         reset.addAction(UIAction { [weak self] _ in
             guard let self = self else { return }
-            if editingText { self.settings.candidateTextColor = -1 } else { self.settings.candidateColor = -1 }
+            Self.setColor(-1, target, in: self.settings)
             self.onChange?()
             self.rebuild()
         }, for: .touchUpInside)
@@ -1142,12 +1171,12 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
     }
 
     /// 選字顏色的色票：改底色時第一格是「主題」、改字色時第一格是「自動」；點了就改現在選的那一個（選中的有粗框）
-    private func candidateColorGrid() -> UIView {
+    private func candidateColorGrid(_ target: ColorTarget) -> UIView {
         let column = UIStackView()
         column.axis = .vertical
         column.spacing = 6
-        let editingText = editingCandidateText
-        let current = editingText ? settings.candidateTextColor : settings.candidateColor
+        let editingText = target == .candidateText
+        let current = colorValue(target)
         // 第一格的樣子：主題的強調色，或自動挑的字色
         let auto = KeyboardStyle.pill(fill: settings.candidateColor >= 0 ? UIColor(hex: UInt32(settings.candidateColor)) : nil,
                                       text: nil, theme: style.theme)
@@ -1166,7 +1195,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             let b = UIButton(type: .custom)
             let dot = UILabel()
             dot.isUserInteractionEnabled = false
-            dot.backgroundColor = value < 0 ? (editingText ? auto.fill : style.theme.accent) : UIColor(hex: UInt32(value))
+            dot.backgroundColor = value < 0 ? (target == .keyText ? style.theme.key : editingText ? auto.fill : style.theme.accent) : UIColor(hex: UInt32(value))
             dot.layer.cornerRadius = 15
             dot.clipsToBounds = true
             dot.layer.borderWidth = selected ? 3 : 1
@@ -1175,7 +1204,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
                 dot.text = editingText ? "自動" : "主題"
                 dot.font = .rounded(10, .bold)
                 dot.textAlignment = .center
-                dot.textColor = editingText ? auto.text : style.theme.accentText
+                dot.textColor = target == .keyText ? style.theme.keyText : editingText ? auto.text : style.theme.accentText
             }
             dot.translatesAutoresizingMaskIntoConstraints = false
             b.addSubview(dot)
@@ -1183,10 +1212,11 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
                 dot.widthAnchor.constraint(equalToConstant: 30), dot.heightAnchor.constraint(equalToConstant: 30),
                 dot.centerXAnchor.constraint(equalTo: b.centerXAnchor), dot.centerYAnchor.constraint(equalTo: b.centerYAnchor),
             ])
-            b.accessibilityLabel = editingText ? (value < 0 ? "選字字色自動" : "選字字色") : (value < 0 ? "選字底色跟主題" : "選字底色")
+            b.accessibilityLabel = target == .keyText ? (value < 0 ? "按鍵字色跟主題" : "按鍵字色")
+                : editingText ? (value < 0 ? "選字字色自動" : "選字字色") : (value < 0 ? "選字底色跟主題" : "選字底色")
             b.addAction(UIAction { [weak self] _ in
                 guard let self = self else { return }
-                if editingText { self.settings.candidateTextColor = value } else { self.settings.candidateColor = value }
+                Self.setColor(value, target, in: self.settings)
                 self.onChange?()
                 self.rebuild()
             }, for: .touchUpInside)

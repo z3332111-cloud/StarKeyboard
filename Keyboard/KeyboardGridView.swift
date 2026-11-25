@@ -414,7 +414,12 @@ final class KeyButton: UIView {
             guard let artwork = foxArtwork else { return }
             let configuration = FoxInkConfiguration(fur: artwork.furColor, preferred: artwork.textColor,
                 top: style.theme.backgroundTop, bottom: style.theme.backgroundBottom, opacity: style.keyAlpha)
-            if style.themeLook != nil {
+            if let custom = style.keyTextColor {
+                // 自己選的字色：直接用，不再自動算對比
+                foxInkConfiguration = nil
+                foxNormalInk = FoxLetterTheme.Ink(color: custom, outline: nil)
+                foxPressedInk = foxNormalInk
+            } else if style.themeLook != nil {
                 // 設計圖鑑的主題字色已經配好，不用再算對比
                 foxInkConfiguration = nil
                 foxNormalInk = FoxLetterTheme.Ink(color: artwork.textColor, outline: nil)
@@ -440,7 +445,7 @@ final class KeyButton: UIView {
                 foxPressedSymbol = nil
                 setNeedsLayout()
             }
-            hintLabel.textColor = style.themeLook?.hint ?? style.theme.keyText
+            hintLabel.textColor = style.keyTextColor?.withAlphaComponent(0.7) ?? style.themeLook?.hint ?? style.theme.keyText
             hintLabel.textAlignment = .center
             updateFoxFeedback()
             return
@@ -473,6 +478,8 @@ final class KeyButton: UIView {
         }
         // 全透明時換行鍵沒有底色，字改用一般按鍵的顏色才看得到
         if style.invisibleKeys { text = t.keyText }
+        // 自己選的字色：一般鍵和功能鍵都換（強調色底的送出鍵維持原本，不然可能看不到）
+        if let custom = style.keyTextColor, spec.kind != .accent || style.invisibleKeys { text = custom }
         let native = style.usesNativeGlassKeys
         if native {
             // 原生材質即時取景，不能把它的父層快取成一張圖片。
