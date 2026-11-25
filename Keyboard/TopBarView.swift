@@ -90,6 +90,9 @@ final class TopBarView: UIView {
     private let editorSource = UIButton(type: .system)
     private let separator = UIView()
     private let heightGrip = UIView()
+    private let gripLine = CALayer()
+    /// 插畫主題的選字列畫成圓角膠囊（設定裡可以改成滿版）
+    private var roundedBar: Bool { style.barRounded && (style.isFoxLetter || RoyalKeyArt.themes[style.theme.id] != nil) }
 
     init(style: KeyboardStyle) {
         self.style = style
@@ -137,6 +140,7 @@ final class TopBarView: UIView {
         heightGrip.isAccessibilityElement = true
         let drag = UIPanGestureRecognizer(target: self, action: #selector(dragBarHeight(_:)))
         heightGrip.addGestureRecognizer(drag)
+        heightGrip.layer.addSublayer(gripLine)
         addSubview(heightGrip)
         trailingButton.addAction(UIAction { [weak self] _ in
             guard let self = self else { return }
@@ -260,12 +264,12 @@ final class TopBarView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        backdropView.frame = (style.isFoxLetter || RoyalKeyArt.themes[style.theme.id] != nil) ? bounds.insetBy(dx: 4, dy: 4) : bounds
+        backdropView.frame = roundedBar ? bounds.insetBy(dx: 4, dy: 4) : bounds
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         foxTexture.frame = backdropView.bounds
         foxShade.frame = backdropView.bounds
-        backdropView.layer.cornerRadius = (style.isFoxLetter || RoyalKeyArt.themes[style.theme.id] != nil) ? backdropView.bounds.height / 2 : 0
+        backdropView.layer.cornerRadius = roundedBar ? backdropView.bounds.height / 2 : 0
         CATransaction.commit()
         let glassBounds = bounds.insetBy(dx: min(4, bounds.width / 2), dy: min(4, bounds.height / 2))
         nativeGlass?.frame = glassBounds
@@ -292,11 +296,13 @@ final class TopBarView: UIView {
         let trailingW: CGFloat = trailingButton.isHidden ? 0 : 44
         trailingButton.frame = CGRect(x: w - 44, y: 0, width: 44, height: h)
         scriptButton.frame = CGRect(x: w - trailingW - scriptW, y: 0, width: scriptW, height: h)
-        heightGrip.frame = CGRect(x: 0, y: max(0, h - 10), width: 18, height: 10)
-        heightGrip.backgroundColor = style.theme.keyText.withAlphaComponent(0.25)
-        heightGrip.layer.cornerRadius = 2
+        // 調高度的小把手：下緣正中間一條細細的（像 iPhone 最下面那條），不再佔掉左邊的位置
+        heightGrip.frame = CGRect(x: w / 2 - 22, y: max(0, h - 9), width: 44, height: 9)
+        gripLine.frame = CGRect(x: 8, y: 3, width: 28, height: 3)
+        gripLine.backgroundColor = style.theme.keyText.withAlphaComponent(0.3).cgColor
+        gripLine.cornerRadius = 1.5
         bringSubviewToFront(heightGrip)
-        candidateScroll.frame = CGRect(x: 18, y: top, width: max(0, w - trailingW - scriptW - 18), height: h - top)
+        candidateScroll.frame = CGRect(x: 0, y: top, width: max(0, w - trailingW - scriptW), height: h - top)
         var x: CGFloat = 6
         let ch = candidateScroll.bounds.height
         for (i, b) in candidateButtons.enumerated() {
@@ -339,14 +345,18 @@ final class TopBarView: UIView {
         let t = style.theme
         // 底色單獨過渡，工具列、選字與編輯文字維持原本的清晰度。
         let packBar = style.themeLook != nil && t.id != "cat-outline"
-        backdropView.backgroundColor = packBar ? t.specialKey : (t.isDark ? UIColor.black.withAlphaComponent(0.35) : UIColor.white.withAlphaComponent(0.6))
-        backdropView.layer.cornerRadius = (style.isFoxLetter || RoyalKeyArt.themes[style.theme.id] != nil) ? 16 : 0
-        backdropView.layer.borderWidth = (style.isFoxLetter || RoyalKeyArt.themes[style.theme.id] != nil) ? 0.65 : 0
-        backdropView.layer.borderColor = (style.isFoxLetter || RoyalKeyArt.themes[style.theme.id] != nil) ? t.keyText.withAlphaComponent(0.3).cgColor : nil
+        // 半透明：看得到後面的背景照片
+        let clear = style.barTranslucent
+        backdropView.backgroundColor = packBar ? t.specialKey.withAlphaComponent(clear ? 0.45 : 1)
+            : (t.isDark ? UIColor.black.withAlphaComponent(clear ? 0.15 : 0.35) : UIColor.white.withAlphaComponent(clear ? 0.25 : 0.6))
+        backdropView.layer.cornerRadius = roundedBar ? 16 : 0
+        backdropView.layer.borderWidth = roundedBar ? 0.65 : 0
+        backdropView.layer.borderColor = roundedBar ? t.keyText.withAlphaComponent(0.3).cgColor : nil
         foxTexture.contents = style.isFoxLetter ? FoxLetterWatercolor.backdrop : nil
         foxTexture.contentsRect = CGRect(x: 0.2, y: 0.3, width: 0.6, height: 0.6)
         foxTexture.isHidden = !style.isFoxLetter
-        foxShade.backgroundColor = UIColor.black.withAlphaComponent(0.65).cgColor
+        foxShade.backgroundColor = UIColor.black.withAlphaComponent(clear ? 0.35 : 0.65).cgColor
+        foxTexture.opacity = clear ? 0.5 : 1
         foxShade.isHidden = !style.isFoxLetter
         if style.usesNativeGlassBar {
             if nativeGlass == nil {

@@ -606,6 +606,9 @@ struct KeyboardStyle {
 
     /// 按鍵上的字（注音、英文、符號）的顏色（使用者自己選的；nil 是跟著主題）
     var keyTextColor: UIColor? = nil
+    /// 選字列：插畫主題畫成圓角膠囊（關掉就是滿版）、半透明（看得到背景）
+    var barRounded = false
+    var barTranslucent = false
 
     /// 選字膠囊：底色和上面字的顏色
     var candidatePill: (fill: UIColor, text: UIColor) {
@@ -1027,6 +1030,8 @@ extension KeyboardSettings {
         if candidateColor >= 0 { s.candidateColor = UIColor(hex: UInt32(candidateColor)) }
         if candidateTextColor >= 0 { s.candidateTextColor = UIColor(hex: UInt32(candidateTextColor)) }
         if keyTextColor >= 0 { s.keyTextColor = UIColor(hex: UInt32(keyTextColor)) }
+        s.barRounded = barRounded
+        s.barTranslucent = barTranslucent
         return s
     }
 }
@@ -1411,6 +1416,17 @@ final class KeyboardSettings {
     var candidateTextColor: Int {
         get { d.object(forKey: "candidateTextColor") as? Int ?? -1 }
         set { d.set(newValue, forKey: "candidateTextColor") }
+    }
+
+    /// 選字列畫成圓角膠囊（插畫主題）；預設滿版
+    var barRounded: Bool {
+        get { bool("barRounded", false) }
+        set { d.set(newValue, forKey: "barRounded") }
+    }
+    /// 選字列半透明，看得到後面的背景照片
+    var barTranslucent: Bool {
+        get { bool("barTranslucent", false) }
+        set { d.set(newValue, forKey: "barTranslucent") }
     }
 
     /// 按鍵上的字的顏色（RGB；-1 = 跟著主題）

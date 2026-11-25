@@ -113,19 +113,20 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         let offset = scroll.contentOffset
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         sections = []
+        collapsed = false
         jumpButton.backgroundColor = style.theme.key.withAlphaComponent(0.8)
         jumpButton.setTitleColor(style.theme.keyText, for: .normal)
         liveButton.backgroundColor = style.theme.specialKey
         liveButton.setTitleColor(style.theme.specialText, for: .normal)
 
-        stack.addArrangedSubview(header("主題、按鍵、字體"))
-        stack.addArrangedSubview(note("主題、按鍵造型和質感、按下去的動作、特效、字體、按鍵聲音，都搬到「糯糯鍵盤」App 下面的分頁了：可以先預覽再換，選好回來鍵盤就換好（要開「允許完整取用」）。鍵盤裡少放這些，比較省記憶體、不容易閃退。"))
+        add(header("主題、按鍵、字體"))
+        add(note("主題、按鍵造型和質感、按下去的動作、特效、字體、按鍵聲音，都搬到「糯糯鍵盤」App 下面的分頁了：可以先預覽再換，選好回來鍵盤就換好（要開「允許完整取用」）。鍵盤裡少放這些，比較省記憶體、不容易閃退。"))
         let fontName = KeyFont(rawValue: settings.fontID)?.title ?? UserFonts.all.first { $0.id == settings.fontID }?.name ?? "系統"
-        stack.addArrangedSubview(note("現在用的：主題「\(KeyboardTheme.named(settings.themeID).name)」、字體「\(fontName)」"))
+        add(note("現在用的：主題「\(KeyboardTheme.named(settings.themeID).name)」、字體「\(fontName)」"))
         if settings.themeID == "custom" {
             // 自訂配色：點色票選顏色；雙色時可以分別選主色和第二色
             let two = settings.customHue2 >= 0
-            stack.addArrangedSubview(choiceRow(["單色", "雙色"], selected: two ? 1 : 0) { [weak self] i in
+            add(choiceRow(["單色", "雙色"], selected: two ? 1 : 0) { [weak self] i in
                 guard let self = self else { return }
                 if i == 1 && self.settings.customHue2 < 0 {
                     // 第二色先配一個對比色（色相轉半圈）
@@ -139,14 +140,14 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
                 self.onChange?()
                 self.rebuild()
             })
-            if two { stack.addArrangedSubview(colorTargetRow()) }
-            stack.addArrangedSubview(swatchGrid())
+            if two { add(colorTargetRow()) }
+            add(swatchGrid())
             let second = two && editingSecond
-            stack.addArrangedSubview(sliderRow("濃淡", value: Float(second ? settings.customSaturation2 : settings.customSaturation), range: 0.05...1) { [weak self] v in
+            add(sliderRow("濃淡", value: Float(second ? settings.customSaturation2 : settings.customSaturation), range: 0.05...1) { [weak self] v in
                 if second { self?.settings.customSaturation2 = Double(v) } else { self?.settings.customSaturation = Double(v) }
                 self?.onChange?()
             })
-            stack.addArrangedSubview(choiceRow(["淺色", "深色"], selected: settings.customDark ? 1 : 0) { [weak self] i in
+            add(choiceRow(["淺色", "深色"], selected: settings.customDark ? 1 : 0) { [weak self] i in
                 self?.settings.customDark = i == 1
                 self?.onChange?()
             })
@@ -154,16 +155,16 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
 
         let currentTheme = settings.themeID
         if style.isIllustrated {
-            stack.addArrangedSubview(switchRow("這個主題也放背景照片", on: settings.themePhoto) { [weak self] on in
+            add(switchRow("這個主題也放背景照片", on: settings.themePhoto) { [weak self] on in
                 self?.settings.themePhoto = on
                 self?.onChange?()
             })
             if settings.themePhoto && !settings.hasBackground {
-                stack.addArrangedSubview(note("還沒有照片：到下面的「背景圖片」新增一張。"))
+                add(note("還沒有照片：到下面的「背景圖片」新增一張。"))
             }
         }
         if !ThemePacks.files(currentTheme).isEmpty, ThemePacks.isReady(currentTheme) {
-            stack.addArrangedSubview(buttonRow([("移除「\(KeyboardTheme.named(currentTheme).name)」的圖（之後可以再下載）", { [weak self] in
+            add(buttonRow([("移除「\(KeyboardTheme.named(currentTheme).name)」的圖（之後可以再下載）", { [weak self] in
                 guard let self = self else { return }
                 self.settings.themeID = self.settings.themeBeforeFox
                 ThemePacks.remove(currentTheme)
@@ -171,12 +172,12 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             })]))
         }
 
-        stack.addArrangedSubview(header("空白鍵"))
+        add(header("空白鍵"))
         if style.isIllustrated {
-            stack.addArrangedSubview(note("可繼續使用自己的空白鍵圖片／GIF或表符。使用圖片時會收起信封配件，保留中央圖案空間。"))
+            add(note("可繼續使用自己的空白鍵圖片／GIF或表符。使用圖片時會收起信封配件，保留中央圖案空間。"))
         }
         let spaceModes = [("theme", "主題符號"), ("image", "我的圖片"), ("emoji", "表符"), ("text", "只有字")]
-        stack.addArrangedSubview(choiceRow(spaceModes.map { $0.1 }, selected: spaceModes.firstIndex { $0.0 == settings.spaceStyle } ?? 0) { [weak self] i in
+        add(choiceRow(spaceModes.map { $0.1 }, selected: spaceModes.firstIndex { $0.0 == settings.spaceStyle } ?? 0) { [weak self] i in
             guard let self = self else { return }
             if spaceModes[i].0 == "image" && !SpaceArt.hasImage {
                 self.onPasteSpaceImage?()
@@ -186,32 +187,32 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             }
             self.rebuild()
         })
-        stack.addArrangedSubview(buttonRow([
+        add(buttonRow([
             ("🖼 貼上圖片／GIF", { [weak self] in self?.onPasteSpaceImage?() }),
             ("😊 貼上表符", { [weak self] in self?.onPasteSpaceEmoji?() }),
         ]))
-        stack.addArrangedSubview(note("先「拷貝」一張圖片、GIF、表情符號或顏文字，再按上面的按鈕，空白鍵就只放那個小圖。想幫照片去背：打開「糯糯鍵盤」App →「空白鍵圖案」挑照片，會自動去背並複製好。"))
+        add(note("先「拷貝」一張圖片、GIF、表情符號或顏文字，再按上面的按鈕，空白鍵就只放那個小圖。想幫照片去背：打開「糯糯鍵盤」App →「空白鍵圖案」挑照片，會自動去背並複製好。"))
 
-        stack.addArrangedSubview(header("注音被拆開了？"))
-        stack.addArrangedSubview(buttonRow([("📋 複製剛剛的打字紀錄", { [weak self] in self?.onCopyTypingLog?() })]))
-        stack.addArrangedSubview(note("打字時注音被拆開（例如「我覺得」變「我居約得」），先不要刪，直接打開 ⚙ 按這個，再貼給開發的人。紀錄是最近 80 次按鍵的注音、時間和選過的字。"))
+        add(header("注音被拆開了？"))
+        add(buttonRow([("📋 複製剛剛的打字紀錄", { [weak self] in self?.onCopyTypingLog?() })]))
+        add(note("打字時注音被拆開（例如「我覺得」變「我居約得」），先不要刪，直接打開 ⚙ 按這個，再貼給開發的人。紀錄是最近 80 次按鍵的注音、時間和選過的字。"))
 
-        stack.addArrangedSubview(header("鍵盤上方多出空隙？"))
-        stack.addArrangedSubview(switchRow("測試：把背景往上畫，蓋住灰邊", on: settings.coverTopGap) { [weak self] on in
+        add(header("鍵盤上方多出空隙？"))
+        add(switchRow("測試：把背景往上畫，蓋住灰邊", on: settings.coverTopGap) { [weak self] on in
             self?.settings.coverTopGap = on
             self?.onChange?()
         })
-        stack.addArrangedSubview(note("灰邊是 iOS 系統多留的，不一定蓋得住。打開後灰邊還在，或是鍵盤上方蓋到畫面，就關掉。"))
-        stack.addArrangedSubview(buttonRow([("開始版面診斷", { [weak self] in self?.onStartLayoutDiagnostics?() })]))
-        stack.addArrangedSubview(buttonRow([
+        add(note("灰邊是 iOS 系統多留的，不一定蓋得住。打開後灰邊還在，或是鍵盤上方蓋到畫面，就關掉。"))
+        add(buttonRow([("開始版面診斷", { [weak self] in self?.onStartLayoutDiagnostics?() })]))
+        add(buttonRow([
             ("複製版面紀錄", { [weak self] in self?.onCopyLayoutDiagnostics?() }),
             ("停止診斷", { [weak self] in self?.onStopLayoutDiagnostics?() }),
         ]))
-        stack.addArrangedSubview(note("先在正常時開始，再切到其他 App 並返回。空隙出現後，先複製紀錄再關閉 App。只記錄尺寸、位置與顯示事件，不記錄打字內容；最近 160 筆保留在記憶體，鍵盤程序重啟後清除。複製需要允許完整取用。"))
+        add(note("先在正常時開始，再切到其他 App 並返回。空隙出現後，先複製紀錄再關閉 App。只記錄尺寸、位置與顯示事件，不記錄打字內容；最近 160 筆保留在記憶體，鍵盤程序重啟後清除。複製需要允許完整取用。"))
 
-        stack.addArrangedSubview(header("我的字體"))
+        add(header("我的字體"))
         if let f = KeyFont(rawValue: settings.fontID), !f.bundled, FontPacks.isReady(f.rawValue) {
-            stack.addArrangedSubview(buttonRow([("移除「\(f.title)」（之後可以再下載）", { [weak self] in
+            add(buttonRow([("移除「\(f.title)」（之後可以再下載）", { [weak self] in
                 guard let self = self else { return }
                 FontPacks.remove(f.rawValue)
                 self.settings.fontID = KeyFont.system.rawValue
@@ -219,7 +220,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             })]))
         }
         if settings.fontID.hasPrefix("user:") {
-            stack.addArrangedSubview(buttonRow([
+            add(buttonRow([
                 ("＋ 貼上我的字體", { [weak self] in self?.onPasteFont?() }),
                 ("刪掉這個字體", { [weak self] in
                     guard let self = self else { return }
@@ -229,31 +230,31 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
                 }),
             ]))
         } else {
-            stack.addArrangedSubview(buttonRow([("＋ 貼上我的字體（自己買的字體）", { [weak self] in self?.onPasteFont?() })]))
+            add(buttonRow([("＋ 貼上我的字體（自己買的字體）", { [weak self] in self?.onPasteFont?() })]))
         }
-        stack.addArrangedSubview(note("匯入自己的字體：打開「糯糯鍵盤」App 按「匯入我的字體」挑 .ttf／.otf 檔，再回來按上面的按鈕。也可以在「檔案」App 長按字體檔「拷貝」。"))
-        stack.addArrangedSubview(note("字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。"))
+        add(note("匯入自己的字體：打開「糯糯鍵盤」App 按「匯入我的字體」挑 .ttf／.otf 檔，再回來按上面的按鈕。也可以在「檔案」App 長按字體檔「拷貝」。"))
+        add(note("字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。"))
 
-        stack.addArrangedSubview(header("大小（邊拖邊看）"))
-        stack.addArrangedSubview(sliderRow("鍵盤高度", value: Float(settings.heightScale), range: 0.8...1.3) { [weak self] v in
+        add(header("大小（邊拖邊看）"))
+        add(sliderRow("鍵盤高度", value: Float(settings.heightScale), range: 0.8...1.3) { [weak self] v in
             self?.settings.heightScale = CGFloat(v)
             self?.onChange?()
         })
-        stack.addArrangedSubview(sliderRow("字的大小", value: Float(settings.fontScale), range: 0.8...1.4) { [weak self] v in
+        add(sliderRow("字的大小", value: Float(settings.fontScale), range: 0.8...1.4) { [weak self] v in
             self?.settings.fontScale = CGFloat(v)
             self?.onChange?()
         })
-        stack.addArrangedSubview(sliderRow("按鍵間距", value: Float(settings.gapScale), range: 0.3...1.6) { [weak self] v in
+        add(sliderRow("按鍵間距", value: Float(settings.gapScale), range: 0.3...1.6) { [weak self] v in
             self?.settings.gapScale = CGFloat(v)
             self?.onChange?()
         })
-        stack.addArrangedSubview(note("間距越小，按鍵越大、越好按。"))
-        stack.addArrangedSubview(sliderRow("造型大小", value: Float(settings.shapeScale), range: 0.9...1.6) { [weak self] v in
+        add(note("間距越小，按鍵越大、越好按。"))
+        add(sliderRow("造型大小", value: Float(settings.shapeScale), range: 0.9...1.6) { [weak self] v in
             self?.settings.shapeScale = CGFloat(v)
             self?.onChange?()
         })
-        stack.addArrangedSubview(note("貓咪、熊熊、肉球這類造型的大小，往右拉會變大顆（可以超出按鍵一點點）。"))
-        stack.addArrangedSubview(buttonRow([
+        add(note("貓咪、熊熊、肉球這類造型的大小，往右拉會變大顆（可以超出按鍵一點點）。"))
+        add(buttonRow([
             ("大小恢復預設", { [weak self] in
                 guard let self = self else { return }
                 self.settings.heightScale = 1
@@ -265,47 +266,47 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             }),
         ]))
 
-        stack.addArrangedSubview(header("背景圖片"))
-        stack.addArrangedSubview(note("先在相簿把照片「拷貝」，再按下面的按鈕。也可以用「糯糯鍵盤」App 挑照片。"))
-        stack.addArrangedSubview(buttonRow([
+        add(header("背景圖片"))
+        add(note("先在相簿把照片「拷貝」，再按下面的按鈕。也可以用「糯糯鍵盤」App 挑照片。"))
+        add(buttonRow([
             ("＋ 從剪貼簿新增照片", { [weak self] in self?.onPasteBackground?() }),
             ("全部拿掉", { [weak self] in self?.onClearBackground?() }),
         ]))
         if !settings.photos.isEmpty {
-            stack.addArrangedSubview(photoRow())
+            add(photoRow())
         }
         if settings.photos.count >= 2 {
             let modes = [("fixed", "固定這張"), ("open", "每次打開換"), ("daily", "每天換")]
-            stack.addArrangedSubview(choiceRow(modes.map { $0.1 }, selected: modes.firstIndex { $0.0 == settings.photoRotation } ?? 0) { [weak self] i in
+            add(choiceRow(modes.map { $0.1 }, selected: modes.firstIndex { $0.0 == settings.photoRotation } ?? 0) { [weak self] i in
                 self?.settings.photoRotation = modes[i].0
             })
         }
         if settings.hasBackground {
-            stack.addArrangedSubview(buttonRow([
+            add(buttonRow([
                 ("調整照片位置和大小（拖拉、兩指縮放）", { [weak self] in self?.onAdjustPhoto?() }),
             ]))
         }
-        stack.addArrangedSubview(sliderRow("圖片淡化", value: Float(settings.backgroundFade), range: 0...0.9) { [weak self] v in
+        add(sliderRow("圖片淡化", value: Float(settings.backgroundFade), range: 0...0.9) { [weak self] v in
             self?.settings.backgroundFade = CGFloat(v)
             self?.onChange?()
         })
-        stack.addArrangedSubview(sliderRow("按鍵透明度", value: Float(settings.keyAlpha), range: 0...1) { [weak self] v in
+        add(sliderRow("按鍵透明度", value: Float(settings.keyAlpha), range: 0...1) { [weak self] v in
             self?.settings.keyAlpha = CGFloat(v)
             self?.onChange?()
         })
 
-        stack.addArrangedSubview(header("快捷片語（打縮寫就跳出整段話）"))
-        stack.addArrangedSubview(buttonRow([("＋ 新增快捷片語", { [weak self] in self?.onAddShortcut?() })]))
+        add(header("快捷片語（打縮寫就跳出整段話）"))
+        add(buttonRow([("＋ 新增快捷片語", { [weak self] in self?.onAddShortcut?() })]))
         if shortcuts.items.isEmpty {
-            stack.addArrangedSubview(note("例如縮寫「地址」→ 你家的完整地址。打注音只打開頭（ㄉㄓ）也可以，英文打 addr 之類也行。"))
+            add(note("例如縮寫「地址」→ 你家的完整地址。打注音只打開頭（ㄉㄓ）也可以，英文打 addr 之類也行。"))
         }
         for item in shortcuts.items {
-            stack.addArrangedSubview(shortcutRow(item))
+            add(shortcutRow(item))
         }
 
-        stack.addArrangedSubview(header("上面那一排按鈕（不用的關掉，比較不擠）"))
+        add(header("上面那一排按鈕（不用的關掉，比較不擠）"))
         for item in ToolbarItem.allCases where item != .settings {
-            stack.addArrangedSubview(switchRow(item.title, on: !settings.hiddenToolbarItems.contains(item)) { [weak self] on in
+            add(switchRow(item.title, on: !settings.hiddenToolbarItems.contains(item)) { [weak self] on in
                 guard let self = self else { return }
                 var hidden = self.settings.hiddenToolbarItems
                 if on { hidden.remove(item) } else { hidden.insert(item) }
@@ -314,9 +315,9 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             })
         }
 
-        stack.addArrangedSubview(header("輸入法（按「中／英」鍵輪流切換）"))
+        add(header("輸入法（按「中／英」鍵輪流切換）"))
         for mode in InputMode.allCases {
-            stack.addArrangedSubview(switchRow(Self.modeName(mode), on: settings.enabledModes.contains(mode)) { [weak self] on in
+            add(switchRow(Self.modeName(mode), on: settings.enabledModes.contains(mode)) { [weak self] on in
                 guard let self = self else { return }
                 var modes = self.settings.enabledModes
                 if on {
@@ -328,93 +329,101 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
                 self.onChange?()
             })
         }
-        stack.addArrangedSubview(switchRow("注音十欄排法（像 Gboard：ㄦ 在空白鍵旁，長按打數字）", on: settings.zhuyinTenColumns) { [weak self] on in
+        add(switchRow("注音十欄排法（像 Gboard：ㄦ 在空白鍵旁，長按打數字）", on: settings.zhuyinTenColumns) { [weak self] on in
             self?.settings.zhuyinTenColumns = on
             self?.onChange?()
         })
-        stack.addArrangedSubview(switchRow("拼音輸出簡體字", on: settings.pinyinSimplified) { [weak self] on in
+        add(switchRow("拼音輸出簡體字", on: settings.pinyinSimplified) { [weak self] on in
             self?.settings.pinyinSimplified = on
         })
-        stack.addArrangedSubview(switchRow("聯想詞（打完字後推薦下一個字）", on: settings.associations) { [weak self] on in
+        add(switchRow("聯想詞（打完字後推薦下一個字）", on: settings.associations) { [weak self] on in
             self?.settings.associations = on
         })
 
-        stack.addArrangedSubview(header("打錯字修正"))
-        stack.addArrangedSubview(switchRow("英文自動修正（按空白時修正，馬上按刪除可以復原）", on: settings.autocorrect) { [weak self] on in
+        add(header("打錯字修正"))
+        add(switchRow("英文自動修正（按空白時修正，馬上按刪除可以復原）", on: settings.autocorrect) { [weak self] on in
             self?.settings.autocorrect = on
         })
-        stack.addArrangedSubview(switchRow("英文滑行輸入（手指不放開，滑過字母就打出整個字）", on: settings.glideTyping) { [weak self] on in
+        add(switchRow("英文滑行輸入（手指不放開，滑過字母就打出整個字）", on: settings.glideTyping) { [weak self] on in
             self?.settings.glideTyping = on
             self?.onChange?()
         })
-        stack.addArrangedSubview(switchRow("注音：按到旁邊的鍵也猜得到", on: settings.fuzzyKeys) { [weak self] on in
+        add(switchRow("注音：按到旁邊的鍵也猜得到", on: settings.fuzzyKeys) { [weak self] on in
             self?.settings.fuzzyKeys = on
             self?.onChange?()
         })
-        stack.addArrangedSubview(switchRow("注音：聲調打錯或忘了打", on: settings.fuzzyTones) { [weak self] on in
+        add(switchRow("注音：聲調打錯或忘了打", on: settings.fuzzyTones) { [weak self] on in
             self?.settings.fuzzyTones = on
             self?.onChange?()
         })
-        stack.addArrangedSubview(switchRow("注音模糊音：ㄣㄥ、ㄓㄗ、ㄔㄘ、ㄕㄙ 分不清", on: settings.fuzzyPhonetic) { [weak self] on in
+        add(switchRow("注音模糊音：ㄣㄥ、ㄓㄗ、ㄔㄘ、ㄕㄙ 分不清", on: settings.fuzzyPhonetic) { [weak self] on in
             self?.settings.fuzzyPhonetic = on
             self?.onChange?()
         })
-        stack.addArrangedSubview(header("選字列高度"))
-        stack.addArrangedSubview(note("也可以按住選字列左下角的小橫條往上或往下拖。字會跟著變大。"))
-        stack.addArrangedSubview(candidateHeightRow())
-        stack.addArrangedSubview(header("選字顏色"))
-        stack.addArrangedSubview(note("選字列第一個字（按空白鍵會送出的）的底色和字色。先選要改「底色」還是「字色」，再點色票，或用下面的滑桿自己調深淺。"))
-        stack.addArrangedSubview(choiceRow(["改底色", "改字色"], selected: editingCandidateText ? 1 : 0) { [weak self] i in
+        add(header("選字列（高度、滿版、半透明）"))
+        add(note("也可以按住選字列下緣正中間的小橫條往上或往下拖。字會跟著變大。"))
+        add(candidateHeightRow())
+        add(switchRow("選字列半透明（看得到後面的背景）", on: settings.barTranslucent) { [weak self] on in
+            self?.settings.barTranslucent = on
+            self?.onChange?()
+        })
+        add(switchRow("插畫主題的選字列用圓角（關掉是滿版）", on: settings.barRounded) { [weak self] on in
+            self?.settings.barRounded = on
+            self?.onChange?()
+        })
+        add(header("選字顏色"))
+        add(note("選字列第一個字（按空白鍵會送出的）的底色和字色。先選要改「底色」還是「字色」，再點色票，或用下面的滑桿自己調深淺。"))
+        add(choiceRow(["改底色", "改字色"], selected: editingCandidateText ? 1 : 0) { [weak self] i in
             self?.editingCandidateText = i == 1
             self?.rebuild()
         })
-        stack.addArrangedSubview(candidateColorGrid(editingCandidateText ? .candidateText : .candidateFill))
-        stack.addArrangedSubview(candidateColorMixer(editingCandidateText ? .candidateText : .candidateFill))
-        stack.addArrangedSubview(header("按鍵字的顏色"))
-        stack.addArrangedSubview(note("按鍵上的注音、英文、數字和符號的顏色。第一格「主題」是跟著主題走。"))
-        stack.addArrangedSubview(candidateColorGrid(.keyText))
-        stack.addArrangedSubview(candidateColorMixer(.keyText))
+        add(candidateColorGrid(editingCandidateText ? .candidateText : .candidateFill))
+        add(candidateColorMixer(editingCandidateText ? .candidateText : .candidateFill))
+        add(header("按鍵字的顏色"))
+        add(note("按鍵上的注音、英文、數字和符號的顏色。第一格「主題」是跟著主題走。"))
+        add(candidateColorGrid(.keyText))
+        add(candidateColorMixer(.keyText))
 
-        stack.addArrangedSubview(header("翻譯"))
-        stack.addArrangedSubview(note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。iOS 26 以上且已下載語言時用 iPhone 內建翻譯，只有開啟「允許外部網路翻譯」後，才會在本機翻譯不可用時使用 MyMemory（原文會傳到該服務）。"))
+        add(header("翻譯"))
+        add(note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。iOS 26 以上且已下載語言時用 iPhone 內建翻譯，只有開啟「允許外部網路翻譯」後，才會在本機翻譯不可用時使用 MyMemory（原文會傳到該服務）。"))
 
-        stack.addArrangedSubview(header("聲音與震動"))
-        stack.addArrangedSubview(switchRow("按鍵聲音", on: settings.keySound) { [weak self] on in
+        add(header("聲音與震動"))
+        add(switchRow("按鍵聲音", on: settings.keySound) { [weak self] on in
             self?.settings.keySound = on
         })
-        stack.addArrangedSubview(note("現在的聲音：「\(KeySound(rawValue: settings.keySoundStyle)?.title ?? "iPhone 原本")」。要換別的軸，到「糯糯鍵盤」App 的「聲音」分頁，點一下就能聽。"))
-        stack.addArrangedSubview(switchRow("按鍵震動", on: settings.haptics) { [weak self] on in
+        add(note("現在的聲音：「\(KeySound(rawValue: settings.keySoundStyle)?.title ?? "iPhone 原本")」。要換別的軸，到「糯糯鍵盤」App 的「聲音」分頁，點一下就能聽。"))
+        add(switchRow("按鍵震動", on: settings.haptics) { [weak self] on in
             self?.settings.haptics = on
         })
 
-        stack.addArrangedSubview(header("隱私與安全"))
-        stack.addArrangedSubview(switchRow("自動記錄剪貼簿", on: settings.clipboardHistoryEnabled) { [weak self] on in
+        add(header("隱私與安全"))
+        add(switchRow("自動記錄剪貼簿", on: settings.clipboardHistoryEnabled) { [weak self] on in
             self?.settings.clipboardHistoryEnabled = on
         })
-        stack.addArrangedSubview(note("預設關閉。開啟後會儲存複製的文字；會略過敏感標記，但無法辨識所有密碼。可在剪貼簿逐筆刪除舊資料。"))
-        stack.addArrangedSubview(switchRow("允許外部網路翻譯", on: settings.allowOnlineTranslation) { [weak self] on in
+        add(note("預設關閉。開啟後會儲存複製的文字；會略過敏感標記，但無法辨識所有密碼。可在剪貼簿逐筆刪除舊資料。"))
+        add(switchRow("允許外部網路翻譯", on: settings.allowOnlineTranslation) { [weak self] on in
             self?.settings.allowOnlineTranslation = on
         })
-        stack.addArrangedSubview(note("預設關閉。開啟後，本機翻譯失敗時會將最多 450 字送到 MyMemory；文字在網址參數中，服務商可能保留紀錄。請勿翻譯密碼或私密資料。完整說明見糯糯鍵盤 App 的「隱私與安全」。"))
-        stack.addArrangedSubview(header("未分類暫存上限（釘選另存）"))
-        stack.addArrangedSubview(clipLimitRow())
+        add(note("預設關閉。開啟後，本機翻譯失敗時會將最多 450 字送到 MyMemory；文字在網址參數中，服務商可能保留紀錄。請勿翻譯密碼或私密資料。完整說明見糯糯鍵盤 App 的「隱私與安全」。"))
+        add(header("未分類暫存上限（釘選另存）"))
+        add(clipLimitRow())
 
-        stack.addArrangedSubview(header("其他"))
-        stack.addArrangedSubview(buttonRow([
+        add(header("其他"))
+        add(buttonRow([
             ("📒 看看記住了哪些字", { [weak self] in self?.onShowLearning?() }),
             ("清除選字學習紀錄", { [weak self] in self?.onResetLearning?() }),
         ]))
         if !hasFullAccess {
-            stack.addArrangedSubview(note("⚠️ 還沒開啟「允許完整取用」：剪貼簿、聲音、震動、貼圖、背景圖片都需要它。\n設定 › 一般 › 鍵盤 › 鍵盤 › 糯糯鍵盤 › 允許完整取用"))
+            add(note("⚠️ 還沒開啟「允許完整取用」：剪貼簿、聲音、震動、貼圖、背景圖片都需要它。\n設定 › 一般 › 鍵盤 › 鍵盤 › 糯糯鍵盤 › 允許完整取用"))
         }
         let current = ReleaseChecker.currentBuild
         if settings.latestBuild > current {
-            stack.addArrangedSubview(note("🎉 有新版：打開「糯糯鍵盤」App 看更新內容和下載方法"))
+            add(note("🎉 有新版：打開「糯糯鍵盤」App 看更新內容和下載方法"))
         }
-        stack.addArrangedSubview(note("糯糯鍵盤 v\(ReleaseChecker.currentVersion) ・ 注音字典來自小麥注音（MIT 授權）・ 機械軸錄音來自 kbsim（Thomas Lai，MIT 授權）"))
+        add(note("糯糯鍵盤 v\(ReleaseChecker.currentVersion) ・ 注音字典來自小麥注音（MIT 授權）・ 機械軸錄音來自 kbsim（Thomas Lai，MIT 授權）"))
 
         jumpButton.menu = UIMenu(title: "跳到…", children: sections.map { s in
-            UIAction(title: s.name) { [weak self] _ in self?.jump(to: s.view) }
+            UIAction(title: s.name) { [weak self] _ in self?.openSection(s.name) }
         })
         setNeedsLayout()
         layoutIfNeeded()
@@ -435,17 +444,50 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
 
     private var textColor: UIColor { style.theme.keyText }
 
-    private func header(_ text: String) -> UILabel {
-        let l = UILabel()
-        l.text = text
-        l.font = .rounded(14, .bold)
-        l.textColor = textColor.withAlphaComponent(0.8)
-        let short = text.components(separatedBy: "（").first?.components(separatedBy: "？").first ?? text
-        sections.append((short, l))
-        return l
+    /// 展開了哪幾段（鍵盤開著的時候記得；一次全部排好會卡好幾秒，所以平常收起來，點標題才展開）
+    private static var openSections: Set<String> = []
+    /// 現在這一段收起來了：後面的內容先不放進畫面
+    private var collapsed = false
+    private weak var lastHeader: UIView?
+
+    /// 放進設定頁；收起來的那一段只放標題
+    private func add(_ view: UIView) {
+        if view === lastHeader || !collapsed { stack.addArrangedSubview(view) }
     }
 
-    /// 點「跳到…」裡的一段：捲到那一段的標題
+    /// 每一段的標題：點一下展開或收起
+    private func header(_ text: String) -> UIView {
+        let short = text.components(separatedBy: "（").first?.components(separatedBy: "？").first ?? text
+        let isOpen = Self.openSections.contains(short)
+        let b = UIButton(type: .custom)
+        b.contentHorizontalAlignment = .leading
+        b.titleLabel?.font = .rounded(15, .bold)
+        b.titleLabel?.numberOfLines = 0
+        b.setTitle((isOpen ? "▾  " : "▸  ") + text, for: .normal)
+        b.setTitleColor(textColor.withAlphaComponent(0.9), for: .normal)
+        b.backgroundColor = style.theme.key.withAlphaComponent(isOpen ? 0.35 : 0.55)
+        b.layer.cornerRadius = 12
+        b.contentEdgeInsets = UIEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
+        b.accessibilityTraits = .header
+        b.accessibilityValue = isOpen ? "已展開" : "已收起"
+        b.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            if Self.openSections.contains(short) { Self.openSections.remove(short) } else { Self.openSections.insert(short) }
+            self.rebuild()
+        }, for: .touchUpInside)
+        sections.append((short, b))
+        collapsed = !isOpen
+        lastHeader = b
+        return b
+    }
+
+    /// 點「跳到…」裡的一段：展開那一段，再捲過去
+    private func openSection(_ name: String) {
+        Self.openSections.insert(name)
+        rebuild()
+        if let view = sections.first(where: { $0.name == name })?.view { jump(to: view) }
+    }
+
     private func jump(to view: UIView) {
         let y = stack.frame.minY + view.frame.minY - 4
         scroll.setContentOffset(CGPoint(x: 0, y: max(0, min(y, scroll.contentSize.height - scroll.bounds.height))), animated: true)
