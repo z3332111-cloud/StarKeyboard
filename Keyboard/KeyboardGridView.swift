@@ -751,6 +751,12 @@ final class KeyButton: UIView {
             let face = CGRect(x: center.x - width / 2, y: center.y - height / 2, width: width, height: height).intersection(bounds)
             label.frame = face
             icon.frame = face
+            if hasPersonalSpaceArt {
+                // 自己的空白鍵圖片／GIF：放在整顆鍵的正中間，高度用鍵帽的七成（不跟著字的大小和位置）
+                let h = frame.height * 0.7
+                icon.frame = CGRect(x: frame.midX - frame.width * 0.4, y: frame.midY - h / 2, width: frame.width * 0.8, height: h)
+                icon.contentMode = .scaleAspectFit
+            }
             hintLabel.font = .rounded(min(9 * style.fontScale, max(1, frame.height * 0.20)), .medium)
             hintLabel.frame = CGRect(x: bounds.maxX - bounds.width * 0.42, y: 0, width: bounds.width * 0.40, height: ceil(hintLabel.font.lineHeight))
             return
