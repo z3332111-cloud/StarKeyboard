@@ -1,0 +1,68 @@
+--- a/Keyboard/ThemePacks.swift
++++ b/Keyboard/ThemePacks.swift
+@@ -32,6 +32,8 @@
+              bar: 0x472534, text: 0xFFF0DF, accent: 0x9A5566, accentText: 0xFFF4E7, shadow: 0x22131C, dark: true, ink: 0xFFF0DF, hint: 0xE2BCC5),
+         make("midnight-cocoa", "微醺可可", emoji: "🍷", subtitle: "紅酒與黑巧克力", bed: 0x472F40, bedBottom: 0x251922,
+              bar: 0x472534, text: 0xFFF0DF, accent: 0x9A5566, accentText: 0xFFF4E7, shadow: 0x22131C, dark: true, ink: 0xFFF0DF, hint: 0xE2BCC5),
++        make("sapphire-mist", "月煙琉璃", emoji: "🪔", subtitle: "藍水晶、月牙與一縷燈煙", bed: 0x203150, bedBottom: 0x16233E,
++             bar: 0x2B405C, text: 0xFFF3D7, accent: 0xCDC2A2, accentText: 0x17223B, shadow: 0x101627, dark: true, ink: 0xFFF3D7, hint: 0xCED8EA),
+         make("moonlit-carpet", "茉莉燈語", emoji: "🪔", subtitle: "白茉莉、鼠尾草與一縷燈煙", bed: 0xE8E9E0, bedBottom: 0xDADDD2,
+              bar: 0xF4F2E9, text: 0x464A40, accent: 0xA0AD8D, accentText: 0x283329, shadow: 0xA4A99B, dark: false, ink: 0x464A40, hint: 0x596253),
+         make("lounge-reserve", "私藏酒廊", emoji: "🍷", subtitle: "水晶杯與黑巧克力", bed: 0x472F40, bedBottom: 0x251922,
+--- a/Keyboard/RoyalKeyArt.swift
++++ b/Keyboard/RoyalKeyArt.swift
+@@ -9,6 +9,9 @@
+     var hasPaintedNumberKey = false
+     var numberY: CGFloat = 0.46
+ 
++    var numberX: CGFloat = 0.5
++    var usesWholeCarpet = false
++
+     var cupKeys: [String: (name: String, anchor: CGPoint)] = [:]
+ 
+     static let themes: [String: RoyalKeyArt] = [
+@@ -16,9 +19,11 @@
+                                     functionCap: 2, spaceY: 0.45, enterY: 0.38),
+         "midnight-cocoa": RoyalKeyArt(anchors: Array(repeating: CGPoint(x: 0.57, y: 0.39), count: 6),
+                                     functionCap: 2, spaceY: 0.45, enterY: 0.38),
++        "sapphire-mist": RoyalKeyArt(anchors: [0.54, 0.56, 0.47, 0.59, 0.5, 0.52].map { CGPoint(x: 0.5, y: $0) },
++                                    functionCap: 1, spaceY: 0.50, enterY: 0.52, hasPaintedNumberKey: true, numberY: 0.60, numberX: 0.56, usesWholeCarpet: true),
+         "moonlit-carpet": RoyalKeyArt(anchors: [0.44, 0.46, 0.49, 0.49, 0.41, 0.43].map { CGPoint(x: 0.5, y: $0) },
+                                        functionCap: 1, spaceY: 0.50, enterY: 0.45,
+-                                       hasPaintedNumberKey: true, numberY: 0.71),
++                                       hasPaintedNumberKey: true, numberY: 0.71, usesWholeCarpet: true),
+         "lounge-reserve": RoyalKeyArt(anchors: Array(repeating: CGPoint(x: 0.57, y: 0.39), count: 6),
+                                     functionCap: 2, spaceY: 0.45, enterY: 0.38, hasPaintedNumberKey: true,
+                                     cupKeys: ["5": ("whisky", CGPoint(x: 0.5, y: 0.48)),
+@@ -48,7 +53,7 @@
+             if let key = key, let cup = cupKeys[key] { return cup }
+         }
+         switch action {
+-        case .layer(.numbers) where hasPaintedNumberKey: return ("numbers", CGPoint(x: 0.5, y: numberY))
++        case .layer(.numbers) where hasPaintedNumberKey: return ("numbers", CGPoint(x: numberX, y: numberY))
+         case .space: return ("space", CGPoint(x: 0.5, y: spaceY))
+         case .returnKey: return ("enter", CGPoint(x: 0.5, y: enterY))
+         default:
+--- a/Keyboard/FoxLetterTheme.swift
++++ b/Keyboard/FoxLetterTheme.swift
+@@ -252,7 +252,7 @@
+             if royalAssetName != name {
+                 royalAssetName = name
+                 let image = UIImage(named: name, in: Bundle(for: FoxLetterArtworkView.self), compatibleWith: nil)
+-                if action == .space, look.theme.id != "moonlit-carpet", let image = image {
++                if action == .space, !art.usesWholeCarpet, let image = image {
+                     let scaled = image.cgImage.map { UIImage(cgImage: $0, scale: CGFloat($0.height) / 38, orientation: .up) } ?? image
+                     let edge = min(20, floor(scaled.size.width * 0.22))
+                     royalImage.image = scaled.resizableImage(withCapInsets: UIEdgeInsets(top: 0, left: edge, bottom: 0, right: edge), resizingMode: .stretch)
+--- a/Keyboard/KeyboardGridView.swift
++++ b/Keyboard/KeyboardGridView.swift
+@@ -734,6 +734,9 @@
+             let anchor = artwork.royalAnchor
+             let center = CGPoint(x: frame.minX + frame.width * anchor.x, y: frame.minY + frame.height * anchor.y)
+             label.font = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, frame.height * 0.55), weight: .semibold)
++            if case .layer(.numbers) = spec.action, let art = RoyalKeyArt.themes[style.theme.id], art.numberX != 0.5 {
++                label.font = KeyFonts.font(style.fontID, size: min(label.font.pointSize, frame.width * 0.19), weight: .semibold)
++            }
+             let height = min(frame.height, ceil(label.font.lineHeight))
+             let face = CGRect(x: center.x - frame.width / 2, y: center.y - height / 2, width: frame.width, height: height).intersection(bounds)
+             label.frame = face

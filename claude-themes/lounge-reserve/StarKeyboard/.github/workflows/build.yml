@@ -1,0 +1,317 @@
+name: 打包 iOS 鍵盤
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths-ignore:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 連續推好幾次時，只留最新的那次打包（避免舊的版本後完成、變成「最新版」）；main 和 develop 各排各的
+concurrency:
+  group: build-${{ github.ref_name }}
+  cancel-in-progress: true
+
+# 原始碼倉庫是私人的：Mac 的打包時間每分鐘算 10 分鐘，每月只有 2000 分鐘，所以分兩種：
+# - 平常推程式（push、拉取請求）：只準備字典＋跑核心測試（選字、注音），確認沒有改壞
+# - 要發新版時手動按「Run workflow」（或叫 Claude 打包）：再加角色主題測試、編譯 IPA，都過了才發佈
+# 先在 Linux 準備字典和字體（約 2 分鐘），Mac 的工作同時跑。
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 字體下載重試與備援測試（本機 HTTP，不連外）
+        run: python3 -m unittest discover -s tools/tests -p 'test_download_font.py' -v
+
+      - name: 下載並轉換字典（小麥注音 MIT、OpenCC 繁簡 Apache 2.0）
+        run: |
+          git clone --depth 1 https://github.com/openvanilla/McBopomofo.git "$RUNNER_TEMP/McBopomofo"
+          make -C "$RUNNER_TEMP/McBopomofo/Source/Data" data.txt
+          for f in TSCharacters TSPhrases; do curl -sSfL -o "$RUNNER_TEMP/$f.txt" "https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/$f.txt"; done
+          curl -sSfL -o "$RUNNER_TEMP/Unihan.zip" https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip
+          unzip -q -o "$RUNNER_TEMP/Unihan.zip" Unihan_IRGSources.txt -d "$RUNNER_TEMP"
+          export UNIHAN="$RUNNER_TEMP/Unihan_IRGSources.txt"
+          python3 tools/build_dict.py "$RUNNER_TEMP/McBopomofo/Source/Data/data.txt" Keyboard/Resources/zhuyin.sqlite "$RUNNER_TEMP/TSCharacters.txt" "$RUNNER_TEMP/TSPhrases.txt"
+          cp "$RUNNER_TEMP/McBopomofo/LICENSE.txt" Keyboard/Resources/McBopomofo-LICENSE.txt
+
+      - name: 下載可愛字體並縮小（粉圓、芫荽、霞鶩文楷、源泉圓體、內海、俐方體11號，都是 SIL OFL 1.1）
+        run: |
+          download_font() {
+            local font_file="$1"
+            shift
+            python3 tools/download_font.py "$RUNNER_TEMP/$font_file" "$@"
+          }
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q fonttools
+          download_font huninn.ttf https://github.com/justfont/open-huninn-font/releases/download/v2.1/jf-openhuninn-2.1.ttf
+          download_font iansui.zip https://github.com/ButTaiwan/iansui/releases/download/v1.020/iansui.zip
+          unzip -q -o "$RUNNER_TEMP/iansui.zip" -d "$RUNNER_TEMP/iansui"
+          IANSUI=$(find "$RUNNER_TEMP/iansui" \( -iname "*.ttf" -o -iname "*.otf" \) | head -1)
+          # Release CDN 曾連續回傳 504；優先使用作者倉庫的同版本檔案，Release 作備援。
+          # SHA-256 取自 v1.530 Release 資產，確保兩個來源都是相同字體。
+          download_font wenkai.ttf \
+            --sha256 6662480a3f95b4a90c80b189c679617a48adce3a505118a6af63ce5a482b83fa \
+            https://raw.githubusercontent.com/lxgw/LxgwWenkaiTC/v1.530/fonts/TTF/LXGWWenKaiTC-Regular.ttf \
+            https://github.com/lxgw/LxgwWenkaiTC/releases/download/v1.530/LXGWWenKaiTC-Regular.ttf
+          download_font gensen.zip https://github.com/ButTaiwan/gensen-font/releases/download/v2.100/GenSenRounded2TW-otf.zip
+          unzip -q -o "$RUNNER_TEMP/gensen.zip" -d "$RUNNER_TEMP/gensen"
+          GENSEN=$(find "$RUNNER_TEMP/gensen" -iname "*.otf" | grep -iE "(-M|Medium).otf$" | head -1)
+          [ -n "$GENSEN" ] || GENSEN=$(find "$RUNNER_TEMP/gensen" -iname "*.otf" | grep -iE "(-R|Regular).otf$" | head -1)
+          echo "源泉圓體：$GENSEN"
+          download_font naikai.ttf https://raw.githubusercontent.com/max32002/naikaifont/master/tw/NaikaiFont-Regular-Lite.ttf
+          download_font cubic.ttf https://raw.githubusercontent.com/ACh-K/Cubic-11/main/fonts/ttf/Cubic_11.ttf
+          "$RUNNER_TEMP/venv/bin/python" tools/build_fonts.py Keyboard/Resources/zhuyin.sqlite Keyboard/Resources/Fonts huninn="$RUNNER_TEMP/huninn.ttf" iansui="$IANSUI" wenkai="$RUNNER_TEMP/wenkai.ttf" gensen="$GENSEN" naikai="$RUNNER_TEMP/naikai.ttf" cubic="$RUNNER_TEMP/cubic.ttf"
+          # 字體都做成「要用再下載」的字體包（粉圓也是），App 才不會越來越大
+          mkdir -p FontPack
+          for f in huninn iansui wenkai gensen naikai cubic; do mv "Keyboard/Resources/Fonts/$f.ttf" FontPack/ 2>/dev/null || true; done
+          ls -la Keyboard/Resources/Fonts FontPack
+
+      - name: 下載英文常用字表（滑行輸入用；FrequencyWords，CC BY-SA 4.0）
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/en_50k.txt" https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/en/en_50k.txt
+          python3 tools/build_words.py "$RUNNER_TEMP/en_50k.txt" Keyboard/Resources/glide_words.txt
+
+      - name: 保存準備好的字典、字體、字表
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-resources
+          retention-days: 3
+          if-no-files-found: error
+          path: |
+            Keyboard/Resources/zhuyin.sqlite
+            Keyboard/Resources/McBopomofo-LICENSE.txt
+            Keyboard/Resources/Fonts/
+            Keyboard/Resources/glide_words.txt
+            FontPack/
+
+  core-tests:
+    needs: prepare
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 選用 Xcode 26（原生 Liquid Glass 需要 iOS 26 SDK）
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+
+      - name: 拿準備好的字典、字體、字表
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-resources
+
+      - name: 核心邏輯測試（注音組字、選字、剪貼簿）
+        run: swift test --package-path Core
+
+      - name: 狐狸主題向量與預覽資料檢查
+        run: |
+          node tools/tests/fox_letter_prototype.test.js
+          node tools/tests/fox_letter_theme.test.js
+          node tools/tests/fox_letter_watercolor.test.js
+          node tools/build_fox_letter_prototype.js --check
+          node tools/build_fox_letter_theme.js --check
+
+
+  theme-tests:
+    needs: prepare
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-15-intel
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 選用 Xcode 26（原生 Liquid Glass 需要 iOS 26 SDK）
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+
+      - name: 拿準備好的字典、字體、字表
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-resources
+
+      - name: 產生 Xcode 專案
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: 角色主題版面、重用與效能測試
+        run: |
+          set -o pipefail
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/theme-simulators.json"
+          THEME_SIMULATOR_ID=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); ids=[v["udid"] for runtime, devices in d["devices"].items() if "iOS-26" in runtime for v in devices if v["name"].startswith("iPhone")]; assert ids, "找不到 iOS 26 iPhone 模擬器"; print(ids[0])' "$RUNNER_TEMP/theme-simulators.json")
+          xcodebuild test -project StarKeyboard.xcodeproj -scheme StarKeyboardThemeTests \
+            -destination "platform=iOS Simulator,id=$THEME_SIMULATOR_ID" \
+            -resultBundlePath "$RUNNER_TEMP/fox-letter-tests.xcresult" \
+            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "$RUNNER_TEMP/fox-letter-tests.log"
+
+      - name: 保存角色主題測試結果（包含效能量測）
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          retention-days: 3
+          name: fox-letter-tests
+          path: |
+            ${{ runner.temp }}/fox-letter-tests.xcresult
+            ${{ runner.temp }}/fox-letter-tests.log
+          if-no-files-found: ignore
+
+
+  build:
+    needs: prepare
+    if: github.event_name == 'workflow_dispatch'
+    # ARM runners have repeatedly timed out while waiting for capacity.
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 選用 Xcode 26（原生 Liquid Glass 需要 iOS 26 SDK）
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+
+      - name: 讀取公開版本
+        run: echo "APP_VERSION=$(cat VERSION)" >> "$GITHUB_ENV"
+
+      - name: 拿準備好的字典、字體、字表
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-resources
+
+      - name: 產生 Xcode 專案
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: 編譯
+        run: |
+          xcodebuild -project StarKeyboard.xcodeproj -scheme StarKeyboard -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            MARKETING_VERSION="$APP_VERSION" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            build > build.log 2>&1 || { grep -E "error:" build.log | sort -u | head -60; tail -40 build.log; exit 1; }
+          grep -E "warning:" build.log | grep -v "/build/" | sort -u | head -40 || true
+
+      - name: 包成 IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/StarKeyboard.app Payload/
+          ls -la Payload/StarKeyboard.app/PlugIns
+          du -sh Payload/StarKeyboard.app
+          zip -qry StarKeyboard.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          retention-days: 3
+          name: StarKeyboard-ipa
+          path: StarKeyboard.ipa
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          retention-days: 3
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
+
+  release:
+    # 手動打包時，測試和編譯都過了才發佈
+    needs: [core-tests, theme-tests, build]
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 讀取公開版本
+        run: echo "APP_VERSION=$(cat VERSION)" >> "$GITHUB_ENV"
+
+      - name: 拿打包好的 IPA
+        uses: actions/download-artifact@v4
+        with:
+          name: StarKeyboard-ipa
+
+      - name: 拿字體包
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-resources
+
+      - name: 整理這次更新了什麼
+        run: |
+          PREV=$(git describe --tags --abbrev=0 --match "build-*" 2>/dev/null || true)
+          if [ -n "$PREV" ]; then RANGE="$PREV..HEAD"; else RANGE="HEAD"; fi
+          {
+            echo "這次更新："
+            git log --no-merges --pretty="- %s" $RANGE -- . ":(exclude)android" | head -20
+            echo
+            echo "下載 StarKeyboard.ipa，用 Sideloadly 直接裝（不要先刪掉舊的，設定和資料會保留）。"
+          } > release_notes.md
+          cat release_notes.md
+
+      # develop 發成「預發佈」的 dev-數字，不會變成 latest，App 的新版提醒只看 main 的 build-數字。
+      # 拉取請求只上傳 IPA 成品，不發佈，避免蓋掉正式版。
+      - name: 發佈到 Releases（方便下載）
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name == 'main' && 'build' || 'dev' }}-${{ github.run_number }}
+          name: 糯糯鍵盤 ${{ github.ref_name != 'main' && '開發版 ' || '' }}v${{ env.APP_VERSION }}
+          body_path: release_notes.md
+          files: StarKeyboard.ipa
+          prerelease: ${{ github.ref_name != 'main' }}
+          make_latest: ${{ github.ref_name == 'main' }}
+
+      # 公開的 nuonuo-keyboard：大家從安裝網站下載的地方（原始碼倉庫之後改成私人，別人只看得到這裡）
+      - name: 發佈到公開的 nuonuo-keyboard
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: z3332111-cloud/nuonuo-keyboard
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          target_commitish: main
+          tag_name: build-${{ github.run_number }}
+          name: 糯糯鍵盤 v${{ env.APP_VERSION }}
+          body_path: release_notes.md
+          files: StarKeyboard.ipa
+          make_latest: true
+
+      # 字體包：放在固定的 font-pack 發佈裡（預發佈，不會變成最新版），鍵盤按「下載」時從這裡拿
+      - name: 上傳可下載的字體包
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view font-pack >/dev/null 2>&1 || gh release create font-pack --title "糯糯鍵盤 字體包" --notes "鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。" --prerelease --latest=false
+          gh release upload font-pack FontPack/*.ttf --clobber
+
+      # 用 action 上傳（同名檔案自動覆蓋）；gh release upload 在連線慢時會重試，第二次碰到「檔名已存在」就失敗
+      - name: 字體包也放到公開的 nuonuo-keyboard（新版鍵盤從這裡下載）
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: z3332111-cloud/nuonuo-keyboard
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          target_commitish: main
+          tag_name: font-pack
+          name: 糯糯鍵盤 字體包
+          body: 鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。
+          files: FontPack/*.ttf
+          prerelease: true
+          make_latest: "false"
+          overwrite_files: true

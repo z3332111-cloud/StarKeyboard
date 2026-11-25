@@ -1,0 +1,261 @@
+import Foundation
+
+/// 注音符號與聲調。這些只能留在組字區，不能進文章，除非使用者在符號鍵上自己選。
+enum PhoneticText {
+    static func isPhonetic(_ c: Character) -> Bool {
+        Bopomofo.kind(of: c) != nil
+    }
+
+    static func containsPhonetic(_ s: String) -> Bool {
+        s.contains(where: isPhonetic)
+    }
+
+    /// 注音路徑要送出的字。聲調與注音一律拿掉。
+    static func commit(_ s: String) -> String {
+        String(s.filter { !isPhonetic($0) })
+    }
+}
+
+/// 注音組字到送出的規則。鍵盤與測試走同一條，避免聲調從某條捷徑漏進文章。
+final class ZhuyinSession {
+    var composer = ZhuyinComposer() {
+        didSet { if let c = cursor, c >= composer.keys.count { cursor = nil } }
+    }
+    /// 游標在注音中間時是第幾個鍵的前面；nil = 在最後面（平常的打法）
+    private(set) var cursor: Int?
+    var candidates: [Candidate] = []
+    var engine: ZhuyinEngine?
+    private var picks: [(readings: [String], text: String)] = []
+    /// 最近的按鍵紀錄（注音被拆開時，使用者可以複製給開發的人看）：時間差、按了什麼、之後組字區長怎樣
+    private(set) var log: [String] = []
+    private var lastLogTime: Double = 0
+
+    func note(_ what: String) {
+        let now = ProcessInfo.processInfo.systemUptime
+        let gap = lastLogTime == 0 ? 0 : Int((now - lastLogTime) * 1000)
+        lastLogTime = now
+        let parts = composer.readings.joined(separator: " ")
+        log.append("+\(gap)ms \(what) → [\(parts)]")
+        if log.count > 80 { log.removeFirst(log.count - 80) }
+    }
+
+    /// 很長的句子仍整段留著。超過這個音節數才把前面已經能決定的部分送出，新按的鍵不會被丟掉。
+    static let overflowSyllables = 180
+    static let keepTail = 8
+
+    func refresh(context: String) {
+        guard !composer.readings.isEmpty else {
+            candidates = []
+            return
+        }
+        guard let engine = engine else {
+            candidates = []
+            return
+        }
+        candidates = engine.candidates(for: composer.readings, before: context).compactMap { candidate in
+            let text = PhoneticText.commit(candidate.text)
+            guard !text.isEmpty else { return nil }
+            return Candidate(text: text, span: candidate.span, kind: candidate.kind, reading: candidate.reading)
+        }
+    }
+
+    /// 注音鍵。回傳這次要送進文章的字（通常是空的；緩衝區太長時是前面那段中文）。
+    func type(_ c: Character) -> String {
+        guard Bopomofo.kind(of: c) != nil else { return "" }
+        defer { note(String(c) + (cursor != nil ? "（游標）" : "")) }
+        if let i = cursor { editKeys(insert: c, at: i); return "" }
+        if !composer.isComposing { picks = [] }
+        _ = composer.input(c, at: ProcessInfo.processInfo.systemUptime)
+        if composer.syllables.count > Self.overflowSyllables {
+            return commitOverflow()
+        }
+        return ""
+    }
+
+    /// 組字區或還沒用到的聲調處理掉了就回傳 true。
+    func backspace() -> Bool {
+        defer { note("刪除") }
+        if let i = cursor {
+            if i > 0 { editKeys(removeAt: i - 1) }
+            return true
+        }
+        if composer.isComposing {
+            composer.backspace()
+            if !composer.isComposing { picks = [] }
+            return true
+        }
+        return composer.consumeStrayTone()
+    }
+
+    enum Space {
+        /// 沒有注音組字，呼叫端自己決定要不要送空白。
+        case passthrough
+        /// 組字區有變，但這次不送出文字。
+        case stay
+        case commit(String)
+    }
+
+    func space() -> Space {
+        defer { note("空白") }
+        if let i = cursor { editKeys(insert: ZhuyinComposer.firstTone, at: i); return .stay }
+        if composer.hasPendingSyllable {
+            composer.confirmSyllable(at: ProcessInfo.processInfo.systemUptime)
+            return .stay
+        }
+        if composer.isComposing {
+            let unfinished = composer.syllables.contains { $0.open }
+            let top = candidates.first
+            let covers = top.map {
+                $0.span == composer.readings.count && $0.kind != .literal && !PhoneticText.containsPhonetic($0.text)
+            } ?? false
+            if unfinished || !covers { return .stay }
+            return .commit(pick(0, learn: false))
+        }
+        _ = composer.consumeStrayTone()
+        return .passthrough
+    }
+
+    func enter() -> String { commitAll() }
+
+    /// 換鍵盤、或必須先把組字區清掉時。整句送出也記進學習。
+    func commitAll() -> String {
+        let readings = composer.readings
+        let text = committedSentence()
+        if !readings.isEmpty, !text.isEmpty, !PhoneticText.containsPhonetic(text) {
+            learnCommitted(readings: readings, text: text)
+        }
+        composer.clear()
+        picks = []
+        candidates = []
+        return text
+    }
+
+    // MARK: 游標在注音中間
+
+    /// 按住空白鍵左右滑：在注音裡移動游標。沒有在打注音就回傳 false
+    @discardableResult
+    func moveCursor(_ steps: Int) -> Bool {
+        guard composer.isComposing else { return false }
+        let n = composer.keys.count
+        let c = max(0, min(n, (cursor ?? n) + steps))
+        cursor = c == n ? nil : c
+        return true
+    }
+
+    /// 上排顯示的注音；游標在中間時用 ▏ 標出位置
+    var displayText: String {
+        guard let c = cursor else { return composer.displayText }
+        let keys = composer.keys
+        return ZhuyinComposer.display(keys[..<c]) + "▏" + ZhuyinComposer.display(keys[c...])
+    }
+
+    private func editKeys(insert c: Character, at i: Int) {
+        var keys = composer.keys
+        let at = min(i, keys.count)
+        keys.insert(c, at: at)
+        composer.replay(keys)
+        placeCursor(at + 1)
+    }
+
+    private func editKeys(removeAt i: Int) {
+        var keys = composer.keys
+        guard i < keys.count else { return }
+        keys.remove(at: i)
+        composer.replay(keys)
+        if !composer.isComposing { picks = [] }
+        placeCursor(i)
+    }
+
+    private func placeCursor(_ c: Int) {
+        let n = composer.keys.count
+        cursor = c >= n ? nil : max(0, c)
+    }
+
+    func pick(_ index: Int, learn: Bool) -> String {
+        guard composer.isComposing, index >= 0, index < candidates.count else { return "" }
+        let c = candidates[index]
+        defer { note("選「\(c.text)」") }
+        // 只有「直接送出注音」那一個候選會留下注音符號，其他一律拿掉
+        let text = c.kind == .raw ? c.text : PhoneticText.commit(c.text)
+        let used = c.reading.map { $0.components(separatedBy: "-") } ?? Array(composer.readings.prefix(c.span))
+        let sentenceOK = c.kind == .sentence && learnableSentence(readings: used, text: text)
+        if c.kind != .literal && c.kind != .raw && !text.isEmpty && (learn || c.kind == .phrase || sentenceOK) {
+            engine?.learn(readings: used, text: text)
+            picks.append((used, text))
+        } else {
+            picks = []
+        }
+        cursor = nil
+        composer.removeFirst(c.span)
+        if !composer.isComposing {
+            if picks.count > 1 {
+                let all = picks.flatMap { $0.readings }
+                engine?.learn(readings: all, text: picks.map { $0.text }.joined())
+            }
+            picks = []
+            candidates = []
+        }
+        return text
+    }
+
+    /// 符號鍵盤上使用者自己點的字，可以是聲調。
+    func insertSymbol(_ s: String) -> String { s }
+
+    /// 使用者送出的句子。和斷詞結果一樣、或不超過詞長上限時，整段記下來；更長就分段記。
+    private func learnCommitted(readings: [String], text: String) {
+        guard let engine, readings.count == text.count else { return }
+        let raw = engine.segmentSpans(readings).map { $0.text }.joined()
+        let same = PhoneticText.commit(raw) == text
+        if same && readings.count <= ZhuyinEngine.maxPhraseLength {
+            engine.learn(readings: readings, text: text)
+            return
+        }
+        for part in engine.segmentSpans(readings)
+        where part.readings.count == part.text.count && !part.text.isEmpty
+            && part.readings.count <= ZhuyinEngine.maxPhraseLength {
+            engine.learn(readings: part.readings, text: part.text)
+        }
+    }
+
+    /// 空白鍵送出整句時，只記住斷詞真的選出來的字，不記住為了避開重複字而替換的結果。
+    private func learnableSentence(readings: [String], text: String) -> Bool {
+        guard let engine else { return false }
+        let raw = engine.bestSegments(readings).map { $0.text }.joined()
+        if PhoneticText.commit(raw) == text { return true }
+        return engine.fuzzyPhrases(readings[...]).contains { $0.corrections == 0 && $0.text == text }
+    }
+
+    private func committedSentence() -> String {
+        guard !composer.readings.isEmpty else { return "" }
+        if let first = candidates.first, first.span == composer.readings.count, !PhoneticText.containsPhonetic(first.text) {
+            return first.text
+        }
+        let raw = engine?.bestSegments(composer.readings).map { $0.text }.joined() ?? ""
+        return PhoneticText.commit(raw)
+    }
+
+    private func commitOverflow() -> String {
+        let count = composer.syllables.count - Self.keepTail
+        guard count > 0 else { return "" }
+        let readings = Array(composer.readings.prefix(count))
+        let text = PhoneticText.commit(engine?.bestSegments(readings).map { $0.text }.joined() ?? "")
+        composer.removeFirst(count)
+        picks = []
+        return text
+    }
+}
+
+/// 選字列高度。拖曳和設定滑桿都用同一組上下限。
+enum CandidateBarMetrics {
+    static let minHeight: Double = 44
+    static let maxHeight: Double = 96
+    static let defaultHeight: Double = 64
+
+    static func clamp(_ height: Double) -> Double {
+        min(maxHeight, max(minHeight, height))
+    }
+
+    static func fontSize(barHeight: Double) -> Double {
+        24 * (clamp(barHeight) / defaultHeight)
+    }
+}

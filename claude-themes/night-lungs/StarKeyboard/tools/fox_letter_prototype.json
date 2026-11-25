@@ -1,0 +1,78 @@
+{
+  "id": "fox-letter-prototype",
+  "title": "小狐狸的楓葉信",
+  "revision": "A02-watercolor",
+  "endCapAspect": 0.85,
+  "labelRect": [14, 26, 72, 44],
+  "hintRect": [34, 0, 32, 20],
+  "faceWidthFraction": 0.58,
+  "faceHeightLimit": 0.50,
+  "faceAspect": 0.45,
+  "faceBottomInset": 0.05,
+  "textColor": "#FFFAF1",
+  "hintColor": "#F8E6CE",
+  "themeColors": {
+    "backgroundTop":"#51424D", "backgroundBottom":"#392F3D",
+    "key":"#6C5050", "keyText":"#FFF5E4",
+    "specialKey":"#59434A", "specialText":"#FFF5E4",
+    "accent":"#E9AE78", "accentText":"#3F2C27", "shadow":"#271D27"
+  },
+  "variants": [
+    {"name":"楓葉橘", "fur":"#A95B30", "cheek":"#F7DEC0", "text":"#FFF9EF", "accessory":"leaf"},
+    {"name":"奶油米", "fur":"#DCBC8E", "cheek":"#FAE8CF", "text":"#543B2F", "accessory":"beret"},
+    {"name":"栗子棕", "fur":"#71514C", "cheek":"#DDBA9D", "text":"#FFF9EF", "accessory":"scarf"},
+    {"name":"楓紅", "fur":"#A85747", "cheek":"#E8B99B", "text":"#FFF9EF", "accessory":"letter"},
+    {"name":"霧橄欖", "fur":"#737344", "cheek":"#E7D3AE", "text":"#FFF9EF", "accessory":"leaf"}
+  ],
+  "accessories": {
+    "leaf": [
+      {"name":"leaf", "space":"head", "fill":"#E3A04F", "stroke":"#975634", "strokeWidth":0.35,
+       "path":"M80 25 L68 22 L73 17 L67 11 L77 12 L78 3 L84 9 L90 4 L91 13 L98 12 L94 20 L99 24 L87 26 L86 31 L82 30 Z"},
+      {"name":"leaf-vein", "space":"head", "fill":"#B76A39", "path":"M80 9 L83 20 L87 29 L85 30 L81 21 L75 16 L77 15 L81 18 L79 10 Z"}
+    ],
+    "beret": [
+      {"name":"beret", "space":"head", "fill":"#8B4F42", "stroke":"#683F37", "strokeWidth":0.4,
+       "path":"M4 19 C0 12 8 5 20 5 C32 1 43 5 43 13 Q46 18 40 23 Q22 24 4 19 Z M24 6 L23 1 Q26 -1 29 1 L28 6 Z"},
+      {"name":"beret-band", "space":"head", "fill":"#6B413A", "path":"M5 18 Q23 22 42 18 L40 23 Q22 25 5 21 Z"}
+    ],
+    "letter": [
+      {"name":"envelope", "space":"head", "fill":"#FFF0D9", "stroke":"#805543", "strokeWidth":0.4,
+       "path":"M67 6 L97 9 L95 29 L65 26 Z"},
+      {"name":"envelope-fold", "space":"head", "fill":"#D4AF89", "path":"M67 7 L81 18 L97 10 L96 12 L81 20 L66 9 Z M65 25 L76 18 L77 20 L67 27 Z M85 20 L95 27 L95 29 L83 21 Z"},
+      {"name":"envelope-seal", "space":"head", "fill":"#B95F44", "path":"M81 16 C76 11 73 17 78 20 L82 24 L86 21 C91 17 86 12 82 16 Z"}
+    ],
+    "scarf": [
+      {"name":"scarf", "space":"head", "fill":"#B69454", "stroke":"#795D40", "strokeWidth":0.3,
+       "path":"M1 80 Q12 85 25 84 L25 95 Q12 97 2 91 Z M19 88 L29 88 L32 100 L23 100 Z"},
+      {"name":"scarf-checks", "space":"head", "fill":"#687748", "path":"M7 83 L11 84 L11 94 L7 93 Z M17 84 L21 84 L21 95 L17 95 Z M25 90 L29 90 L31 100 L27 100 Z M2 87 L25 89 L25 92 L2 90 Z"}
+    ]
+  },
+  "layers": [
+    {
+      "name": "outline",
+      "space": "head",
+      "fill": "#C87843",
+      "stroke": "#825138",
+      "strokeWidth": 0.65,
+      "path": "M5 34 C5 23 8 9 12 3 Q13 0 17 4 L32 20 Q50 15 68 20 L83 4 Q87 0 89 4 C94 14 96 26 95 37 C101 55 99 75 91 89 C83 98 67 99 50 99 C29 99 14 97 7 87 C0 74 0 53 5 34 Z"
+    },
+    {
+      "name": "inner-ears",
+      "space": "head",
+      "fill": "#F6D9B5",
+      "path": "M11 29 Q12 16 15 10 L27 24 Q18 24 11 29 Z M73 24 L85 10 Q89 18 90 31 Q83 26 73 24 Z"
+    },
+    {
+      "name": "cheeks",
+      "space": "head",
+      "fill": "#F6E2C6",
+      "path": "M3 69 C15 68 31 79 50 84 C69 79 85 68 97 69 C97 83 88 93 74 96 C59 100 39 100 25 96 C10 93 3 83 3 69 Z"
+    },
+    {
+      "name": "expression",
+      "space": "face",
+      "fill": "#56382C",
+      "path": "E18 32 6 13.333333 E82 32 6 13.333333 M43 57 Q50 52 57 57 Q59 60 56 65 L51 72 Q50 73 49 72 L44 65 Q41 61 43 57 Z"
+    }
+  ]
+}
