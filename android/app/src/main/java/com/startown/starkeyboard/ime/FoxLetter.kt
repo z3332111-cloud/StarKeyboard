@@ -32,6 +32,15 @@ object ThemeLooks {
         emoji, subtitle, art, shape, finish, c(ink), c(spaceInk), c(hint))
 
     val all = listOf(
+        // 宮廷系列（鍵帽圖：RoyalKeyArt，要用才下載）
+        make("royal-lion", "凡爾賽・金獅", "🦁", "暖橘宮廷", "#F7DFB5", "#996A44", "#533114", "#A37741", "#FFF5E5", "#A37741", false, "#533114",
+            bedBottom = "#DEB27D", specialText = "#FFF5E5"),
+        make("royal-swan", "杏桃・天鵝宮", "🦢", "暖橘宮廷", "#F9DFCC", "#9F6D60", "#623823", "#AA755E", "#FFF5E5", "#AA755E", false, "#623823",
+            bedBottom = "#E4B097", specialText = "#FFF5E5"),
+        make("royal-chapel", "琥珀・加冕廳", "👑", "暖橘宮廷", "#F9DF9E", "#986027", "#55300D", "#AC763D", "#FFF5E5", "#AC763D", false, "#55300D",
+            bedBottom = "#E3AF61", specialText = "#FFF5E5"),
+        make("royal-orangery", "御苑・橙花房", "🍊", "暖橘宮廷", "#F8E5B9", "#957A51", "#523714", "#A17A49", "#FFF5E5", "#A17A49", false, "#523714",
+            bedBottom = "#E2B878", specialText = "#FFF5E5"),
         make("persimmon", "柿子貓的茶屋", "🍊", "秋日水彩", "#F8E6C6", "#E9CB9C", "#51351F", "#D9793A", "#FFFFFF", "#C9A878", false, "#412C20", spaceInk = "#302E1D"),
         make("observatory", "小梟的月相室", "🦉", "秋日水彩", "#18243B", "#293850", "#F5E9CD", "#E3B566", "#171B31", "#0F1728", true, "#171B31", spaceInk = "#FFF4D9"),
         make("railway", "稻雀的末班車", "🌾", "秋日水彩", "#294544", "#365851", "#FFF0CF", "#E0A64B", "#332817", "#1C302F", true, "#332817", spaceInk = "#4C3323"),
@@ -53,6 +62,7 @@ object ThemePacks {
     private const val BASE = "https://z3332111-cloud.github.io/nuonuo-keyboard/theme-packs/"
 
     fun files(id: String): List<String> = when {
+        RoyalKeyArt.themes.containsKey(id) -> RoyalKeyArt.files(id)
         id == FoxLetter.ID -> listOf("keycaps-watercolor-v2", "wide-keycaps-watercolor-v2", "background-watercolor-v2")
         ThemeLooks.named(id)?.hasArt == true -> listOf("theme-$id")
         else -> emptyList()
@@ -240,6 +250,9 @@ object FoxLetter {
         images[name]?.let { return it }
         // 換主題就放掉前一款的圖，記憶體裡只留正在用的
         if (name.startsWith("theme-") || images.keys.any { it.startsWith("theme-") }) images.clear()
+        // 宮廷主題一款八張：換到另一款就把前一款的放掉
+        val royal = RoyalKeyArt.themes.keys.firstOrNull { name.startsWith("$it-") }
+        if (royal != null && images.keys.any { it.startsWith("royal-") && !it.startsWith("$royal-") }) images.keys.removeAll { it.startsWith("royal-") }
         val file = ThemePacks.file(context, name)
         val plain = if (file.exists()) runCatching { BitmapFactory.decodeFile(file.path) }.getOrNull() else null
         val bitmap = if (plain != null && name != "background-watercolor-v2" && finish != KeyFinish.FLAT)
@@ -247,6 +260,9 @@ object FoxLetter {
         if (bitmap != null) images[name] = bitmap
         return bitmap
     }
+
+    /** 宮廷主題的鍵帽圖（要先下載） */
+    fun royal(context: Context, name: String) = image(context, name)
 
     fun keycaps(context: Context) = image(context, "keycaps-watercolor-v2")
     fun wideKeycaps(context: Context) = image(context, "wide-keycaps-watercolor-v2")
@@ -442,4 +458,38 @@ class FoxBarDrawable(private val image: Bitmap?, private val dp: Float, private 
     override fun setColorFilter(colorFilter: ColorFilter?) {}
     @Deprecated("Deprecated in Java")
     override fun getOpacity() = PixelFormat.TRANSLUCENT
+}
+
+/**
+ * 宮廷主題（金獅、天鵝宮、加冕廳、橙花房）：每款六顆鍵帽＋空白鍵＋換行鍵，一張圖一顆，只畫鍵帽，字是程式畫的。
+ * 圖放在 GitHub Pages 的 theme-packs（要用才下載），anchors 是每顆鍵帽上放字的位置（0～1）。和 iPhone 版 Keyboard/RoyalKeyArt.swift 同一份資料。
+ */
+class RoyalKeyArt(val anchors: List<android.graphics.PointF>, val functionCap: Int, val spaceY: Float, val enterY: Float) {
+    /** 這顆鍵用哪張圖（不含主題名）、字放哪裡 */
+    fun face(index: Int, action: KeyAction): Pair<String, android.graphics.PointF> = when (action) {
+        KeyAction.Space -> "space" to android.graphics.PointF(0.5f, spaceY)
+        KeyAction.Return -> "enter" to android.graphics.PointF(0.5f, enterY)
+        else -> {
+            val cap = if (action.isCharacter) ORDER[max(0, index) % ORDER.size] else functionCap
+            "cap-${cap + 1}" to anchors[cap]
+        }
+    }
+
+    companion object {
+        private fun p(x: Float, y: Float) = android.graphics.PointF(x, y)
+        val themes = mapOf(
+            "royal-lion" to RoyalKeyArt(listOf(p(0.5f, 0.4f), p(0.5f, 0.41f), p(0.5f, 0.45f), p(0.5f, 0.44f), p(0.5f, 0.46f), p(0.5f, 0.42f)), 3, 0.49f, 0.56f),
+            "royal-swan" to RoyalKeyArt(listOf(p(0.5f, 0.4f), p(0.5f, 0.45f), p(0.5f, 0.43f), p(0.57f, 0.43f), p(0.43f, 0.53f), p(0.5f, 0.36f)), 1, 0.49f, 0.46f),
+            "royal-chapel" to RoyalKeyArt(listOf(p(0.5f, 0.53f), p(0.5f, 0.44f), p(0.5f, 0.51f), p(0.5f, 0.45f), p(0.5f, 0.44f), p(0.5f, 0.44f)), 3, 0.51f, 0.5f),
+            "royal-orangery" to RoyalKeyArt(listOf(p(0.5f, 0.53f), p(0.5f, 0.45f), p(0.49f, 0.49f), p(0.43f, 0.49f), p(0.5f, 0.65f), p(0.5f, 0.47f)), 1, 0.6f, 0.65f),
+        )
+        private val ORDER = intArrayOf(
+            0, 2, 1, 3, 5, 4, 0, 3, 2, 5, 4, 1, 3, 5, 2, 0, 4, 5, 1, 3,
+            2, 5, 4, 1, 0, 3, 5, 2, 4, 0, 3, 0, 2, 4, 1, 5, 2, 4, 0, 1,
+        )
+
+        /** 這款要下載的圖（不含 .png） */
+        fun files(id: String): List<String> =
+            if (themes.containsKey(id)) (1..6).map { "$id-cap-$it" } + listOf("$id-space", "$id-enter") else emptyList()
+    }
 }

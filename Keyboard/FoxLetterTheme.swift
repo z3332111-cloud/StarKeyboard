@@ -211,6 +211,9 @@ enum FoxLetterPathCache {
 
 /// 多色向量圖層重用。壓下只改插畫透明度，不重建路徑，字面由 KeyButton 繪製。
 final class FoxLetterArtworkView: UIView {
+    private let royalImage = UIImageView()
+    private var royalAssetName = ""
+    private(set) var royalAnchor = CGPoint(x: 0.5, y: 0.5)
     private let drawing = CALayer()
     private let paper = FoxLetterWatercolorKeyView(frame: .zero)
     private var artwork: [CAShapeLayer] = []
@@ -228,6 +231,8 @@ final class FoxLetterArtworkView: UIView {
         isUserInteractionEnabled = false
         layer.addSublayer(drawing)
         addSubview(paper)
+        addSubview(royalImage)
+        royalImage.isHidden = true
         configure(index: 0, action: .text(""), personalSpaceArt: false)
     }
 
@@ -237,6 +242,35 @@ final class FoxLetterArtworkView: UIView {
     var look: ThemeLook?
 
     func configure(index: Int, action: KeyAction, personalSpaceArt: Bool, compact requestedCompact: Bool? = nil) {
+        // 宮廷主題：每顆鍵一張鍵帽圖（照 RoyalKeyArt 的順序），字畫在 anchor 的位置
+        if let look = look, let art = RoyalKeyArt.themes[look.theme.id] {
+            drawing.isHidden = true
+            paper.isHidden = true
+            royalImage.isHidden = false
+            let face = art.face(index: index, action: action)
+            royalAnchor = face.anchor
+            let name = look.theme.id + "-" + face.name
+            // 圖還沒下載好時（nil）下次再讀一次
+            if royalAssetName != name || royalImage.image == nil {
+                royalAssetName = name
+                // 圖要先下載（ThemePacks）；讀過的圖所有按鍵共用一份
+                let image = FoxLetterWatercolor.image(name)
+                if action == .space, let image = image {
+                    let scaled = image.cgImage.map { UIImage(cgImage: $0, scale: CGFloat($0.height) / 38, orientation: .up) } ?? image
+                    let edge = min(20, floor(scaled.size.width * 0.22))
+                    royalImage.image = scaled.resizableImage(withCapInsets: UIEdgeInsets(top: 0, left: edge, bottom: 0, right: edge), resizingMode: .stretch)
+                } else {
+                    royalImage.image = image
+                }
+            }
+            royalImage.contentMode = action == .space ? .scaleToFill : .scaleAspectFit
+            textColor = action == .space ? look.spaceInk : look.ink
+            furColor = look.theme.key
+            return
+        }
+        royalImage.isHidden = true
+        royalAssetName = ""
+        royalImage.image = nil
         if let look = look {
             drawing.isHidden = true
             paper.isHidden = false
@@ -301,11 +335,13 @@ final class FoxLetterArtworkView: UIView {
         CATransaction.setDisableActions(true)
         drawing.opacity = Float(min(1, max(0, opacity)) * (pressed ? 0.82 : 1))
         paper.layer.opacity = drawing.opacity
+        royalImage.alpha = CGFloat(drawing.opacity)
         CATransaction.commit()
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        if !royalImage.isHidden { royalImage.frame = bounds; return }
         if !paper.isHidden {
             paper.frame = bounds
             paper.layoutIfNeeded()

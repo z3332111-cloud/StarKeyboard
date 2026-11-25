@@ -727,6 +727,22 @@ final class KeyButton: UIView {
 
     private func layoutFoxLetter() {
         guard let artwork = foxArtwork else { return }
+        if RoyalKeyArt.themes[style.theme.id] != nil {
+            // 宮廷主題：每種鍵都是鍵帽圖，字放在圖上指定的位置（anchor）
+            let frame = FoxLetterTheme.frame(in: bounds, gap: style.gapScale, scale: style.shapeScale)
+            artwork.frame = frame
+            artwork.configure(index: illustratedIndex, action: spec.action, personalSpaceArt: hasPersonalSpaceArt)
+            let anchor = artwork.royalAnchor
+            let center = CGPoint(x: frame.minX + frame.width * anchor.x, y: frame.minY + frame.height * anchor.y)
+            label.font = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, frame.height * 0.55), weight: .semibold)
+            let height = min(frame.height, ceil(label.font.lineHeight))
+            let face = CGRect(x: center.x - frame.width / 2, y: center.y - height / 2, width: frame.width, height: height).intersection(bounds)
+            label.frame = face
+            icon.frame = face
+            hintLabel.font = .rounded(min(9 * style.fontScale, max(1, frame.height * 0.20)), .medium)
+            hintLabel.frame = CGRect(x: bounds.maxX - bounds.width * 0.42, y: 0, width: bounds.width * 0.40, height: ceil(hintLabel.font.lineHeight))
+            return
+        }
         if style.themeLook != nil && !spec.action.isCharacter && spec.action != .space {
             // 設計圖鑑主題的功能鍵：也是鍵帽插畫（固定第三顆），照原本的比例放在中間，不拉成長條
             let chipFrame = bounds.insetBy(dx: 2.5 * style.gapScale, dy: 4 * style.gapScale)

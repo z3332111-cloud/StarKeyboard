@@ -260,12 +260,12 @@ final class TopBarView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        backdropView.frame = style.isFoxLetter ? bounds.insetBy(dx: 4, dy: 4) : bounds
+        backdropView.frame = (style.isFoxLetter || RoyalKeyArt.themes[style.theme.id] != nil) ? bounds.insetBy(dx: 4, dy: 4) : bounds
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         foxTexture.frame = backdropView.bounds
         foxShade.frame = backdropView.bounds
-        backdropView.layer.cornerRadius = style.isFoxLetter ? backdropView.bounds.height / 2 : 0
+        backdropView.layer.cornerRadius = (style.isFoxLetter || RoyalKeyArt.themes[style.theme.id] != nil) ? backdropView.bounds.height / 2 : 0
         CATransaction.commit()
         let glassBounds = bounds.insetBy(dx: min(4, bounds.width / 2), dy: min(4, bounds.height / 2))
         nativeGlass?.frame = glassBounds
@@ -340,9 +340,9 @@ final class TopBarView: UIView {
         // 底色單獨過渡，工具列、選字與編輯文字維持原本的清晰度。
         let packBar = style.themeLook != nil && t.id != "cat-outline"
         backdropView.backgroundColor = packBar ? t.specialKey : (t.isDark ? UIColor.black.withAlphaComponent(0.35) : UIColor.white.withAlphaComponent(0.6))
-        backdropView.layer.cornerRadius = style.isFoxLetter ? 16 : 0
-        backdropView.layer.borderWidth = style.isFoxLetter ? 0.65 : 0
-        backdropView.layer.borderColor = style.isFoxLetter ? t.keyText.withAlphaComponent(0.3).cgColor : nil
+        backdropView.layer.cornerRadius = (style.isFoxLetter || RoyalKeyArt.themes[style.theme.id] != nil) ? 16 : 0
+        backdropView.layer.borderWidth = (style.isFoxLetter || RoyalKeyArt.themes[style.theme.id] != nil) ? 0.65 : 0
+        backdropView.layer.borderColor = (style.isFoxLetter || RoyalKeyArt.themes[style.theme.id] != nil) ? t.keyText.withAlphaComponent(0.3).cgColor : nil
         foxTexture.contents = style.isFoxLetter ? FoxLetterWatercolor.backdrop : nil
         foxTexture.contentsRect = CGRect(x: 0.2, y: 0.3, width: 0.6, height: 0.6)
         foxTexture.isHidden = !style.isFoxLetter

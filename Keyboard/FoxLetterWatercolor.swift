@@ -22,6 +22,11 @@ enum FoxLetterWatercolor {
         guard let url = ThemePacks.localURL(name) ?? bundle.url(forResource: name, withExtension: "png", subdirectory: "FoxLetter") else { return nil }
         // 換主題就放掉前一款的圖，記憶體裡只留正在用的
         if name.hasPrefix("theme-") || images.keys.contains(where: { $0.hasPrefix("theme-") }) { images.removeAll() }
+        // 宮廷主題一款八張：換到另一款就把前一款的放掉
+        if name.hasPrefix("royal-"), let theme = RoyalKeyArt.themes.keys.first(where: { name.hasPrefix($0 + "-") }),
+           images.keys.contains(where: { $0.hasPrefix("royal-") && !$0.hasPrefix(theme + "-") }) {
+            images = images.filter { !$0.key.hasPrefix("royal-") }
+        }
         // 讀圖的暫存馬上放掉，不要等到這一輪結束才一起放
         let image: UIImage? = autoreleasepool {
             let plain = UIImage.downsampled(url: url, maxSide: 768)

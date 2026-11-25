@@ -28,6 +28,15 @@ struct ThemeLook {
     }
 
     static let all: [ThemeLook] = [
+        // 宮廷系列（鍵帽圖：RoyalKeyArt，要用才下載）
+        make("royal-lion", "凡爾賽・金獅", emoji: "🦁", subtitle: "暖橘宮廷", bed: 0xF7DFB5, bedBottom: 0xDEB27D, bar: 0x996A44, text: 0x533114,
+             accent: 0xA37741, accentText: 0xFFF5E5, shadow: 0xA37741, dark: false, specialText: 0xFFF5E5, ink: 0x533114),
+        make("royal-swan", "杏桃・天鵝宮", emoji: "🦢", subtitle: "暖橘宮廷", bed: 0xF9DFCC, bedBottom: 0xE4B097, bar: 0x9F6D60, text: 0x623823,
+             accent: 0xAA755E, accentText: 0xFFF5E5, shadow: 0xAA755E, dark: false, specialText: 0xFFF5E5, ink: 0x623823),
+        make("royal-chapel", "琥珀・加冕廳", emoji: "👑", subtitle: "暖橘宮廷", bed: 0xF9DF9E, bedBottom: 0xE3AF61, bar: 0x986027, text: 0x55300D,
+             accent: 0xAC763D, accentText: 0xFFF5E5, shadow: 0xAC763D, dark: false, specialText: 0xFFF5E5, ink: 0x55300D),
+        make("royal-orangery", "御苑・橙花房", emoji: "🍊", subtitle: "暖橘宮廷", bed: 0xF8E5B9, bedBottom: 0xE2B878, bar: 0x957A51, text: 0x523714,
+             accent: 0xA17A49, accentText: 0xFFF5E5, shadow: 0xA17A49, dark: false, specialText: 0xFFF5E5, ink: 0x523714),
         make("persimmon", "柿子貓的茶屋", emoji: "🍊", subtitle: "秋日水彩", bed: 0xF8E6C6, bar: 0xE9CB9C, text: 0x51351F,
              accent: 0xD9793A, accentText: 0xFFFFFF, shadow: 0xC9A878, dark: false, ink: 0x412C20, spaceInk: 0x302E1D),
         make("observatory", "小梟的月相室", emoji: "🦉", subtitle: "秋日水彩", bed: 0x18243B, bar: 0x293850, text: 0xF5E9CD,
@@ -63,6 +72,7 @@ enum ThemePacks {
     }
 
     static func files(_ id: String) -> [String] {
+        if RoyalKeyArt.themes[id] != nil { return RoyalKeyArt.files(id) }
         if id == FoxLetterTheme.id { return ["keycaps-watercolor-v2", "wide-keycaps-watercolor-v2", "background-watercolor-v2"] }
         return ThemeLook.named(id)?.hasArt == true ? ["theme-\(id)"] : []
     }

@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Handler
@@ -515,8 +516,51 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         }
     }
 
+    /** 宮廷主題：每顆鍵一張鍵帽圖（照 RoyalKeyArt 的順序），空白鍵兩端不變形、中間延展，字畫在 anchor 的位置 */
+    private fun drawRoyalKey(canvas: Canvas, k: Key, look: ThemeLook, art: RoyalKeyArt) {
+        val frame = FoxLetter.frame(k.frame, style.gapScale, style.shapeScale, dp)
+        if (frame.isEmpty) return
+        val action = k.spec.action
+        val (face, anchor) = art.face(k.index, action)
+        foxPaint.alpha = (style.keyAlpha * (if (k.pressed) 0.82f else 1f) * 255).toInt().coerceIn(0, 255)
+        FoxLetter.royal(context, look.theme.id + "-" + face)?.let { bmp ->
+            if (action == KeyAction.Space) {
+                val s = frame.height() / bmp.height
+                val srcEdge = minOf(bmp.width * 0.22f, 20 * dp / s).toInt().coerceAtLeast(1)
+                val destEdge = minOf(srcEdge * s, frame.width() / 2)
+                val top = frame.top; val bottom = frame.bottom
+                canvas.drawBitmap(bmp, Rect(0, 0, srcEdge, bmp.height), RectF(frame.left, top, frame.left + destEdge, bottom), foxPaint)
+                canvas.drawBitmap(bmp, Rect(srcEdge, 0, bmp.width - srcEdge, bmp.height), RectF(frame.left + destEdge, top, frame.right - destEdge, bottom), foxPaint)
+                canvas.drawBitmap(bmp, Rect(bmp.width - srcEdge, 0, bmp.width, bmp.height), RectF(frame.right - destEdge, top, frame.right, bottom), foxPaint)
+            } else {
+                // 照比例放進框裡（不拉長）
+                val s = minOf(frame.width() / bmp.width, frame.height() / bmp.height)
+                val w = bmp.width * s; val h = bmp.height * s
+                canvas.drawBitmap(bmp, null, RectF(frame.centerX() - w / 2, frame.centerY() - h / 2, frame.centerX() + w / 2, frame.centerY() + h / 2), foxPaint)
+            }
+        }
+        if (k.spec.hint.isNotEmpty()) {
+            hintPaint.textAlign = Paint.Align.RIGHT
+            hintPaint.color = look.hint
+            hintPaint.textSize = minOf(9 * dp * style.fontScale, maxOf(1f, frame.height() * 0.2f))
+            canvas.drawText(k.spec.hint, k.frame.right - k.frame.width() * 0.02f, k.frame.top + hintPaint.textSize, hintPaint)
+        }
+        if (drawSpaceArt(canvas, k)) return
+        textPaint.typeface = KeyFonts.get(context, style.fontId) ?: Typeface.DEFAULT_BOLD
+        textPaint.color = if (action == KeyAction.Space) look.spaceInk else look.ink
+        var size = minOf(k.spec.fontSize * dp * style.fontScale, frame.height() * 0.55f)
+        textPaint.textSize = size
+        val w = textPaint.measureText(k.spec.label)
+        if (w > frame.width() * 0.9f && w > 0) { size *= frame.width() * 0.9f / w; textPaint.textSize = size }
+        val cx = frame.left + frame.width() * anchor.x
+        val cy = frame.top + frame.height() * anchor.y
+        val fm = textPaint.fontMetrics
+        canvas.drawText(k.spec.label, cx, cy - (fm.ascent + fm.descent) / 2, textPaint)
+    }
+
     /** 設計圖鑑的主題：字的鍵是鍵帽、空白鍵是寬圖、功能鍵是素色方塊 */
     private fun drawPackKey(canvas: Canvas, k: Key, look: ThemeLook) {
+        RoyalKeyArt.themes[look.theme.id]?.let { drawRoyalKey(canvas, k, look, it); return }
         val action = k.spec.action
         val opacity = style.keyAlpha * (if (k.pressed) 0.82f else 1f)
         val color: Int
