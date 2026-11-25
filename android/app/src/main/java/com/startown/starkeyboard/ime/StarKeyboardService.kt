@@ -161,7 +161,9 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     // ===== 生命週期 =====
 
     // App 裡拖大小、透明度的滑桿時，鍵盤馬上跟著變（App 和鍵盤共用同一份設定）
-    private val liveKeys = setOf("heightScale", "fontScale", "gapScale", "shapeScale", "keyAlpha", "backgroundFade")
+    // App 的分頁改了這些（主題、按鍵、字體、字色），鍵盤開著也馬上跟著變
+    private val liveKeys = setOf("heightScale", "fontScale", "gapScale", "shapeScale", "keyAlpha", "backgroundFade",
+        "themeId", "shape", "keyFinish", "artFinish", "keyMotion", "keyEffect", "fontId", "keyTextColor")
     private var livePending = false
     private val liveListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key in liveKeys && root != null && !livePending) {

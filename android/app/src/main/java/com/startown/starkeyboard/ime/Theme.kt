@@ -993,8 +993,15 @@ class KeyboardSettings(context: Context) {
         get() = p.getString("fontId", KeyFont.SYSTEM.id) ?: KeyFont.SYSTEM.id
         set(v) = p.edit().putString("fontId", v).apply()
 
-    val style get() = FoxLetter.resolved(KeyboardStyle(theme, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish, shapeScale, keyMotion,
-        candidateColor = candidateColor, candidateTextColor = candidateTextColor, keyTextColor = keyTextColor))
+    val style get() = style(null)
+
+    /** 照設定組出鍵盤的樣子；themeId 給了就換成那個主題（App 的主題卡片預覽用） */
+    fun style(themeId: String?): KeyboardStyle {
+        val t = if (themeId == null || themeId == this.themeId) theme else if (themeId == "custom")
+            KeyboardTheme.custom(customHue, customSaturation, customDark, customHue2, customSaturation2) else KeyboardTheme.named(themeId)
+        return FoxLetter.resolved(KeyboardStyle(t, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish, shapeScale, keyMotion,
+            candidateColor = candidateColor, candidateTextColor = candidateTextColor, keyTextColor = keyTextColor))
+    }
 }
 
 /** 線條的顏色：線稿質感的外框、貓咪的尾巴鬍鬚眼睛肉球 */

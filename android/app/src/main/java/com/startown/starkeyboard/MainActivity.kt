@@ -42,6 +42,12 @@ class MainActivity : Activity() {
     private lateinit var updateBox: LinearLayout
     private lateinit var tryBox: EditText
     private val dp get() = resources.displayMetrics.density
+    private lateinit var scroll: ScrollView
+    private lateinit var tabBar: LinearLayout
+    private lateinit var looks: LookTabs
+    /** 下面的分頁：首頁、主題、按鍵、字體、聲音 */
+    private var tab = 0
+    private val tabs = listOf("🏠" to "首頁", "🎨" to "主題", "⌨️" to "按鍵", "🔤" to "字體", "🔊" to "聲音")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,14 +57,51 @@ class MainActivity : Activity() {
             setPadding(px(20f), px(24f), px(20f), px(40f))
             setBackgroundColor(Color.parseColor("#FFF6F8"))
         }
-        setContentView(ScrollView(this).apply { setBackgroundColor(Color.parseColor("#FFF6F8")); addView(col) })
-        build()
+        scroll = ScrollView(this).apply { setBackgroundColor(Color.parseColor("#FFF6F8")); addView(col) }
+        tabBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(Color.WHITE)
+            elevation = 8 * dp
+        }
+        setContentView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+            addView(tabBar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, px(60f)))
+        })
+        looks = LookTabs(this, col) { showTab(tab, keepScroll = true) }
+        showTab(0)
         intent?.getIntExtra(EXTRA_PICK, 0)?.takeIf { it != 0 }?.let { pick(it) }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent?.getIntExtra(EXTRA_PICK, 0)?.takeIf { it != 0 }?.let { pick(it) }
+        intent?.getIntExtra(EXTRA_PICK, 0)?.takeIf { it != 0 }?.let { if (tab != 0) showTab(0); pick(it) }
+    }
+
+    /** 換分頁（keepScroll：同一頁重畫時留在原本捲到的地方） */
+    private fun showTab(index: Int, keepScroll: Boolean = false) {
+        if (isFinishing || isDestroyed) return
+        val y = if (keepScroll && index == tab) scroll.scrollY else 0
+        tab = index
+        col.removeAllViews()
+        when (index) {
+            1 -> looks.themes()
+            2 -> looks.keys()
+            3 -> looks.fonts()
+            4 -> looks.sounds()
+            else -> build()
+        }
+        scroll.post { scroll.scrollTo(0, y) }
+        tabBar.removeAllViews()
+        for ((i, t) in tabs.withIndex()) {
+            val on = i == tab
+            tabBar.addView(TextView(this).apply {
+                text = "${t.first}\n${t.second}"; textSize = 12f; gravity = Gravity.CENTER
+                setTextColor(if (on) pink else Color.parseColor("#7A5A64"))
+                typeface = if (on) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+                setOnClickListener { if (i != tab) showTab(i) }
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+        }
     }
 
     private fun px(v: Float) = (v * dp).toInt()
@@ -201,7 +244,7 @@ class MainActivity : Activity() {
 
         title("我的字體")
         button("匯入我的字體（.ttf／.otf）") { pick(PICK_FONT) }
-        text("可以用自己買的字體，只在自己的鍵盤上顯示。匯入後到鍵盤 ⚙ 設定 › 字體 選它；不要的話選它再按「刪掉這個字體」。中文字體檔通常比較大，超過 40MB 的鍵盤裝不下。")
+        text("可以用自己買的字體，只在自己的鍵盤上顯示。匯入後到下面的「字體」分頁選它；不要的話到鍵盤 ⚙ 設定按「刪掉這個字體」。中文字體檔通常比較大，超過 40MB 的鍵盤裝不下。")
 
         title("使用小提醒")
         text("• 注音是大千排列。空白鍵＝一聲；打完按空白送出整句，或點上面的候選字一段一段選。")
@@ -210,7 +253,7 @@ class MainActivity : Activity() {
         text("• 手寫：第一次用會下載 Google 的手寫辨識資料（約 20MB），之後不用網路。")
         text("• 翻譯：工具列的「譯」。第一次翻譯某個語言要下載資料。")
         text("• 剪貼簿：自動記錄預設關閉，可在鍵盤 ⚙ → 隱私與安全開啟；不要保存密碼或驗證碼。")
-        text("• 大小、主題、按鍵造型都在鍵盤的 ⚙ 設定裡調。")
+        text("• 主題、按鍵造型、字體、聲音在下面的分頁換，可以先預覽；大小在上面「邊調邊看」或鍵盤的 ⚙ 設定裡調。")
         text("• 所有版本：${ReleaseChecker.PAGE}")
     }
 

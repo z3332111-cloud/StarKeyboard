@@ -821,49 +821,6 @@ class SettingsPanel(
         col.addView(row)
     }
 
-    /** 角色主題：一排小卡片，有 ⬇ 的按一下才下載，不用可以移除 */
-    private fun packThemeRow() {
-        class Card(val id: String, val name: String, val emoji: String, val subtitle: String, val color: Int, val text: Int)
-        val cards = listOf(Card(FoxLetter.ID, FoxLetter.theme.name, "🦊", "秋日水彩", FoxLetter.theme.top, FoxLetter.theme.keyText)) +
-            ThemeLooks.all.map { Card(it.theme.id, it.theme.name, it.emoji, it.subtitle, it.theme.top,
-                if (it.theme.dark && it.theme.id != "pool") it.theme.keyText else android.graphics.Color.parseColor("#33291F")) }
-        val row = LinearLayout(context).apply { orientation = HORIZONTAL }
-        for (card in cards) {
-            val selected = settings.themeId == card.id
-            val ready = ThemePacks.isReady(context, card.id)
-            row.addView(Tap(context, card.emoji + "\n" + card.name + (if (selected) " ✓" else "") + "\n" + (if (ready) card.subtitle else "⬇ 按一下下載"), 11f, card.text, true) {
-                if (!ready) onDownloadTheme(card.id)
-                else {
-                    if (ThemeLooks.named(settings.themeId) == null && settings.themeId != FoxLetter.ID) settings.themeBeforeFox = settings.themeId
-                    settings.themeId = card.id
-                    onChange()
-                }
-            }.apply {
-                maxLines = 3
-                background = android.graphics.drawable.GradientDrawable().apply {
-                    setColor(card.color)
-                    cornerRadius = dp(14f)
-                    setStroke(if (selected) dpi(2f) else dpi(1f), if (selected) t.accent else card.text.withAlpha(0.4f))
-                }
-                contentDescription = card.name + if (ready) "" else "，要下載"
-            }, LayoutParams(dpi(112f), dpi(80f)).apply { rightMargin = dpi(8f) })
-        }
-        col.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(row) },
-            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = dpi(6f) })
-        val current = settings.themeId
-        if (settings.style.isIllustrated) {
-            toggle("這個主題也放背景照片", settings.themePhoto) { settings.themePhoto = it; onChange(); rebuildHere() }
-            if (settings.themePhoto && !settings.hasBackground) note("還沒有照片：到下面的「背景照片」新增一張。")
-        }
-        if (ThemePacks.files(current).isNotEmpty() && ThemePacks.isReady(context, current)) {
-            button("移除「" + KeyboardTheme.named(current).name + "」的圖（之後可以再下載）") {
-                settings.themeId = settings.themeBeforeFox
-                ThemePacks.remove(context, current)
-                onChange()
-            }
-        }
-    }
-
     private fun toggle(title: String, on: Boolean, set: (Boolean) -> Unit) {
         col.addView(Switch(context).apply {
             text = title; textSize = 14f; setTextColor(t.keyText); isChecked = on
@@ -873,24 +830,11 @@ class SettingsPanel(
 
     private fun build() {
         sections.clear()
-        header("主題")
-        packThemeRow()
-        val themes = LinearLayout(context).apply { orientation = HORIZONTAL }
-        for (theme in KeyboardTheme.all + KeyboardTheme.custom(settings.customHue, settings.customSaturation, settings.customDark, settings.customHue2, settings.customSaturation2)) {
-            val selected = theme.id == settings.themeId
-            val cell = LinearLayout(context).apply { orientation = VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dpi(4f), 0, dpi(4f), 0) }
-            cell.addView(View(context).apply {
-                background = android.graphics.drawable.GradientDrawable().apply {
-                    shape = android.graphics.drawable.GradientDrawable.OVAL
-                    setColor(theme.top)
-                    setStroke(if (selected) dpi(3f) else dpi(1f), if (selected) theme.accent else theme.shadow)
-                }
-            }, LayoutParams(dpi(46f), dpi(46f)))
-            cell.addView(TextView(context).apply { text = if (theme.id == "custom") "🎨 自訂" else theme.name; textSize = 11f; setTextColor(t.keyText); gravity = Gravity.CENTER })
-            cell.setOnClickListener { settings.themeId = theme.id; onChange() }
-            themes.addView(cell)
-        }
-        col.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(themes) })
+        header("主題、按鍵、字體")
+        note("主題、按鍵造型和質感、按下去的動作、特效、字體、按鍵聲音，都搬到「糯糯鍵盤」App 下面的分頁了：可以先預覽再換，選了鍵盤馬上換好。鍵盤裡少放這些，比較省記憶體、不容易閃退。")
+        val fontName = KeyFont.values().firstOrNull { it.id == settings.fontId }?.title
+            ?: UserFonts.all(context).firstOrNull { it.id == settings.fontId }?.name ?: "系統"
+        note("現在用的：主題「${KeyboardTheme.named(settings.themeId).name.takeIf { settings.themeId != "custom" } ?: "自訂配色"}」、字體「$fontName」")
         if (settings.themeId == "custom") {
             // 自訂配色：點色票選顏色；雙色時可以分別選主色和第二色
             val two = settings.customHue2 >= 0f
@@ -915,42 +859,18 @@ class SettingsPanel(
             choices(listOf("淺色", "深色"), if (settings.customDark) 1 else 0) { settings.customDark = it == 1; onChange() }
         }
 
-        if (ThemeLooks.named(settings.themeId)?.hasArt == false) {
-            note("這個主題已配好造型和質感；切回其他主題就恢復你原本選的。")
-        } else if (settings.style.isIllustrated) {
-            header("按鍵質感")
-            val artChoices = ArtFinish.choices
-            choices(artChoices.map { it.title }, artChoices.indexOf(settings.artFinish).coerceAtLeast(0)) {
-                settings.artFinish = artChoices[it]; onChange()
+        val current = settings.themeId
+        if (settings.style.isIllustrated) {
+            toggle("這個主題也放背景照片", settings.themePhoto) { settings.themePhoto = it; onChange(); rebuildHere() }
+            if (settings.themePhoto && !settings.hasBackground) note("還沒有照片：到下面的「背景照片」新增一張。")
+        }
+        if (ThemePacks.files(current).isNotEmpty() && ThemePacks.isReady(context, current)) {
+            button("移除「" + KeyboardTheme.named(current).name + "」的圖（之後可以再下載）") {
+                settings.themeId = settings.themeBeforeFox
+                ThemePacks.remove(context, current)
+                onChange()
             }
-            note("角色主題的質感另外記：胖胖是軟軟的陰影，立體是邊緣有厚度，液態玻璃亮亮的，液態金屬像金屬。換回其他主題，原本選的造型和質感會恢復。")
-        } else {
-        header("按鍵造型")
-        for (group in KeyShape.values().toList().chunked(4)) {
-            val shapes = LinearLayout(context).apply { orientation = HORIZONTAL }
-            for (shape in group) {
-                val selected = shape == settings.shape
-                shapes.addView(Tap(context, shape.title, 14f, if (selected) t.accentText else t.keyText, selected) {
-                    settings.shape = shape; onChange()
-                }.apply { background = roundRect(if (selected) t.accent else t.key.withAlpha(0.6f), dp(12f)) },
-                    LayoutParams(0, dpi(44f), 1f).apply { rightMargin = dpi(6f); bottomMargin = dpi(6f) })
-            }
-            repeat(4 - group.size) { shapes.addView(View(context), LayoutParams(0, dpi(44f), 1f)) }
-            col.addView(shapes)
         }
-
-        header("按鍵質感")
-        choices(KeyFinish.values().map { it.title }, settings.keyFinish.ordinal) {
-            settings.keyFinish = KeyFinish.values()[it]; onChange()
-        }
-        note("胖胖：圓滾滾，按下去會壓扁。立體：按鍵有厚度，按下去會往下沉；按鍵調透明也看得出來。")
-        }
-
-        header("按下去的動作")
-        choices(KeyMotion.values().map { it.title }, KeyMotion.values().indexOfFirst { it.id == settings.keyMotion }.coerceAtLeast(0)) {
-            settings.keyMotion = KeyMotion.values()[it].id; onChange()
-        }
-        note("果凍彈彈：壓扁再 duang duang 抖回來。跳跳：放開時蹦一下。搖搖：左右扭一扭。")
 
         header("空白鍵")
         if (settings.style.isIllustrated) note("可繼續使用自己的空白鍵圖片／GIF或表符。使用圖片時會收起信封配件，保留中央圖案空間。")
@@ -967,42 +887,13 @@ class SettingsPanel(
         button("📋 複製剛剛的打字紀錄") { onCopyTypingLog() }
         note("打字時注音被拆開（例如「我覺得」變「我居約得」），先不要刪，直接打開 ⚙ 按這個，再貼給開發的人。紀錄是最近 80 次按鍵的注音、時間和選過的字。")
 
-        header("按鍵特效（按下去冒出小圖案）")
-        choices(KeyEffect.values().map { it.title }, KeyEffect.values().indexOfFirst { it.id == settings.keyEffect }) {
-            settings.keyEffect = KeyEffect.values()[it].id; onChange()
-        }
-
-        header("字體（按鍵和候選字）")
-        val allFonts = KeyFont.values().map { it.id to it.title } + UserFonts.all(context).map { it.id to it.name }
-        for (group in allFonts.chunked(4)) {
-            val fonts = LinearLayout(context).apply { orientation = HORIZONTAL }
-            for ((id, title) in group) {
-            val ready = FontPacks.isReady(context, id)
-            val selected = id == settings.fontId && ready
-            fonts.addView(Tap(context, if (ready) title else "⬇ $title", if (ready) 16f else 15f, if (selected) t.accentText else t.keyText, selected) {
-                if (ready) { settings.fontId = id; onChange() } else onDownloadFont(id)
-            }.apply {
-                background = roundRect(if (selected) t.accent else t.key.withAlpha(0.6f), dp(12f))
-                if (ready) KeyFonts.get(context, id)?.let { typeface = it }
-                maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
-            }, LayoutParams(0, dpi(40f), 1f).apply { rightMargin = dpi(6f); bottomMargin = dpi(6f) })
-            }
-            repeat(4 - group.size) { fonts.addView(View(context), LayoutParams(0, dpi(40f), 1f)) }
-            col.addView(fonts)
-        }
-        KeyFont.values().firstOrNull { it.id == settings.fontId && !it.bundled && FontPacks.isReady(context, it.id) }?.let { f ->
-            button("移除「${f.title}」（之後可以再下載）") {
-                FontPacks.remove(context, f.id)
-                settings.fontId = KeyFont.SYSTEM.id; onChange()
-            }
-        }
+        header("我的字體")
         button("＋ 匯入我的字體（自己買的 .ttf／.otf）") { onImportFont() }
         if (settings.fontId.startsWith("user:")) button("刪掉這個字體") {
             UserFonts.remove(context, settings.fontId)
             settings.fontId = KeyFont.SYSTEM.id; onChange()
         }
-        note("有 ⬇ 的字體按一下才下載（要有網路），不用的可以移除，鍵盤就不會越來越大。")
-        note("字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。")
+        note("匯入後到「糯糯鍵盤」App 的「字體」分頁選它。字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。")
 
         header("大小（邊拖邊看）")
         slider("鍵盤高度", settings.heightScale, 0.8f, 1.3f) { settings.heightScale = it }
@@ -1083,11 +974,7 @@ class SettingsPanel(
 
         header("聲音與震動")
         toggle("按鍵聲音", settings.keySound) { settings.keySound = it }
-        // 還沒下載的機械軸標一個 ⬇︎，點了會自動下載（每種只有幾十 KB）
-        choices(KeySound.values().map { if (SoundPacks.isReady(context, it)) it.title else it.title + " ⬇︎" }, KeySound.values().indexOfFirst { it.id == settings.keySoundStyle }) {
-            settings.keySoundStyle = KeySound.values()[it].id; settings.keySound = true; onChange()
-        }
-        note("點一下就會播放聽聽看。標 ⬇︎ 的機械軸是真實錄音，第一次點會先下載，每種只有幾十 KB。")
+        note("現在的聲音：「${KeySound.from(settings.keySoundStyle).title}」。要換別的軸，到「糯糯鍵盤」App 的「聲音」分頁，點一下就能聽。")
         toggle("按鍵震動", settings.haptics) { settings.haptics = it }
 
         header("選字列高度")
