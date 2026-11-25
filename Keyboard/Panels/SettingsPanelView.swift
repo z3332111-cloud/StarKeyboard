@@ -51,7 +51,6 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
     private let stack = UIStackView()
     private let bar: PanelBottomBar
     // 換主題會重建，要記住主題那排橫向捲到哪
-    private weak var themeScroll: UIScrollView?
     // 自訂配色：現在點色票是改主色還是第二色
     private var editingSecond = false
     // 選字顏色：現在滑桿調的是底色還是字色
@@ -112,7 +111,6 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
     func rebuild() {
         bar.style = style
         let offset = scroll.contentOffset
-        let themeX = themeScroll?.contentOffset.x ?? 0
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         sections = []
         jumpButton.backgroundColor = style.theme.key.withAlphaComponent(0.8)
@@ -120,10 +118,10 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         liveButton.backgroundColor = style.theme.specialKey
         liveButton.setTitleColor(style.theme.specialText, for: .normal)
 
-        stack.addArrangedSubview(header("主題"))
-        stack.addArrangedSubview(note("打開「糯糯鍵盤」App，下面的「主題」「按鍵」「字體」「聲音」分頁可以先預覽再換，選好回來鍵盤就換好了。"))
-        stack.addArrangedSubview(packThemeRow())
-        stack.addArrangedSubview(themeRow())
+        stack.addArrangedSubview(header("主題、按鍵、字體"))
+        stack.addArrangedSubview(note("主題、按鍵造型和質感、按下去的動作、特效、字體、按鍵聲音，都搬到「糯糯鍵盤」App 下面的分頁了：可以先預覽再換，選好回來鍵盤就換好（要開「允許完整取用」）。鍵盤裡少放這些，比較省記憶體、不容易閃退。"))
+        let fontName = KeyFont(rawValue: settings.fontID)?.title ?? UserFonts.all.first { $0.id == settings.fontID }?.name ?? "系統"
+        stack.addArrangedSubview(note("現在用的：主題「\(KeyboardTheme.named(settings.themeID).name)」、字體「\(fontName)」"))
         if settings.themeID == "custom" {
             // 自訂配色：點色票選顏色；雙色時可以分別選主色和第二色
             let two = settings.customHue2 >= 0
@@ -154,28 +152,23 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             })
         }
 
-        if style.themeLook?.hasArt == false {
-            stack.addArrangedSubview(note("這個主題已配好造型和質感；切回其他主題就恢復你原本選的。"))
-        } else if style.isIllustrated {
-            stack.addArrangedSubview(header("按鍵質感"))
-            let choices = ArtFinish.choices
-            stack.addArrangedSubview(choiceRow(choices.map { $0.title },
-                                               selected: choices.firstIndex(of: settings.artFinish) ?? 0) { [weak self] i in
-                self?.settings.artFinish = choices[i]
+        let current = settings.themeID
+        if style.isIllustrated {
+            stack.addArrangedSubview(switchRow("這個主題也放背景照片", on: settings.themePhoto) { [weak self] on in
+                self?.settings.themePhoto = on
                 self?.onChange?()
             })
-            stack.addArrangedSubview(note("角色主題的質感另外記：胖胖是軟軟的陰影，立體是邊緣有厚度，液態玻璃亮亮的，液態金屬像金屬。換回其他主題，原本選的造型和質感會恢復。"))
-        } else {
-            stack.addArrangedSubview(header("按鍵造型"))
-            stack.addArrangedSubview(shapeRow())
-
-            stack.addArrangedSubview(header("按鍵質感"))
-            stack.addArrangedSubview(choiceRow(KeyFinish.allCases.map { $0.title },
-                                               selected: KeyFinish.allCases.firstIndex(of: settings.keyFinish) ?? 0) { [weak self] i in
-                self?.settings.keyFinish = KeyFinish.allCases[i]
-                self?.onChange?()
-            })
-            stack.addArrangedSubview(note("胖胖：圓滾滾，按下去會壓扁。立體：按鍵有厚度，按下去會往下沉；按鍵調透明也看得出來。"))
+            if settings.themePhoto && !settings.hasBackground {
+                stack.addArrangedSubview(note("還沒有照片：到下面的「背景圖片」新增一張。"))
+            }
+        }
+        if !ThemePacks.files(current).isEmpty, ThemePacks.isReady(current) {
+            stack.addArrangedSubview(buttonRow([("移除「\(KeyboardTheme.named(current).name)」的圖（之後可以再下載）", { [weak self] in
+                guard let self = self else { return }
+                self.settings.themeID = self.settings.themeBeforeFox
+                ThemePacks.remove(current)
+                self.onChange?()
+            })]))
         }
 
         stack.addArrangedSubview(header("空白鍵"))
@@ -199,14 +192,6 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         ]))
         stack.addArrangedSubview(note("先「拷貝」一張圖片、GIF、表情符號或顏文字，再按上面的按鈕，空白鍵就只放那個小圖。想幫照片去背：打開「糯糯鍵盤」App →「空白鍵圖案」挑照片，會自動去背並複製好。"))
 
-        stack.addArrangedSubview(header("按下去的動作"))
-        stack.addArrangedSubview(choiceRow(KeyMotion.allCases.map { $0.title },
-                                           selected: KeyMotion.allCases.firstIndex { $0.rawValue == settings.keyMotion } ?? 0) { [weak self] i in
-            self?.settings.keyMotion = KeyMotion.allCases[i].rawValue
-            self?.onChange?()
-        })
-        stack.addArrangedSubview(note("果凍彈彈：壓扁再 duang duang 抖回來。跳跳：放開時蹦一下。搖搖：左右扭一扭。"))
-
         stack.addArrangedSubview(header("注音被拆開了？"))
         stack.addArrangedSubview(buttonRow([("📋 複製剛剛的打字紀錄", { [weak self] in self?.onCopyTypingLog?() })]))
         stack.addArrangedSubview(note("打字時注音被拆開（例如「我覺得」變「我居約得」），先不要刪，直接打開 ⚙ 按這個，再貼給開發的人。紀錄是最近 80 次按鍵的注音、時間和選過的字。"))
@@ -224,15 +209,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         ]))
         stack.addArrangedSubview(note("先在正常時開始，再切到其他 App 並返回。空隙出現後，先複製紀錄再關閉 App。只記錄尺寸、位置與顯示事件，不記錄打字內容；最近 160 筆保留在記憶體，鍵盤程序重啟後清除。複製需要允許完整取用。"))
 
-        stack.addArrangedSubview(header("按鍵特效（按下去冒出小圖案）"))
-        stack.addArrangedSubview(choiceRow(KeyEffect.allCases.map { $0.title },
-                                           selected: KeyEffect.allCases.firstIndex { $0.rawValue == settings.keyEffect } ?? 0) { [weak self] i in
-            self?.settings.keyEffect = KeyEffect.allCases[i].rawValue
-            self?.onChange?()
-        })
-
-        stack.addArrangedSubview(header("字體（按鍵和候選字）"))
-        stack.addArrangedSubview(fontRow())
+        stack.addArrangedSubview(header("我的字體"))
         if let f = KeyFont(rawValue: settings.fontID), !f.bundled, FontPacks.isReady(f.rawValue) {
             stack.addArrangedSubview(buttonRow([("移除「\(f.title)」（之後可以再下載）", { [weak self] in
                 guard let self = self else { return }
@@ -254,7 +231,6 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         } else {
             stack.addArrangedSubview(buttonRow([("＋ 貼上我的字體（自己買的字體）", { [weak self] in self?.onPasteFont?() })]))
         }
-        stack.addArrangedSubview(note("有 ⬇ 的字體按一下才下載（要開「允許完整取用」和網路），不用的可以移除，鍵盤就不會越來越大。"))
         stack.addArrangedSubview(note("匯入自己的字體：打開「糯糯鍵盤」App 按「匯入我的字體」挑 .ttf／.otf 檔，再回來按上面的按鈕。也可以在「檔案」App 長按字體檔「拷貝」。"))
         stack.addArrangedSubview(note("字體只改變鍵盤上看到的樣子；傳出去的字由對方的 App 決定。想讓別人也看到特別的字，用工具列的「𝒜 花式文字」。"))
 
@@ -406,14 +382,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         stack.addArrangedSubview(switchRow("按鍵聲音", on: settings.keySound) { [weak self] on in
             self?.settings.keySound = on
         })
-        // 還沒下載的機械軸標一個 ⬇︎，點了會自動下載（每種只有幾十 KB）
-        stack.addArrangedSubview(choiceRow(KeySound.allCases.map { SoundPacks.isReady($0) ? $0.title : $0.title + " ⬇︎" },
-                                           selected: KeySound.allCases.firstIndex { $0.rawValue == settings.keySoundStyle } ?? 0) { [weak self] i in
-            self?.settings.keySoundStyle = KeySound.allCases[i].rawValue
-            self?.settings.keySound = true
-            self?.onChange?()
-        })
-        stack.addArrangedSubview(note("點一下就會播放聽聽看（要打開「允許完整取用」）。標 ⬇︎ 的機械軸是真實錄音，第一次點會先下載，每種只有幾十 KB。"))
+        stack.addArrangedSubview(note("現在的聲音：「\(KeySound(rawValue: settings.keySoundStyle)?.title ?? "iPhone 原本")」。要換別的軸，到「糯糯鍵盤」App 的「聲音」分頁，點一下就能聽。"))
         stack.addArrangedSubview(switchRow("按鍵震動", on: settings.haptics) { [weak self] on in
             self?.settings.haptics = on
         })
@@ -451,9 +420,6 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         layoutIfNeeded()
         scroll.contentOffset = CGPoint(x: 0, y: min(offset.y, max(0, scroll.contentSize.height - scroll.bounds.height)))
         updateJumpTitle()
-        if let s = themeScroll {
-            s.contentOffset = CGPoint(x: min(themeX, max(0, s.contentSize.width - s.bounds.width)), y: 0)
-        }
     }
 
     private static func modeName(_ mode: InputMode) -> String {
@@ -511,120 +477,6 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         v.backgroundColor = style.theme.key.withAlphaComponent(0.55)
         v.layer.cornerRadius = 12
         return v
-    }
-
-    private func themeRow() -> UIView {
-        let scrollRow = UIScrollView()
-        scrollRow.showsHorizontalScrollIndicator = false
-        scrollRow.heightAnchor.constraint(equalToConstant: 78).isActive = true
-        var x: CGFloat = 0
-        for theme in KeyboardTheme.all.filter({ $0.id != FoxLetterTheme.id && ThemeLook.named($0.id) == nil }) + [KeyboardTheme.named("custom")] {
-            let selected = theme.id == settings.themeID
-            let b = UIButton(type: .custom)
-            b.frame = CGRect(x: x, y: 0, width: 64, height: 76)
-            let swatch = UIView(frame: CGRect(x: 8, y: 2, width: 48, height: 48))
-            swatch.isUserInteractionEnabled = false
-            swatch.backgroundColor = theme.backgroundTop
-            swatch.layer.cornerRadius = 24
-            swatch.layer.borderWidth = selected ? 3 : 1
-            swatch.layer.borderColor = (selected ? theme.accent : theme.shadow).cgColor
-            let dot = UIView(frame: CGRect(x: 12, y: 14, width: 24, height: 20))
-            dot.backgroundColor = theme.key
-            dot.layer.cornerRadius = 7
-            let accent = UIView(frame: CGRect(x: 30, y: 30, width: 12, height: 10))
-            accent.backgroundColor = theme.accent
-            accent.layer.cornerRadius = 4
-            swatch.addSubview(dot)
-            swatch.addSubview(accent)
-            b.addSubview(swatch)
-            let name = UILabel(frame: CGRect(x: 0, y: 54, width: 64, height: 18))
-            name.text = theme.id == "custom" ? "🎨 自訂" : theme.name
-            name.font = .rounded(11, selected ? .bold : .regular)
-            name.textAlignment = .center
-            name.textColor = textColor
-            b.addSubview(name)
-            b.addAction(UIAction { [weak self] _ in
-                self?.settings.themeID = theme.id
-                self?.onChange?()
-            }, for: .touchUpInside)
-            scrollRow.addSubview(b)
-            x += 68
-        }
-        scrollRow.contentSize = CGSize(width: x, height: 76)
-        themeScroll = scrollRow
-        return scrollRow
-    }
-
-    private struct PackCard {
-        let id: String, name: String, emoji: String, subtitle: String
-        let color: UIColor, text: UIColor
-    }
-
-    /// 角色主題：一排小卡片，有 ⬇ 的按一下才下載，不用可以移除
-    private func packThemeRow() -> UIView {
-        let box = UIStackView()
-        box.axis = .vertical
-        box.spacing = 6
-        let scrollRow = UIScrollView()
-        scrollRow.showsHorizontalScrollIndicator = false
-        scrollRow.heightAnchor.constraint(equalToConstant: 84).isActive = true
-        var x: CGFloat = 0
-        var cards = [PackCard(id: FoxLetterTheme.id, name: "小狐狸的楓葉信", emoji: "🦊", subtitle: "秋日水彩",
-                              color: UIColor(hex: 0x51424D), text: UIColor(hex: 0xFFF5E4))]
-        for look in ThemeLook.all {
-            let t = look.theme
-            let text = t.isDark && t.id != "pool" ? t.keyText : UIColor(hex: 0x33291F)
-            cards.append(PackCard(id: t.id, name: t.name, emoji: look.emoji, subtitle: look.subtitle, color: t.backgroundTop, text: text))
-        }
-        for card in cards {
-            let selected = settings.themeID == card.id
-            let ready = ThemePacks.isReady(card.id)
-            let b = UIButton(type: .custom)
-            b.frame = CGRect(x: x, y: 2, width: 112, height: 80)
-            b.backgroundColor = card.color
-            b.layer.cornerRadius = 14
-            b.layer.borderWidth = selected ? 2 : 0.7
-            b.layer.borderColor = (selected ? style.theme.accent : card.text.withAlphaComponent(0.4)).cgColor
-            b.titleLabel?.numberOfLines = 3
-            b.titleLabel?.textAlignment = .center
-            b.titleLabel?.font = .rounded(11, .bold)
-            b.titleLabel?.adjustsFontSizeToFitWidth = true
-            b.setTitleColor(card.text, for: .normal)
-            b.setTitle("\(card.emoji)\n\(card.name)\(selected ? " ✓" : "")\n\(ready ? card.subtitle : "⬇ 按一下下載")", for: .normal)
-            b.accessibilityLabel = card.name + (ready ? "" : "，要下載")
-            b.addAction(UIAction { [weak self] _ in
-                guard let self = self else { return }
-                guard ready else { self.onDownloadTheme?(card.id); return }
-                if ThemeLook.named(self.settings.themeID) == nil && self.settings.themeID != FoxLetterTheme.id {
-                    self.settings.themeBeforeFox = self.settings.themeID
-                }
-                self.settings.themeID = card.id
-                self.onChange?()
-            }, for: .touchUpInside)
-            scrollRow.addSubview(b)
-            x += 120
-        }
-        scrollRow.contentSize = CGSize(width: x, height: 84)
-        box.addArrangedSubview(scrollRow)
-        let current = settings.themeID
-        if style.isIllustrated {
-            box.addArrangedSubview(switchRow("這個主題也放背景照片", on: settings.themePhoto) { [weak self] on in
-                self?.settings.themePhoto = on
-                self?.onChange?()
-            })
-            if settings.themePhoto && !settings.hasBackground {
-                box.addArrangedSubview(note("還沒有照片：到下面的「背景圖片」新增一張。"))
-            }
-        }
-        if !ThemePacks.files(current).isEmpty, ThemePacks.isReady(current) {
-            box.addArrangedSubview(buttonRow([("移除「\(KeyboardTheme.named(current).name)」的圖（之後可以再下載）", { [weak self] in
-                guard let self = self else { return }
-                self.settings.themeID = self.settings.themeBeforeFox
-                ThemePacks.remove(current)
-                self.onChange?()
-            })]))
-        }
-        return box
     }
 
     private func shortcutRow(_ item: ShortcutStore.Item) -> UIView {
@@ -767,43 +619,6 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         return scroll
     }
 
-    private func fontRow() -> UIView {
-        let column = UIStackView()
-        column.axis = .vertical
-        column.spacing = 8
-        var row = UIStackView()
-        let fonts = KeyFont.allCases.map { ($0.rawValue, $0.title) } + UserFonts.all.map { ($0.id, $0.name) }
-        for (index, font) in fonts.enumerated() {
-            if index % 4 == 0 {
-                row = UIStackView()
-                row.axis = .horizontal
-                row.distribution = .fillEqually
-                row.spacing = 8
-                row.heightAnchor.constraint(equalToConstant: 40).isActive = true
-                column.addArrangedSubview(row)
-            }
-            let ready = FontPacks.isReady(font.0)
-            let selected = font.0 == settings.fontID && ready
-            let b = UIButton(type: .custom)
-            b.layer.cornerRadius = 12
-            b.backgroundColor = selected ? style.theme.accent : style.theme.key.withAlphaComponent(0.6)
-            b.setTitle(ready ? font.1 : "⬇ " + font.1, for: .normal)
-            b.setTitleColor(selected ? style.theme.accentText : style.theme.keyText, for: .normal)
-            // 只有選中的用它自己的字體畫；其他的用系統字（每個字體都載入，鍵盤記憶體會太高）
-            b.titleLabel?.font = selected ? KeyFonts.font(font.0, size: 16, weight: .bold) : .rounded(15)
-            b.titleLabel?.adjustsFontSizeToFitWidth = true
-            b.titleLabel?.minimumScaleFactor = 0.6
-            b.addAction(UIAction { [weak self] _ in
-                guard ready else { self?.onDownloadFont?(font.0); return }
-                self?.settings.fontID = font.0
-                self?.onChange?()
-            }, for: .touchUpInside)
-            row.addArrangedSubview(b)
-        }
-        while row.arrangedSubviews.count < 4 { row.addArrangedSubview(UIView()) }
-        return column
-    }
-
     /// 雙色時選「現在要改哪個顏色」：兩顆按鈕，裡面有目前的顏色
     private func colorTargetRow() -> UIView {
         let row = UIStackView()
@@ -888,66 +703,6 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             row.addArrangedSubview(b)
         }
         while row.arrangedSubviews.count < 7 { row.addArrangedSubview(UIView()) }
-        return column
-    }
-
-    private func shapeRow() -> UIView {
-        let column = UIStackView()
-        column.axis = .vertical
-        column.spacing = 8
-        var row = UIStackView()
-        for (index, shape) in KeyShape.allCases.enumerated() {
-            if index % 4 == 0 {
-                row = UIStackView()
-                row.axis = .horizontal
-                row.distribution = .fillEqually
-                row.spacing = 8
-                row.heightAnchor.constraint(equalToConstant: 64).isActive = true
-                column.addArrangedSubview(row)
-            }
-            let selected = shape == settings.keyShape
-            let b = UIButton(type: .custom)
-            b.accessibilityLabel = shape.title
-            b.accessibilityTraits = selected ? [.button, .selected] : .button
-            b.layer.cornerRadius = 12
-            b.backgroundColor = selected ? style.theme.specialKey.withAlphaComponent(0.8) : .clear
-            let preview = CAShapeLayer()
-            preview.path = shape.path(in: CGRect(x: 0, y: 0, width: 40, height: 34))
-            preview.fillColor = style.theme.key.cgColor
-            preview.strokeColor = style.theme.shadow.cgColor
-            preview.lineWidth = 1
-            let holder = UIView(frame: CGRect(x: 0, y: 0, width: 40, height: 34))
-            holder.isUserInteractionEnabled = false
-            holder.layer.addSublayer(preview)
-            let detail = CAShapeLayer()
-            detail.path = shape.detailPath(in: CGRect(x: 0, y: 0, width: 40, height: 34))
-            detail.fillColor = shape.detailColor(theme: style.theme).withAlphaComponent(shape.detailOpacity()).cgColor
-            holder.layer.addSublayer(detail)
-            holder.translatesAutoresizingMaskIntoConstraints = false
-            b.addSubview(holder)
-            NSLayoutConstraint.activate([
-                holder.centerXAnchor.constraint(equalTo: b.centerXAnchor),
-                holder.topAnchor.constraint(equalTo: b.topAnchor, constant: 4),
-                holder.widthAnchor.constraint(equalToConstant: 40),
-                holder.heightAnchor.constraint(equalToConstant: 34),
-            ])
-            let name = UILabel()
-            name.text = shape.title
-            name.font = .rounded(12, selected ? .bold : .regular)
-            name.textColor = textColor
-            name.translatesAutoresizingMaskIntoConstraints = false
-            b.addSubview(name)
-            NSLayoutConstraint.activate([
-                name.centerXAnchor.constraint(equalTo: b.centerXAnchor),
-                name.bottomAnchor.constraint(equalTo: b.bottomAnchor, constant: -4),
-            ])
-            b.addAction(UIAction { [weak self] _ in
-                self?.settings.keyShape = shape
-                self?.onChange?()
-            }, for: .touchUpInside)
-            row.addArrangedSubview(b)
-        }
-        while row.arrangedSubviews.count < 4 { row.addArrangedSubview(UIView()) }
         return column
     }
 
