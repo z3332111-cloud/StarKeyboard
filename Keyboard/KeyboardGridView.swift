@@ -741,9 +741,14 @@ final class KeyButton: UIView {
             artwork.configure(index: illustratedIndex, action: spec.action, personalSpaceArt: hasPersonalSpaceArt)
             let anchor = artwork.royalAnchor
             let center = CGPoint(x: frame.minX + frame.width * anchor.x, y: frame.minY + frame.height * anchor.y)
-            label.font = KeyFonts.font(style.fontID, size: min(spec.fontSize * style.fontScale, frame.height * 0.55), weight: .semibold)
+            var size = min(spec.fontSize * style.fontScale, frame.height * 0.55)
+            // 123 放在圖案旁邊（神燈）時字小一點，才不會壓到圖
+            if case .layer(.numbers) = spec.action, anchor.x != 0.5 { size = min(size, frame.width * 0.19) }
+            label.font = KeyFonts.font(style.fontID, size: size, weight: .semibold)
             let height = min(frame.height, ceil(label.font.lineHeight))
-            let face = CGRect(x: center.x - frame.width / 2, y: center.y - height / 2, width: frame.width, height: height).intersection(bounds)
+            // 字不在正中間時（酒杯在左、貝斯在左），左右留一樣寬，字才會對準 anchor
+            let width = max(1, 2 * min(center.x - bounds.minX, bounds.maxX - center.x))
+            let face = CGRect(x: center.x - width / 2, y: center.y - height / 2, width: width, height: height).intersection(bounds)
             label.frame = face
             icon.frame = face
             hintLabel.font = .rounded(min(9 * style.fontScale, max(1, frame.height * 0.20)), .medium)

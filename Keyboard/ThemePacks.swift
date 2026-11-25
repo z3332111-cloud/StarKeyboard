@@ -28,7 +28,13 @@ struct ThemeLook {
     }
 
     static let all: [ThemeLook] = [
-        // 宮廷系列（鍵帽圖：RoyalKeyArt，要用才下載）
+        // 一張圖一顆鍵的插畫主題（鍵帽圖：RoyalKeyArt，要用才下載）
+        make("lounge-reserve", "私藏酒廊", emoji: "🍷", subtitle: "水晶杯與黑巧克力", bed: 0x472F40, bedBottom: 0x251922,
+             bar: 0x472534, text: 0xFFF0DF, accent: 0x9A5566, accentText: 0xFFF4E7, shadow: 0x22131C, dark: true, ink: 0xFFF0DF, hint: 0xE2BCC5),
+        make("sapphire-mist", "月煙琉璃", emoji: "🪔", subtitle: "藍水晶、月牙與一縷燈煙", bed: 0x203150, bedBottom: 0x16233E,
+             bar: 0x2B405C, text: 0xFFF3D7, accent: 0xCDC2A2, accentText: 0x17223B, shadow: 0x101627, dark: true, ink: 0xFFF3D7, hint: 0xCED8EA),
+        make("night-lungs", "夜肺・地下排練室", emoji: "🎸", subtitle: "後龐克・黑膠與四弦貝斯", bed: 0x262629, bedBottom: 0x111114,
+             bar: 0x28282A, text: 0xEFECE6, accent: 0x883D47, accentText: 0xFFF3ED, shadow: 0x151416, dark: true, ink: 0xF4F1E9, hint: 0xCDC9C8),
         make("royal-lion", "凡爾賽・金獅", emoji: "🦁", subtitle: "暖橘宮廷", bed: 0xF7DFB5, bedBottom: 0xDEB27D, bar: 0x996A44, text: 0x533114,
              accent: 0xA37741, accentText: 0xFFF5E5, shadow: 0xA37741, dark: false, specialText: 0xFFF5E5, ink: 0x533114),
         make("royal-swan", "杏桃・天鵝宮", emoji: "🦢", subtitle: "暖橘宮廷", bed: 0xF9DFCC, bedBottom: 0xE4B097, bar: 0x9F6D60, text: 0x623823,

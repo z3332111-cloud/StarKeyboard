@@ -525,14 +525,21 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         val (face, anchor) = art.face(k.index, action)
         foxPaint.alpha = (style.keyAlpha * (if (k.pressed) 0.82f else 1f) * 255).toInt().coerceIn(0, 255)
         FoxLetter.royal(context, look.theme.id + "-" + face)?.let { bmp ->
-            if (action == KeyAction.Space) {
+            if (action == KeyAction.Space && art.spaceArt == RoyalKeyArt.SpaceArt.WHOLE) {
+                // 飛毯：整張拉滿
+                canvas.drawBitmap(bmp, null, frame, foxPaint)
+            } else if (action == KeyAction.Space) {
+                // 兩端（或左邊的圖案）不變形，只拉長中間
                 val s = frame.height() / bmp.height
-                val srcEdge = minOf(bmp.width * 0.22f, 20 * dp / s).toInt().coerceAtLeast(1)
-                val destEdge = minOf(srcEdge * s, frame.width() / 2)
+                val band = art.spaceArt == RoyalKeyArt.SpaceArt.BAND
+                val srcLeft = (if (band) bmp.width * 0.47f else minOf(bmp.width * 0.22f, 20 * dp / s)).toInt().coerceIn(1, bmp.width / 2)
+                val srcRight = (if (band) 5 * dp / s else srcLeft.toFloat()).toInt().coerceIn(1, bmp.width / 2)
+                val destLeft = minOf(srcLeft * s, frame.width() * (if (band) 0.6f else 0.5f))
+                val destRight = minOf(srcRight * s, frame.width() - destLeft)
                 val top = frame.top; val bottom = frame.bottom
-                canvas.drawBitmap(bmp, Rect(0, 0, srcEdge, bmp.height), RectF(frame.left, top, frame.left + destEdge, bottom), foxPaint)
-                canvas.drawBitmap(bmp, Rect(srcEdge, 0, bmp.width - srcEdge, bmp.height), RectF(frame.left + destEdge, top, frame.right - destEdge, bottom), foxPaint)
-                canvas.drawBitmap(bmp, Rect(bmp.width - srcEdge, 0, bmp.width, bmp.height), RectF(frame.right - destEdge, top, frame.right, bottom), foxPaint)
+                canvas.drawBitmap(bmp, Rect(0, 0, srcLeft, bmp.height), RectF(frame.left, top, frame.left + destLeft, bottom), foxPaint)
+                canvas.drawBitmap(bmp, Rect(srcLeft, 0, bmp.width - srcRight, bmp.height), RectF(frame.left + destLeft, top, frame.right - destRight, bottom), foxPaint)
+                canvas.drawBitmap(bmp, Rect(bmp.width - srcRight, 0, bmp.width, bmp.height), RectF(frame.right - destRight, top, frame.right, bottom), foxPaint)
             } else {
                 // 照比例放進框裡（不拉長）
                 val s = minOf(frame.width() / bmp.width, frame.height() / bmp.height)
@@ -550,10 +557,14 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         textPaint.typeface = KeyFonts.get(context, style.fontId) ?: Typeface.DEFAULT_BOLD
         textPaint.color = style.keyInk(if (action == KeyAction.Space) look.spaceInk else look.ink)
         var size = minOf(k.spec.fontSize * dp * style.fontScale, frame.height() * 0.55f)
+        // 123 放在圖案旁邊（神燈）時字小一點，才不會壓到圖
+        if (action is KeyAction.Layer && anchor.x != 0.5f) size = minOf(size, frame.width() * 0.19f)
         textPaint.textSize = size
-        val w = textPaint.measureText(k.spec.label)
-        if (w > frame.width() * 0.9f && w > 0) { size *= frame.width() * 0.9f / w; textPaint.textSize = size }
+        // 字不在正中間時，左右只能用到比較近的那一邊的兩倍寬
         val cx = frame.left + frame.width() * anchor.x
+        val room = 2 * minOf(cx - k.frame.left, k.frame.right - cx) * 0.95f
+        val w = textPaint.measureText(k.spec.label)
+        if (w > room && w > 0) { size *= room / w; textPaint.textSize = size }
         val cy = frame.top + frame.height() * anchor.y
         val fm = textPaint.fontMetrics
         canvas.drawText(k.spec.label, cx, cy - (fm.ascent + fm.descent) / 2, textPaint)

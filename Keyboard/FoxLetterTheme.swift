@@ -255,10 +255,13 @@ final class FoxLetterArtworkView: UIView {
                 royalAssetName = name
                 // 圖要先下載（ThemePacks）；讀過的圖所有按鍵共用一份
                 let image = FoxLetterWatercolor.image(name)
-                if action == .space, let image = image {
+                if action == .space, art.spaceArt != .whole, let image = image {
+                    // 空白鍵：兩端（或左邊的圖案）不變形，只拉長中間
                     let scaled = image.cgImage.map { UIImage(cgImage: $0, scale: CGFloat($0.height) / 38, orientation: .up) } ?? image
-                    let edge = min(20, floor(scaled.size.width * 0.22))
-                    royalImage.image = scaled.resizableImage(withCapInsets: UIEdgeInsets(top: 0, left: edge, bottom: 0, right: edge), resizingMode: .stretch)
+                    let band = art.spaceArt == .band
+                    let left = band ? ceil(scaled.size.width * 0.47) : min(20, floor(scaled.size.width * 0.22))
+                    let right: CGFloat = band ? 5 : left
+                    royalImage.image = scaled.resizableImage(withCapInsets: UIEdgeInsets(top: 0, left: left, bottom: 0, right: right), resizingMode: .stretch)
                 } else {
                     royalImage.image = image
                 }
