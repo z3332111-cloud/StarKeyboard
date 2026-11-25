@@ -620,7 +620,6 @@ class SettingsPanel(
 
     /** 選字顏色的調色盤：預覽＋色相、鮮豔、明暗三條漸層滑桿（底色和字色分開調） */
     private fun candidateColorMixer() {
-        choices(listOf("調底色", "調字色"), if (editingCandidateText) 1 else 0) { editingCandidateText = it == 1; rebuildHere() }
         val editingText = editingCandidateText
         val preview = TextView(context).apply {
             text = "選字 範例"; textSize = 18f; gravity = Gravity.CENTER
@@ -680,6 +679,7 @@ class SettingsPanel(
             col.addView(row)
         }
         paintTracks()
+        if (editingText) note("字的顏色太深時，色相看不太出來：先把「明暗」往右拉，再調色相和鮮豔。")
         col.addView(TextView(context).apply {
             text = if (editingText) "字色改回自動（照底色挑黑或白）" else "底色改回跟著主題"
             textSize = 14f; setTextColor(t.accent); typeface = android.graphics.Typeface.DEFAULT_BOLD
@@ -691,25 +691,35 @@ class SettingsPanel(
         })
     }
 
-    /** 選字底色：第一格「跟主題」，後面是色票（選中的有粗框） */
+    /** 選字顏色的色票：改底色時第一格是「主題」、改字色時第一格是「自動」；點了就改現在選的那一個（選中的有粗框） */
     private fun candidateColorGrid() {
+        val editingText = editingCandidateText
+        val current = if (editingText) settings.candidateTextColor else settings.candidateColor
+        // 第一格的樣子：主題的強調色，或自動挑的字色（字色先當沒選，算出自動的那個）
+        val autoStyle = settings.style.copy(candidateTextColor = -1)
         val options = listOf(-1) + KeyboardTheme.candidateColors
         for (group in options.chunked(8)) {
             val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
             for (value in group) {
-                val selected = value == settings.candidateColor
+                val selected = value == current
                 val cell = FrameLayout(context)
                 cell.addView(TextView(context).apply {
                     gravity = Gravity.CENTER
-                    if (value < 0) { text = "主題"; textSize = 10f; setTextColor(t.accentText); typeface = android.graphics.Typeface.DEFAULT_BOLD }
+                    if (value < 0) {
+                        text = if (editingText) "自動" else "主題"; textSize = 10f; typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        setTextColor(if (editingText) autoStyle.candidatePillText else t.accentText)
+                    }
                     background = android.graphics.drawable.GradientDrawable().apply {
                         shape = android.graphics.drawable.GradientDrawable.OVAL
-                        setColor(if (value < 0) t.accent else (0xFF000000.toInt() or value))
+                        setColor(if (value < 0) (if (editingText) autoStyle.candidatePillFill else t.accent) else (0xFF000000.toInt() or value))
                         setStroke(if (selected) dpi(3f) else dpi(1f), if (selected) t.keyText else android.graphics.Color.WHITE)
                     }
                 }, FrameLayout.LayoutParams(dpi(30f), dpi(30f), Gravity.CENTER))
-                cell.contentDescription = if (value < 0) "選字底色跟主題" else "選字底色"
-                cell.setOnClickListener { settings.candidateColor = value; onChange(); rebuildHere() }
+                cell.contentDescription = if (editingText) (if (value < 0) "選字字色自動" else "選字字色") else (if (value < 0) "選字底色跟主題" else "選字底色")
+                cell.setOnClickListener {
+                    if (editingText) settings.candidateTextColor = value else settings.candidateColor = value
+                    onChange(); rebuildHere()
+                }
                 row.addView(cell, LayoutParams(0, dpi(38f), 1f))
             }
             repeat(8 - group.size) { row.addView(View(context), LayoutParams(0, dpi(38f), 1f)) }
@@ -1073,7 +1083,8 @@ class SettingsPanel(
         }
         col.addView(height, LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
         header("選字顏色")
-        note("選字列第一個字（按空白鍵會送出的）的底色和字色。點色票快速換底色（第一格跟主題），想要更深、更淺就用下面的滑桿自己調。")
+        note("選字列第一個字（按空白鍵會送出的）的底色和字色。先選要改「底色」還是「字色」，再點色票，或用下面的滑桿自己調深淺。")
+        choices(listOf("改底色", "改字色"), if (editingCandidateText) 1 else 0) { editingCandidateText = it == 1; rebuildHere() }
         candidateColorGrid()
         candidateColorMixer()
         header("隱私與安全")

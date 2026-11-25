@@ -386,7 +386,11 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         stack.addArrangedSubview(note("也可以按住選字列左下角的小橫條往上或往下拖。字會跟著變大。"))
         stack.addArrangedSubview(candidateHeightRow())
         stack.addArrangedSubview(header("選字顏色"))
-        stack.addArrangedSubview(note("選字列第一個字（按空白鍵會送出的）的底色和字色。點色票快速換底色（第一格跟主題），想要更深、更淺就用下面的滑桿自己調。"))
+        stack.addArrangedSubview(note("選字列第一個字（按空白鍵會送出的）的底色和字色。先選要改「底色」還是「字色」，再點色票，或用下面的滑桿自己調深淺。"))
+        stack.addArrangedSubview(choiceRow(["改底色", "改字色"], selected: editingCandidateText ? 1 : 0) { [weak self] i in
+            self?.editingCandidateText = i == 1
+            self?.rebuild()
+        })
         stack.addArrangedSubview(candidateColorGrid())
         stack.addArrangedSubview(candidateColorMixer())
 
@@ -1004,11 +1008,6 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         let column = UIStackView()
         column.axis = .vertical
         column.spacing = 8
-        column.addArrangedSubview(choiceRow(["調底色", "調字色"], selected: editingCandidateText ? 1 : 0) { [weak self] i in
-            self?.editingCandidateText = i == 1
-            self?.rebuild()
-        })
-
         // 底下的閉包會掛在滑桿上：只抓設定和主題，不抓 self，面板關掉才放得掉
         let store = settings
         let theme = style.theme
@@ -1074,6 +1073,9 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             column.addArrangedSubview(row.view)
         }
 
+        if editingText {
+            column.addArrangedSubview(note("字的顏色太深時，色相看不太出來：先把「明暗」往右拉，再調色相和鮮豔。"))
+        }
         let reset = UIButton(type: .system)
         reset.setTitle(editingText ? "字色改回自動（照底色挑黑或白）" : "底色改回跟著主題", for: .normal)
         reset.titleLabel?.font = .rounded(14, .semibold)
@@ -1139,11 +1141,16 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         }
     }
 
-    /// 選字底色：第一格「跟主題」，後面是色票（選中的有粗框）
+    /// 選字顏色的色票：改底色時第一格是「主題」、改字色時第一格是「自動」；點了就改現在選的那一個（選中的有粗框）
     private func candidateColorGrid() -> UIView {
         let column = UIStackView()
         column.axis = .vertical
         column.spacing = 6
+        let editingText = editingCandidateText
+        let current = editingText ? settings.candidateTextColor : settings.candidateColor
+        // 第一格的樣子：主題的強調色，或自動挑的字色
+        let auto = KeyboardStyle.pill(fill: settings.candidateColor >= 0 ? UIColor(hex: UInt32(settings.candidateColor)) : nil,
+                                      text: nil, theme: style.theme)
         let options = [-1] + KeyboardTheme.candidateColors
         var row = UIStackView()
         for (index, value) in options.enumerated() {
@@ -1155,20 +1162,20 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
                 row.heightAnchor.constraint(equalToConstant: 38).isActive = true
                 column.addArrangedSubview(row)
             }
-            let selected = value == settings.candidateColor
+            let selected = value == current
             let b = UIButton(type: .custom)
             let dot = UILabel()
             dot.isUserInteractionEnabled = false
-            dot.backgroundColor = value < 0 ? style.theme.accent : UIColor(hex: UInt32(value))
+            dot.backgroundColor = value < 0 ? (editingText ? auto.fill : style.theme.accent) : UIColor(hex: UInt32(value))
             dot.layer.cornerRadius = 15
             dot.clipsToBounds = true
             dot.layer.borderWidth = selected ? 3 : 1
             dot.layer.borderColor = (selected ? style.theme.keyText : UIColor.white).cgColor
             if value < 0 {
-                dot.text = "主題"
+                dot.text = editingText ? "自動" : "主題"
                 dot.font = .rounded(10, .bold)
                 dot.textAlignment = .center
-                dot.textColor = style.theme.accentText
+                dot.textColor = editingText ? auto.text : style.theme.accentText
             }
             dot.translatesAutoresizingMaskIntoConstraints = false
             b.addSubview(dot)
@@ -1176,10 +1183,10 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
                 dot.widthAnchor.constraint(equalToConstant: 30), dot.heightAnchor.constraint(equalToConstant: 30),
                 dot.centerXAnchor.constraint(equalTo: b.centerXAnchor), dot.centerYAnchor.constraint(equalTo: b.centerYAnchor),
             ])
-            b.accessibilityLabel = value < 0 ? "選字底色跟主題" : "選字底色"
+            b.accessibilityLabel = editingText ? (value < 0 ? "選字字色自動" : "選字字色") : (value < 0 ? "選字底色跟主題" : "選字底色")
             b.addAction(UIAction { [weak self] _ in
                 guard let self = self else { return }
-                self.settings.candidateColor = value
+                if editingText { self.settings.candidateTextColor = value } else { self.settings.candidateColor = value }
                 self.onChange?()
                 self.rebuild()
             }, for: .touchUpInside)
