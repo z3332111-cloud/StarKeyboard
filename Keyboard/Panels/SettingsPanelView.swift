@@ -383,6 +383,9 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         stack.addArrangedSubview(header("選字列高度"))
         stack.addArrangedSubview(note("也可以按住選字列左下角的小橫條往上或往下拖。字會跟著變大。"))
         stack.addArrangedSubview(candidateHeightRow())
+        stack.addArrangedSubview(header("選字底色"))
+        stack.addArrangedSubview(note("選字列第一個字（按空白鍵會送出的）後面那塊顏色。第一格是跟著主題。"))
+        stack.addArrangedSubview(candidateColorGrid())
 
         stack.addArrangedSubview(header("翻譯"))
         stack.addArrangedSubview(note("工具列的「譯」：先打要翻譯的話，選目標語言，按「翻譯」。iOS 26 以上且已下載語言時用 iPhone 內建翻譯，只有開啟「允許外部網路翻譯」後，才會在本機翻譯不可用時使用 MyMemory（原文會傳到該服務）。"))
@@ -991,6 +994,56 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         row.addArrangedSubview(l)
         row.addArrangedSubview(sw)
         return row
+    }
+
+    /// 選字底色：第一格「跟主題」，後面是色票（選中的有粗框）
+    private func candidateColorGrid() -> UIView {
+        let column = UIStackView()
+        column.axis = .vertical
+        column.spacing = 6
+        let options = [-1] + KeyboardTheme.candidateColors
+        var row = UIStackView()
+        for (index, value) in options.enumerated() {
+            if index % 8 == 0 {
+                row = UIStackView()
+                row.axis = .horizontal
+                row.distribution = .fillEqually
+                row.spacing = 4
+                row.heightAnchor.constraint(equalToConstant: 38).isActive = true
+                column.addArrangedSubview(row)
+            }
+            let selected = value == settings.candidateColor
+            let b = UIButton(type: .custom)
+            let dot = UILabel()
+            dot.isUserInteractionEnabled = false
+            dot.backgroundColor = value < 0 ? style.theme.accent : UIColor(hex: UInt32(value))
+            dot.layer.cornerRadius = 15
+            dot.clipsToBounds = true
+            dot.layer.borderWidth = selected ? 3 : 1
+            dot.layer.borderColor = (selected ? style.theme.keyText : UIColor.white).cgColor
+            if value < 0 {
+                dot.text = "主題"
+                dot.font = .rounded(10, .bold)
+                dot.textAlignment = .center
+                dot.textColor = style.theme.accentText
+            }
+            dot.translatesAutoresizingMaskIntoConstraints = false
+            b.addSubview(dot)
+            NSLayoutConstraint.activate([
+                dot.widthAnchor.constraint(equalToConstant: 30), dot.heightAnchor.constraint(equalToConstant: 30),
+                dot.centerXAnchor.constraint(equalTo: b.centerXAnchor), dot.centerYAnchor.constraint(equalTo: b.centerYAnchor),
+            ])
+            b.accessibilityLabel = value < 0 ? "選字底色跟主題" : "選字底色"
+            b.addAction(UIAction { [weak self] _ in
+                guard let self = self else { return }
+                self.settings.candidateColor = value
+                self.onChange?()
+                self.rebuild()
+            }, for: .touchUpInside)
+            row.addArrangedSubview(b)
+        }
+        while row.arrangedSubviews.count < 8 { row.addArrangedSubview(UIView()) }
+        return column
     }
 
     private func candidateHeightRow() -> UIView {

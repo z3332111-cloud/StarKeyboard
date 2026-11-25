@@ -58,6 +58,8 @@ data class KeyboardTheme(
         )
 
         /** 色票上看到的顏色 */
+        /** 選字底色可以選的顏色：和自訂配色同一組色票，再加白色、深灰（0xRRGGBB） */
+        val candidateColors: List<Int> get() = swatches.map { swatchColor(it.first, it.second) and 0xFFFFFF } + listOf(0xFFFFFF, 0x3A3A3C)
         fun swatchColor(hue: Float, saturation: Float) = Color.HSVToColor(floatArrayOf(hue.coerceIn(0f, 1f) * 360f, saturation.coerceIn(0f, 1f), 0.95f))
 
         /** 自訂配色：主色（按鍵的字、背景上半）＋第二色（功能鍵、強調色、背景下半），hue2 < 0 就全部用主色 */
@@ -425,7 +427,17 @@ data class KeyboardStyle(
     val shapeScale: Float = 1.15f,
     /** 按下去的動作：jelly 果凍彈彈、hop 跳跳、wiggle 搖搖、pop 放大、none 無（只有字的按鍵會動） */
     val motion: String = "jelly",
+    /** 選字膠囊的底色（0xRRGGBB）；-1 是跟著主題的強調色 */
+    val candidateColor: Int = -1,
 ) {
+    /** 選字膠囊：底色和上面字的顏色（自己選的顏色照亮度挑黑字或白字） */
+    val candidatePillFill: Int get() = if (candidateColor < 0) theme.accent else (0xFF000000.toInt() or candidateColor)
+    val candidatePillText: Int get() {
+        if (candidateColor < 0) return theme.accentText
+        val r = (candidateColor shr 16) and 0xFF; val g = (candidateColor shr 8) and 0xFF; val b = candidateColor and 0xFF
+        return if (0.299 * r + 0.587 * g + 0.114 * b > 0.62 * 255) 0xFF2E2A28.toInt() else Color.WHITE
+    }
+
     /** 按鍵透明度拉到最左邊（全透明）：按鍵還在、照常能按，只是不畫按鍵本身，只看得到字和背景照片 */
     val invisibleKeys get() = keyAlpha < INVISIBLE_ALPHA && !isIllustrated
 
@@ -916,6 +928,10 @@ class KeyboardSettings(context: Context) {
         get() = p.getBoolean("allowOnlineTranslation", false)
         set(v) = p.edit().putBoolean("allowOnlineTranslation", v).apply()
     /** 選字列高度（dp）。設定滑桿會記下來，字跟著變大。 */
+    /** 選字列第一個（按空白會送出的）膠囊的底色，0xRRGGBB；-1 是跟著主題 */
+    var candidateColor: Int
+        get() = p.getInt("candidateColor", -1)
+        set(v) = p.edit().putInt("candidateColor", v).apply()
     var candidateBarHeight: Float
         get() = p.getFloat("candidateBarHeight", 50f).coerceIn(40f, 88f)
         set(v) = p.edit().putFloat("candidateBarHeight", v.coerceIn(40f, 88f)).apply()
@@ -960,7 +976,8 @@ class KeyboardSettings(context: Context) {
         get() = p.getString("fontId", KeyFont.SYSTEM.id) ?: KeyFont.SYSTEM.id
         set(v) = p.edit().putString("fontId", v).apply()
 
-    val style get() = FoxLetter.resolved(KeyboardStyle(theme, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish, shapeScale, keyMotion))
+    val style get() = FoxLetter.resolved(KeyboardStyle(theme, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish, shapeScale, keyMotion,
+        candidateColor = candidateColor))
 }
 
 /** 線條的顏色：線稿質感的外框、貓咪的尾巴鬍鬚眼睛肉球 */

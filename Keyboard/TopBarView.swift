@@ -244,8 +244,9 @@ final class TopBarView: UIView {
             // 字加粗；第一個（按空白會送出的）放在主題色的膠囊裡，一眼就看得到
             b.titleLabel?.font = KeyFonts.font(style.fontID, size: candidateFontSize, weight: i == 0 ? .heavy : .semibold)
             if i == 0 {
-                b.backgroundColor = style.theme.accent.withAlphaComponent(style.usesNativeGlassBar ? 0.85 : 1)
-                b.setTitleColor(style.theme.accentText, for: .normal)
+                let pill = style.candidatePill
+                b.backgroundColor = pill.fill.withAlphaComponent(style.usesNativeGlassBar ? 0.85 : 1)
+                b.setTitleColor(pill.text, for: .normal)
                 b.layer.shadowColor = style.theme.shadow.cgColor
                 b.layer.shadowOpacity = (style.usesNativeGlassBar || style.isFoxLetter) ? 0.12 : 0.6
                 b.layer.shadowRadius = 2

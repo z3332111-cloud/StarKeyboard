@@ -616,6 +616,32 @@ class SettingsPanel(
         col.addView(row)
     }
 
+    /** 選字底色：第一格「跟主題」，後面是色票（選中的有粗框） */
+    private fun candidateColorGrid() {
+        val options = listOf(-1) + KeyboardTheme.candidateColors
+        for (group in options.chunked(8)) {
+            val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            for (value in group) {
+                val selected = value == settings.candidateColor
+                val cell = FrameLayout(context)
+                cell.addView(TextView(context).apply {
+                    gravity = Gravity.CENTER
+                    if (value < 0) { text = "主題"; textSize = 10f; setTextColor(t.accentText); typeface = android.graphics.Typeface.DEFAULT_BOLD }
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.OVAL
+                        setColor(if (value < 0) t.accent else (0xFF000000.toInt() or value))
+                        setStroke(if (selected) dpi(3f) else dpi(1f), if (selected) t.keyText else android.graphics.Color.WHITE)
+                    }
+                }, FrameLayout.LayoutParams(dpi(30f), dpi(30f), Gravity.CENTER))
+                cell.contentDescription = if (value < 0) "選字底色跟主題" else "選字底色"
+                cell.setOnClickListener { settings.candidateColor = value; onChange(); rebuildHere() }
+                row.addView(cell, LayoutParams(0, dpi(38f), 1f))
+            }
+            repeat(8 - group.size) { row.addView(View(context), LayoutParams(0, dpi(38f), 1f)) }
+            col.addView(row)
+        }
+    }
+
     /** 色票：一格一個圓點，點了就換顏色（選中的有粗框） */
     private fun swatchGrid() {
         val second = settings.customHue2 >= 0f && editingSecond
@@ -971,6 +997,9 @@ class SettingsPanel(
             })
         }
         col.addView(height, LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
+        header("選字底色")
+        note("選字列第一個字（按空白鍵會送出的）後面那塊顏色。第一格是跟著主題。")
+        candidateColorGrid()
         header("隱私與安全")
         toggle("自動記錄剪貼簿", settings.clipboardHistoryEnabled) { settings.clipboardHistoryEnabled = it }
         note("預設關閉。開啟後會儲存複製的文字；會略過敏感標記，但無法辨識所有密碼。舊紀錄可在剪貼簿逐筆刪除。")

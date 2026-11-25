@@ -160,9 +160,11 @@ final class KeyboardViewController: UIInputViewController {
     private let toastLabel = UILabel()
 
     private var style: KeyboardStyle {
-        FoxLetterTheme.resolved(KeyboardStyle(theme: KeyboardTheme.named(settings.themeID), shape: settings.keyShape, keyAlpha: settings.keyAlpha,
+        var s = FoxLetterTheme.resolved(KeyboardStyle(theme: KeyboardTheme.named(settings.themeID), shape: settings.keyShape, keyAlpha: settings.keyAlpha,
                       fontScale: settings.fontScale, gapScale: settings.gapScale, fontID: settings.fontID,
                       keyEffect: settings.keyEffect, finish: settings.keyFinish, shapeScale: settings.shapeScale, motion: settings.keyMotion))
+        if settings.candidateColor >= 0 { s.candidateColor = UIColor(hex: UInt32(settings.candidateColor)) }
+        return s
     }
 
     /// 注音或日文正在組字

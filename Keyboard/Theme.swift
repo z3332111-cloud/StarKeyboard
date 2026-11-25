@@ -163,6 +163,17 @@ struct KeyboardTheme {
         (0.65, 0.8), (0.72, 0.38), (0.75, 0.6), (0.83, 0.4), (0.88, 0.6), (0.0, 0.25), (0.6, 0.06),
     ]
 
+    /// 選字底色可以選的顏色：和自訂配色同一組色票，再加白色、深灰
+    static var candidateColors: [Int] {
+        swatches.map { hex(swatchColor($0.0, $0.1)) } + [0xFFFFFF, 0x3A3A3C]
+    }
+
+    static func hex(_ c: UIColor) -> Int {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        c.getRed(&r, green: &g, blue: &b, alpha: &a)
+        return Int((r * 255).rounded()) << 16 | Int((g * 255).rounded()) << 8 | Int((b * 255).rounded())
+    }
+
     /// 色票上看到的顏色
     static func swatchColor(_ hue: Double, _ saturation: Double) -> UIColor {
         UIColor(hue: CGFloat(hue), saturation: CGFloat(saturation), brightness: 0.95, alpha: 1)
@@ -586,6 +597,18 @@ struct KeyboardStyle {
     var shapeScale: CGFloat = 1.15
     /// 按下去的動作：jelly 果凍彈彈、hop 跳跳、wiggle 搖搖、pop 放大、none 無（只有字的按鍵會動）
     var motion = KeyMotion.jelly.rawValue
+
+    /// 選字膠囊的底色（使用者自己選的；nil 是跟著主題的強調色）
+    var candidateColor: UIColor? = nil
+
+    /// 選字膠囊：底色和上面字的顏色（自己選的顏色照亮度挑黑字或白字）
+    var candidatePill: (fill: UIColor, text: UIColor) {
+        guard let c = candidateColor else { return (theme.accent, theme.accentText) }
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        c.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let light = 0.299 * r + 0.587 * g + 0.114 * b > 0.62
+        return (c, light ? UIColor(hex: 0x2E2A28) : .white)
+    }
 
     /// 按鍵透明度拉到最左邊（全透明）：按鍵還在、照常能按，只是不畫按鍵本身，只看得到字和背景照片
     var invisibleKeys: Bool { keyAlpha < Self.invisibleAlpha && !isIllustrated }
@@ -1331,6 +1354,12 @@ final class KeyboardSettings {
         set { d.set(newValue, forKey: "allowOnlineTranslation") }
     }
     /// 選字列高度（點）。拖曳或設定裡的滑桿都會記下來。
+    /// 選字列第一個（按空白會送出的）膠囊的底色。0xRRGGBB；-1 是跟著主題
+    var candidateColor: Int {
+        get { d.object(forKey: "candidateColor") as? Int ?? -1 }
+        set { d.set(newValue, forKey: "candidateColor") }
+    }
+
     var candidateBarHeight: Double {
         get {
             let stored = d.object(forKey: "candidateBarHeight") as? Double ?? CandidateBarMetrics.defaultHeight
