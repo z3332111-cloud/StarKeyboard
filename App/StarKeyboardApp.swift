@@ -9,7 +9,18 @@ import CoreImage
 struct StarKeyboardApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            TabView {
+                ContentView()
+                    .tabItem { Label("首頁", systemImage: "house") }
+                ThemeGalleryView()
+                    .tabItem { Label("主題", systemImage: "paintpalette") }
+                KeyLookView()
+                    .tabItem { Label("按鍵", systemImage: "keyboard") }
+                FontGalleryView()
+                    .tabItem { Label("字體", systemImage: "textformat") }
+                SoundGalleryView()
+                    .tabItem { Label("聲音", systemImage: "speaker.wave.2") }
+            }
         }
     }
 }

@@ -6,7 +6,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.13.8"
+    MARKETING_VERSION: "0.14.0"
     CURRENT_PROJECT_VERSION: "1"
     TARGETED_DEVICE_FAMILY: "1"
     DEVELOPMENT_TEAM: ""
@@ -16,8 +16,14 @@ targets:
     platform: iOS
     sources:
       - path: App
-      - path: Core/Sources/KeyboardCore/Release.swift
-      - path: Core/Sources/KeyboardCore/LiveLook.swift
+      # App 的主題、按鍵、字體分頁用鍵盤同一套程式畫預覽
+      - path: Keyboard
+        excludes:
+          - Resources/**
+          - "**/*.plist"
+      - path: Keyboard/Resources/Sounds
+        type: folder
+      - path: Core/Sources/KeyboardCore
     info:
       path: App/Info.plist
       properties:

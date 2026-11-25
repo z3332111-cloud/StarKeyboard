@@ -159,15 +159,7 @@ final class KeyboardViewController: UIInputViewController {
     private var handwritingView: HandwritingView?
     private let toastLabel = UILabel()
 
-    private var style: KeyboardStyle {
-        var s = FoxLetterTheme.resolved(KeyboardStyle(theme: KeyboardTheme.named(settings.themeID), shape: settings.keyShape, keyAlpha: settings.keyAlpha,
-                      fontScale: settings.fontScale, gapScale: settings.gapScale, fontID: settings.fontID,
-                      keyEffect: settings.keyEffect, finish: settings.keyFinish, shapeScale: settings.shapeScale, motion: settings.keyMotion))
-        if settings.candidateColor >= 0 { s.candidateColor = UIColor(hex: UInt32(settings.candidateColor)) }
-        if settings.candidateTextColor >= 0 { s.candidateTextColor = UIColor(hex: UInt32(settings.candidateTextColor)) }
-        if settings.keyTextColor >= 0 { s.keyTextColor = UIColor(hex: UInt32(settings.keyTextColor)) }
-        return s
-    }
+    private var style: KeyboardStyle { settings.style() }
 
     /// 注音或日文正在組字
     private var isComposing: Bool { composer.isComposing || !kanaBuffer.isEmpty || !pinyinBuffer.isEmpty }
@@ -367,9 +359,12 @@ final class KeyboardViewController: UIInputViewController {
             applyLiveLook(last.look)
         }
         liveLookCount = currentLook.publish(from: "keyboard")
+        // App 的主題、字體、聲音分頁選好的：先套用；沒有新的就把鍵盤現在的樣子告訴 App
+        if !checkAppPick() { appPickCount = AppPick.publish(from: "keyboard") }
         liveLookTimer?.invalidate()
         liveLookTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in
             guard let self = self else { return }
+            self.checkAppPick()
             let count = LiveLook.changeCount
             guard count != self.liveLookCount else { return }
             self.liveLookCount = count
@@ -377,6 +372,55 @@ final class KeyboardViewController: UIInputViewController {
                 self.applyLiveLook(last.look)
             }
         }
+    }
+
+    // MARK: - App 的主題、按鍵、字體、聲音分頁
+
+    private var appPickCount = -1
+
+    /// App 選了新的樣子就套用；回傳這次有沒有套用
+    @discardableResult
+    private func checkAppPick() -> Bool {
+        let count = AppPick.changeCount
+        guard count != appPickCount else { return false }
+        appPickCount = count
+        guard let pick = AppPick.read(), pick.from == "app", !pick.id.isEmpty,
+              pick.id != UserDefaults.standard.string(forKey: "lastAppPick") else { return false }
+        UserDefaults.standard.set(pick.id, forKey: "lastAppPick")
+        applyAppPick(pick.values)
+        return true
+    }
+
+    private func applyAppPick(_ incoming: [String: Any]) {
+        var values = incoming
+        let theme = values.removeValue(forKey: "themeID") as? String
+        let font = values.removeValue(forKey: "fontID") as? String
+        let changed = AppPick.apply(values)
+        if changed.contains("keySound") || changed.contains("keySoundStyle") { prepareKeySound() }
+        var waiting = false
+        // 主題：圖已經在鍵盤裡就直接換，不然鍵盤自己下載一份（好了才換）
+        if let theme, theme != settings.themeID, KeyboardTheme.all.contains(where: { $0.id == theme }) || theme == "custom" {
+            if ThemePacks.isReady(theme) {
+                if ThemeLook.named(settings.themeID) == nil && settings.themeID != FoxLetterTheme.id {
+                    settings.themeBeforeFox = settings.themeID
+                }
+                settings.themeID = theme
+            } else if hasFullAccess {
+                downloadTheme(theme)
+                waiting = true
+            }
+        }
+        // 字體：自己匯入的字體只在鍵盤裡，App 不會傳；要下載的同上
+        if let font, font != settings.fontID, let f = KeyFont(rawValue: font) {
+            if f.bundled || FontPacks.isReady(font) {
+                settings.fontID = font
+            } else if hasFullAccess {
+                downloadFont(font)
+                waiting = true
+            }
+        }
+        settingsChanged()
+        if !waiting { toast("已換成 App 裡選的樣子") }
     }
 
     private func applyLiveLook(_ l: LiveLook) {

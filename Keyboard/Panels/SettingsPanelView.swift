@@ -121,6 +121,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
         liveButton.setTitleColor(style.theme.specialText, for: .normal)
 
         stack.addArrangedSubview(header("主題"))
+        stack.addArrangedSubview(note("打開「糯糯鍵盤」App，下面的「主題」「按鍵」「字體」「聲音」分頁可以先預覽再換，選好回來鍵盤就換好了。"))
         stack.addArrangedSubview(packThemeRow())
         stack.addArrangedSubview(themeRow())
         if settings.themeID == "custom" {
@@ -788,7 +789,8 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             b.backgroundColor = selected ? style.theme.accent : style.theme.key.withAlphaComponent(0.6)
             b.setTitle(ready ? font.1 : "⬇ " + font.1, for: .normal)
             b.setTitleColor(selected ? style.theme.accentText : style.theme.keyText, for: .normal)
-            b.titleLabel?.font = ready ? KeyFonts.font(font.0, size: 16, weight: selected ? .bold : .regular) : .rounded(15)
+            // 只有選中的用它自己的字體畫；其他的用系統字（每個字體都載入，鍵盤記憶體會太高）
+            b.titleLabel?.font = selected ? KeyFonts.font(font.0, size: 16, weight: .bold) : .rounded(15)
             b.titleLabel?.adjustsFontSizeToFitWidth = true
             b.titleLabel?.minimumScaleFactor = 0.6
             b.addAction(UIAction { [weak self] _ in

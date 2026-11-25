@@ -1018,6 +1018,19 @@ enum UserFonts {
 }
 
 /// 鍵盤自己的設定（存在鍵盤擴充功能自己的空間，不需要 App Group）
+extension KeyboardSettings {
+    /// 照設定組出鍵盤的樣子（鍵盤和 App 的預覽共用）；themeID 給了就換成那個主題（App 的主題卡片用）
+    func style(themeID: String? = nil) -> KeyboardStyle {
+        var s = FoxLetterTheme.resolved(KeyboardStyle(theme: KeyboardTheme.named(themeID ?? self.themeID), shape: keyShape, keyAlpha: keyAlpha,
+                      fontScale: fontScale, gapScale: gapScale, fontID: fontID,
+                      keyEffect: keyEffect, finish: keyFinish, shapeScale: shapeScale, motion: keyMotion))
+        if candidateColor >= 0 { s.candidateColor = UIColor(hex: UInt32(candidateColor)) }
+        if candidateTextColor >= 0 { s.candidateTextColor = UIColor(hex: UInt32(candidateTextColor)) }
+        if keyTextColor >= 0 { s.keyTextColor = UIColor(hex: UInt32(keyTextColor)) }
+        return s
+    }
+}
+
 final class KeyboardSettings {
     static let shared = KeyboardSettings()
     private let d = UserDefaults.standard
