@@ -1151,13 +1151,18 @@ final class KeyboardSettings {
     func removePhoto(at index: Int) {
         var list = photos
         guard list.indices.contains(index) else { return }
-        try? FileManager.default.removeItem(at: Self.photoDirectory.appendingPathComponent(list.remove(at: index).file))
+        let file = list.remove(at: index).file
+        try? FileManager.default.removeItem(at: Self.photoDirectory.appendingPathComponent(file))
+        try? FileManager.default.removeItem(at: Self.photoDirectory.appendingPathComponent("thumbs/" + file + ".jpg"))
+        Self.thumbCache.removeObject(forKey: file as NSString)
         photos = list
         photoIndex = list.isEmpty ? 0 : min(wrapped(photoIndex, list.count), list.count - 1)
     }
 
     func clearPhotos() {
         for p in photos { try? FileManager.default.removeItem(at: Self.photoDirectory.appendingPathComponent(p.file)) }
+        try? FileManager.default.removeItem(at: Self.photoDirectory.appendingPathComponent("thumbs", isDirectory: true))
+        Self.thumbCache.removeAllObjects()
         photos = []
         photoIndex = 0
     }
@@ -1176,17 +1181,34 @@ final class KeyboardSettings {
     }
 
     /// 照片的小縮圖（設定面板用）
+    /// 設定裡的照片小圖：記在記憶體和小檔案裡，打開 ⚙、每改一個設定就不用再把每張大照片解開一次（以前照片多會卡好幾秒甚至閃退）
+    private static let thumbCache = NSCache<NSString, UIImage>()
+
     func thumbnail(_ p: BgPhoto) -> UIImage? {
-        // 直接讀小圖，不先把整張照片解開（省記憶體）
+        if let hit = Self.thumbCache.object(forKey: p.file as NSString) { return hit }
         let url = Self.photoDirectory.appendingPathComponent(p.file)
-        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        let opts: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: 240,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-        ]
-        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
-        return UIImage(cgImage: cg)
+        let small = Self.photoDirectory.appendingPathComponent("thumbs", isDirectory: true).appendingPathComponent(p.file + ".jpg")
+        if let data = try? Data(contentsOf: small), let img = UIImage(data: data) {
+            Self.thumbCache.setObject(img, forKey: p.file as NSString)
+            return img
+        }
+        // 直接讀小圖，不先把整張照片解開（省記憶體）
+        let image: UIImage? = autoreleasepool {
+            guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+            let opts: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: 168,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceShouldCacheImmediately: true,
+            ]
+            guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
+            return UIImage(cgImage: cg)
+        }
+        guard let image else { return nil }
+        Self.thumbCache.setObject(image, forKey: p.file as NSString)
+        try? FileManager.default.createDirectory(at: small.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if let jpg = image.jpegData(compressionQuality: 0.8) { try? jpg.write(to: small, options: .atomic) }
+        return image
     }
     var keyEffect: String {
         get { d.string(forKey: "keyEffect") ?? KeyEffect.none.rawValue }

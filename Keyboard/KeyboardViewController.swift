@@ -339,6 +339,8 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - App 裡邊調邊看：App 拖滑桿時，鍵盤馬上跟著變
 
     private var liveLookTimer: Timer?
+    /// 最後一次按鍵的時間（打字時暫停跟 App 對設定）
+    private var lastKeyTime: CFTimeInterval = 0
     private var liveLookCount = -1
 
     private var currentLook: LiveLook {
@@ -362,9 +364,14 @@ final class KeyboardViewController: UIInputViewController {
         // App 的主題、字體、聲音分頁選好的：先套用；沒有新的就把鍵盤現在的樣子告訴 App
         if !checkAppPick() { appPickCount = AppPick.publish(from: "keyboard") }
         liveLookTimer?.invalidate()
+        var tick = 0
         liveLookTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            self.checkAppPick()
+            // 問剪貼簿要跨程序，會讓按鍵慢一拍：正在打字（1.5 秒內按過鍵）就先不問
+            guard CACurrentMediaTime() - self.lastKeyTime > 1.5 else { return }
+            tick += 1
+            // App 的主題分頁不用那麼即時：大約 2 秒看一次就好
+            if tick % 5 == 0 { self.checkAppPick() }
             let count = LiveLook.changeCount
             guard count != self.liveLookCount else { return }
             self.liveLookCount = count
@@ -713,6 +720,7 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - 按鍵
 
     private func handle(_ spec: KeySpec) {
+        lastKeyTime = CACurrentMediaTime()
         if quick != nil {
             quick = nil
             refreshTopBar()
