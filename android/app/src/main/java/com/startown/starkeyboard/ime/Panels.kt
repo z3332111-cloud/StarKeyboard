@@ -977,7 +977,7 @@ class SettingsPanel(
         note("現在的聲音：「${KeySound.from(settings.keySoundStyle).title}」。要換別的軸，到「糯糯鍵盤」App 的「聲音」分頁，點一下就能聽。")
         toggle("按鍵震動", settings.haptics) { settings.haptics = it }
 
-        header("選字列高度")
+        header("選字列（高度、半透明）")
         note("字會跟著變高。也可以在設定裡拖這個滑桿。")
         val height = android.widget.SeekBar(context).apply {
             max = 48
@@ -993,6 +993,7 @@ class SettingsPanel(
             })
         }
         col.addView(height, LayoutParams(LayoutParams.MATCH_PARENT, dpi(40f)))
+        toggle("選字列半透明（看得到後面的背景）", settings.barTranslucent) { settings.barTranslucent = it; onChange() }
         header("選字顏色")
         note("選字列第一個字（按空白鍵會送出的）的底色和字色。先選要改「底色」還是「字色」，再點色票，或用下面的滑桿自己調深淺。")
         choices(listOf("改底色", "改字色"), if (editingCandidateText) 1 else 0) { editingCandidateText = it == 1; rebuildHere() }

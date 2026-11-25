@@ -433,6 +433,8 @@ data class KeyboardStyle(
     val candidateTextColor: Int = -1,
     /** 按鍵上的字（注音、英文、符號）的顏色（0xRRGGBB）；-1 是跟著主題 */
     val keyTextColor: Int = -1,
+    /** 選字列半透明（看得到後面的背景照片） */
+    val barTranslucent: Boolean = false,
 ) {
     /** 按鍵上的字：自己選了顏色就用自己的，不然用主題的 */
     fun keyInk(default: Int): Int = if (keyTextColor >= 0) 0xFF000000.toInt() or keyTextColor else default
@@ -1000,8 +1002,13 @@ class KeyboardSettings(context: Context) {
         val t = if (themeId == null || themeId == this.themeId) theme else if (themeId == "custom")
             KeyboardTheme.custom(customHue, customSaturation, customDark, customHue2, customSaturation2) else KeyboardTheme.named(themeId)
         return FoxLetter.resolved(KeyboardStyle(t, shape, keyAlpha, fontScale, gapScale, fontId, keyEffect, keyFinish, shapeScale, keyMotion,
-            candidateColor = candidateColor, candidateTextColor = candidateTextColor, keyTextColor = keyTextColor))
+            candidateColor = candidateColor, candidateTextColor = candidateTextColor, keyTextColor = keyTextColor, barTranslucent = barTranslucent))
     }
+
+    /** 選字列半透明（看得到後面的背景照片） */
+    var barTranslucent: Boolean
+        get() = p.getBoolean("barTranslucent", false)
+        set(v) = p.edit().putBoolean("barTranslucent", v).apply()
 }
 
 /** 線條的顏色：線稿質感的外框、貓咪的尾巴鬍鬚眼睛肉球 */
