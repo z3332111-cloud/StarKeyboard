@@ -19,7 +19,7 @@ final class KeyboardViewController: UIInputViewController {
         static let barHeight: CGFloat = 64
     }
 
-    private enum SuggestionSource { case association, handwriting, spelling, glide }
+    private enum SuggestionSource { case association, handwriting, spelling, glide, paste }
 
     /// 上面那條編輯框的用途：新增表符，或是先打中文再翻譯
     private enum EditorPurpose { case emoticon, symbol, clipboardSearch, translate, fancy, shortcutPhrase, shortcutCode, clipboardCategory, clipboardItem }
@@ -448,6 +448,7 @@ final class KeyboardViewController: UIInputViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         CrashTrail.mark("顯示好了")
+        offerPaste()
         if crashedLastTime {
             crashedLastTime = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
@@ -1001,6 +1002,17 @@ final class KeyboardViewController: UIInputViewController {
             updateAutoShift()
             return
         }
+        // 中文：快速按兩下空白變成「。」（前面是字才換，標點、空白後面不換）
+        if mode == .zhuyin || mode == .pinyin || mode == .handwriting, editorText == nil,
+           Date().timeIntervalSince(lastSpaceTime) < 0.4,
+           let before = textDocumentProxy.documentContextBeforeInput, before.hasSuffix(" "),
+           let prev = before.dropLast().last, prev.isLetter || prev.isNumber {
+            deleteOutput()
+            output("。")
+            lastSpaceTime = .distantPast
+            clearSuggestions()
+            return
+        }
         applyAutocorrect()
         lastSpaceTime = Date()
         output(" ")
@@ -1325,6 +1337,10 @@ final class KeyboardViewController: UIInputViewController {
                 showAssociations(after: text)
                 refreshReturnTitle()
             }
+        } else if suggestionSource == .paste {
+            // 剛複製的東西：點了才讀剪貼簿貼上
+            if let s = UIPasteboard.general.string, !s.isEmpty { output(s) }
+            clearSuggestions()
         } else if suggestionSource == .glide, i < suggestions.count {
             // 滑行輸入認錯了：換成點的那個字
             let choice = suggestions[i]
@@ -1443,7 +1459,8 @@ final class KeyboardViewController: UIInputViewController {
         if editorText == nil, mode == .zhuyin || mode == .handwriting || mode == .pinyin {
             let punctuation = PunctuationSuggestions.after(context)
             // 先露出兩個聯想詞，再放其餘標點，避免四個符號擋住所有詞。
-            suggestions = Array(punctuation.prefix(1)) + Array(suggestions.prefix(2)) +
+            let emoji = EmojiSuggestions.after(context)
+            suggestions = Array(punctuation.prefix(1)) + Array(suggestions.prefix(2)) + emoji +
                 Array(punctuation.dropFirst()) + Array(suggestions.dropFirst(2))
         }
         suggestionSource = .association
@@ -1775,6 +1792,19 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     // MARK: - 剪貼簿
+
+    /// 剛複製了文字：選字列先放一個「📋 貼上」，點了才真的讀剪貼簿（只看有沒有文字、不先讀內容，不會跳「已貼上」提示）
+    private func offerPaste() {
+        guard hasFullAccess, editorText == nil, !isComposing, suggestions.isEmpty else { return }
+        let pb = UIPasteboard.general
+        let key = "pasteOfferedCount"
+        guard pb.changeCount != UserDefaults.standard.integer(forKey: key), pb.hasStrings,
+              ClipboardPrivacy.mayRecord(types: pb.types) else { return }
+        UserDefaults.standard.set(pb.changeCount, forKey: key)
+        suggestions = ["📋 貼上剛複製的"]
+        suggestionSource = .paste
+        refreshTopBar()
+    }
 
     private func captureClipboard() {
         guard hasFullAccess, settings.clipboardHistoryEnabled else { return }
@@ -2576,7 +2606,8 @@ final class KeyboardViewController: UIInputViewController {
         lastReturnTitle = returnTitle
         let context = KeyLayouts.Context(mode: mode, layer: layer, shift: shift, needsGlobe: needsInputModeSwitchKey,
                                          returnTitle: returnTitle, spaceTitle: spaceTitle, nextModeTitle: nextModeTitle,
-                                         fullWidthSymbols: settings.fullWidthSymbols, zhuyinTenColumns: settings.zhuyinTenColumns)
+                                         fullWidthSymbols: settings.fullWidthSymbols, zhuyinTenColumns: settings.zhuyinLayout == "ten",
+                                         zhuyinAligned: settings.zhuyinLayout == "aligned")
         grid.setLayout(KeyLayouts.layout(context))
         grid.glideEnabled = mode == .english && layer == .letters && settings.glideTyping
 

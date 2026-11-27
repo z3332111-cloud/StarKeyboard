@@ -965,6 +965,10 @@ class KeyboardSettings(context: Context) {
     var zhuyinTenColumns: Boolean
         get() = p.getBoolean("zhuyinTenColumns", false)
         set(v) = p.edit().putBoolean("zhuyinTenColumns", v).apply()
+    /** 注音排法：dachen 大千 11 欄、ten 十欄（像 Gboard）、aligned 對齊（像 iPhone 內建：ㄢ、ㄦ 同一顆） */
+    var zhuyinLayout: String
+        get() = p.getString("zhuyinLayout", null) ?: if (zhuyinTenColumns) "ten" else "dachen"
+        set(v) { p.edit().putString("zhuyinLayout", v).apply(); zhuyinTenColumns = v == "ten" }
     /** 拼音模式輸出簡體字（馬來西亞、中國用簡體） */
     var pinyinSimplified: Boolean
         get() = p.getBoolean("pinyinSimplified", false)

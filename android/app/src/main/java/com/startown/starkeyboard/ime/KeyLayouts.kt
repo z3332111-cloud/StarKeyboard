@@ -59,6 +59,7 @@ object KeyLayouts {
         val nextModeTitle: String,
         val fullWidthSymbols: Boolean = false,
         val zhuyinTenColumns: Boolean = false,
+        val zhuyinAligned: Boolean = false,
     )
 
     fun layout(c: Context): KeyboardLayout {
@@ -137,11 +138,28 @@ object KeyLayouts {
     }
 
     private fun zhuyin(c: Context): KeyboardLayout {
+        if (c.zhuyinAligned) return zhuyinAligned(c)
         if (c.zhuyinTenColumns) return zhuyinTen(c)
         val rows = Bopomofo.dachenRows.map { line -> line.map { KeySpec(it.toString(), KeyAction.Zhuyin(it), fontSize = 20f) } }.toMutableList()
         rows[3] = rows[3] + backspace(1f)
         rows.add(bottomRow(c, 11f))
         return KeyboardLayout(rows, 11f)
+    }
+
+    /** 注音對齊（像 iPhone 內建注音）：四排都是 10 顆、上下對齊；ㄦ 和 ㄢ 同一顆，按住 ㄢ 打出 ㄦ */
+    private fun zhuyinAligned(c: Context): KeyboardLayout {
+        val rows = Bopomofo.dachenRows.map { line ->
+            line.filter { it != 'ㄦ' }.map { ch -> KeySpec(ch.toString(), KeyAction.Zhuyin(ch), fontSize = 21f, hint = if (ch == 'ㄢ') "ㄦ" else "") }
+        }
+        val bottom = listOf(
+            KeySpec("123", KeyAction.Layer(KeyboardLayer.NUMBERS), 1.2f, KeyKind.SPECIAL, 16f),
+            KeySpec(c.nextModeTitle, KeyAction.NextMode, 1f, KeyKind.SPECIAL, 17f),
+            KeySpec("，", KeyAction.Text("，"), 1f, KeyKind.NORMAL, 20f, hint = "。", popup = KeySpec.PUNCTUATION_POPUP),
+            KeySpec(c.spaceTitle, KeyAction.Space, 0f, KeyKind.NORMAL, 15f),
+            backspace(1.3f),
+            KeySpec("↵", KeyAction.Return, 1.6f, KeyKind.ACCENT, 22f),
+        )
+        return KeyboardLayout(rows + listOf(bottom), 10f)
     }
 
     /** 注音十欄（像 Gboard）：ㄦ 搬到空白鍵旁邊，每顆鍵右上角有數字／字母，長按就打出來 */

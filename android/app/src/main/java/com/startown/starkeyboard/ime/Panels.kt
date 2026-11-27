@@ -958,7 +958,11 @@ class SettingsPanel(
                 onChange()
             }
         }
-        toggle("注音十欄排法（像 Gboard：ㄦ 在空白鍵旁，長按打數字）", settings.zhuyinTenColumns) { settings.zhuyinTenColumns = it; onChange() }
+        val layouts = listOf("dachen" to "大千 11 欄", "ten" to "十欄（像 Gboard）", "aligned" to "對齊（像 iPhone）")
+        choices(layouts.map { it.second }, layouts.indexOfFirst { it.first == settings.zhuyinLayout }.coerceAtLeast(0)) {
+            settings.zhuyinLayout = layouts[it].first; onChange()
+        }
+        note("注音排法：大千 ㄦ 在最右邊多一顆；十欄 ㄦ 在空白鍵旁、長按打數字；對齊跟 iPhone 內建一樣四排對齊，按住 ㄢ 打出 ㄦ。")
         toggle("拼音輸出簡體字", settings.pinyinSimplified) { settings.pinyinSimplified = it }
         toggle("聯想詞（打完字後推薦下一個字）", settings.associations) { settings.associations = it }
 

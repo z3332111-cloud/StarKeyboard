@@ -978,6 +978,19 @@ final class KeyboardGridView: UIView {
 
     // MARK: 觸控
 
+    /// 最後一次按刪除鍵的時間：連續刪的時候，手指稍微偏到旁邊的鍵也當成刪除（防手滑）
+    private var lastBackspaceAt: CFTimeInterval = 0
+
+    /// 手指剛按下去的那顆鍵：正在連續刪（0.4 秒內按過刪除），又落在刪除鍵旁邊三分之一顆鍵以內，就算刪除鍵
+    private func keyForNewTouch(at p: CGPoint) -> KeyButton? {
+        if CACurrentMediaTime() - lastBackspaceAt < 0.4,
+           let del = keys.first(where: { $0.spec.action == .backspace }),
+           del.frame.insetBy(dx: -del.frame.width * 0.35, dy: -del.frame.height * 0.25).contains(p) {
+            return del
+        }
+        return key(at: p)
+    }
+
     private func key(at p: CGPoint) -> KeyButton? {
         if let k = keys.first(where: { $0.frame.contains(p) }) { return k }
         return keys.min { distance($0.frame, p) < distance($1.frame, p) }
@@ -1028,7 +1041,12 @@ final class KeyboardGridView: UIView {
             if !key.spec.popup.isEmpty {
                 self.showPopup(touch, key)
             } else {
-                self.onKey?(KeySpec(face: .text(hint), action: .text(hint)))
+                // 小字是注音（對齊排法的 ㄦ）就當成打注音，其他（數字、字母、標點）照字打出
+                if hint.count == 1, let ch = hint.first, ch.unicodeScalars.allSatisfy({ (0x3105...0x3129).contains($0.value) }) {
+                    self.onKey?(KeySpec(face: .text(hint), action: .zhuyin(ch)))
+                } else {
+                    self.onKey?(KeySpec(face: .text(hint), action: .text(hint)))
+                }
             }
         }
     }
@@ -1134,7 +1152,7 @@ final class KeyboardGridView: UIView {
         var fresh: [(UITouch, KeyButton)] = []
         for touch in touches.sorted(by: touchOrder) {
             let p = touch.location(in: self)
-            guard let key = key(at: p) else { continue }
+            guard let key = keyForNewTouch(at: p) else { continue }
             key.isPressed = true
             fresh.append((touch, key))
         }
@@ -1157,6 +1175,7 @@ final class KeyboardGridView: UIView {
             if !key.spec.hint.isEmpty || !key.spec.popup.isEmpty { startHint(touch, key) }
             switch key.spec.action {
             case .backspace:
+                lastBackspaceAt = CACurrentMediaTime()
                 track.fired = true
                 tracks[touch] = track
                 fire(key)

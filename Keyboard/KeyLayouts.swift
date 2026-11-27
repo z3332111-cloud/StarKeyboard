@@ -98,6 +98,7 @@ enum KeyLayouts {
         var nextModeTitle: String
         var fullWidthSymbols = false
         var zhuyinTenColumns = false
+        var zhuyinAligned = false
     }
 
     static func layout(_ c: Context) -> KeyboardLayout {
@@ -189,6 +190,7 @@ enum KeyLayouts {
     }
 
     private static func zhuyin(_ c: Context) -> KeyboardLayout {
+        if c.zhuyinAligned { return zhuyinAligned(c) }
         if c.zhuyinTenColumns { return zhuyinTen(c) }
         var rows: [[KeySpec]] = Bopomofo.dachenRows.map { line in
             line.map { ch in KeySpec(face: .text(String(ch)), action: .zhuyin(ch), fontSize: 20) }
@@ -196,6 +198,26 @@ enum KeyLayouts {
         rows[3].append(backspace(1))
         rows.append(bottomRow(c, columns: 11))
         return KeyboardLayout(rows: rows, columns: 11)
+    }
+
+    /// 注音對齊（像 iPhone 內建注音）：四排都是 10 顆、上下對齊；ㄦ 和 ㄢ 同一顆，按住 ㄢ 打出 ㄦ
+    private static func zhuyinAligned(_ c: Context) -> KeyboardLayout {
+        var rows: [[KeySpec]] = Bopomofo.dachenRows.map { line in
+            line.filter { $0 != "ㄦ" }.map { ch in
+                KeySpec(face: .text(String(ch)), action: .zhuyin(ch), fontSize: 21, hint: ch == "ㄢ" ? "ㄦ" : "")
+            }
+        }
+        var bottom = [KeySpec(face: .text("123"), action: .layer(.numbers), width: 1.2, kind: .special, fontSize: 16)]
+        if c.needsGlobe {
+            bottom.append(KeySpec(face: .symbol("globe"), action: .globe, width: 1, kind: .special))
+        }
+        bottom.append(KeySpec(face: .text(c.nextModeTitle), action: .nextMode, width: 1, kind: .special, fontSize: 17))
+        bottom.append(KeySpec(face: .text("，"), action: .text("，"), width: 1, fontSize: 20, hint: "。", popup: KeySpec.punctuationPopup))
+        bottom.append(KeySpec(face: .text(c.spaceTitle), action: .space, width: 0, fontSize: 15))
+        bottom.append(backspace(1.3))
+        bottom.append(KeySpec(face: .symbol("return"), action: .returnKey, width: 1.6, kind: .accent, fontSize: 16))
+        rows.append(bottom)
+        return KeyboardLayout(rows: rows, columns: 10)
     }
 
     /// 注音十欄（像 Gboard）：ㄦ 搬到空白鍵旁邊，每顆鍵右上角有數字／字母，長按就打出來

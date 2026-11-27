@@ -330,10 +330,13 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
                 self.onChange?()
             })
         }
-        add(switchRow("注音十欄排法（像 Gboard：ㄦ 在空白鍵旁，長按打數字）", on: settings.zhuyinTenColumns) { [weak self] on in
-            self?.settings.zhuyinTenColumns = on
+        let layouts = [("dachen", "大千 11 欄"), ("ten", "十欄（像 Gboard）"), ("aligned", "對齊（像 iPhone）")]
+        add(choiceRow(layouts.map { $0.1 }, selected: layouts.firstIndex { $0.0 == settings.zhuyinLayout } ?? 0) { [weak self] i in
+            self?.settings.zhuyinLayout = layouts[i].0
             self?.onChange?()
+            self?.rebuild()
         })
+        add(note("注音排法：大千 ㄦ 在最右邊多一顆；十欄 ㄦ 在空白鍵旁、長按打數字；對齊跟 iPhone 內建一樣四排對齊，按住 ㄢ 打出 ㄦ。"))
         add(switchRow("拼音輸出簡體字", on: settings.pinyinSimplified) { [weak self] on in
             self?.settings.pinyinSimplified = on
         })

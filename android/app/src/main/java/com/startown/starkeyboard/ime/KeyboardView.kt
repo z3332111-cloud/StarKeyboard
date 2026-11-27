@@ -776,6 +776,21 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
 
     // ===== 觸控 =====
 
+    /** 最後一次按刪除鍵的時間：連續刪的時候，手指稍微偏到旁邊的鍵也當成刪除（防手滑） */
+    private var lastBackspaceAt = 0L
+
+    /** 手指剛按下去的那顆鍵：0.4 秒內按過刪除、又落在刪除鍵旁邊三分之一顆鍵以內，就算刪除鍵 */
+    private fun keyForNewTouch(x: Float, y: Float): Key? {
+        if (android.os.SystemClock.uptimeMillis() - lastBackspaceAt < 400) {
+            keys.firstOrNull { it.spec.action == KeyAction.Backspace }?.let { del ->
+                val f = del.frame
+                val dx = f.width() * 0.35f; val dy = f.height() * 0.25f
+                if (x >= f.left - dx && x <= f.right + dx && y >= f.top - dy && y <= f.bottom + dy) return del
+            }
+        }
+        return keyAt(x, y)
+    }
+
     private fun keyAt(x: Float, y: Float): Key? {
         keys.firstOrNull { it.frame.contains(x, y) }?.let { return it }
         return keys.minByOrNull { k ->
@@ -924,7 +939,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 val i = e.actionIndex
-                val key = keyAt(e.getX(i), e.getY(i)) ?: return true
+                val key = keyForNewTouch(e.getX(i), e.getY(i)) ?: return true
                 // 先亮起這顆鍵，再送出上一拍還沒放開的字。選字不能擋住按鍵變色。
                 setPressed(key, true)
                 onPress?.invoke(key.spec.action.isBig)
@@ -941,6 +956,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                 }
                 when (key.spec.action) {
                     KeyAction.Backspace -> {
+                        lastBackspaceAt = android.os.SystemClock.uptimeMillis()
                         track.fired = true
                         fire(key)
                         startRepeat(key)
@@ -971,6 +987,8 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
                                 previewKey = null
                                 invalidate()
                                 if (key.spec.popup.isNotEmpty()) showPopup(pid, key, track)
+                                // 小字是注音（對齊排法的 ㄦ）就當成打注音，其他照字打出
+                                else if (hint.length == 1 && hint[0] in 'ㄅ'..'ㄩ') onKey?.invoke(KeySpec(hint, KeyAction.Zhuyin(hint[0])))
                                 else onKey?.invoke(KeySpec(hint, KeyAction.Text(hint)))
                             }
                         }, 450)

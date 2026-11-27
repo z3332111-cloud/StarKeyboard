@@ -54,7 +54,9 @@ import java.io.File
 import java.util.Locale
 
 class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheckerSessionListener {
-    private enum class SuggestionSource { ASSOCIATION, HANDWRITING, SPELLING, GLIDE }
+    private enum class SuggestionSource { ASSOCIATION, HANDWRITING, SPELLING, GLIDE, PASTE }
+    /** 選字列「📋 貼上」那一格要貼的字 */
+    private var pasteText: String? = null
     private enum class EditorPurpose { EMOTICON, SYMBOL, CLIPBOARD_SEARCH, TRANSLATE, FANCY, SHORTCUT_PHRASE, SHORTCUT_CODE, CLIPBOARD_CATEGORY, CLIPBOARD_ITEM }
     private var renamingCategory: String? = null
     private var editingClipId: String? = null
@@ -298,6 +300,7 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         rebuildKeys()
         updateAutoShift()
         refreshTopBar()
+        offerPaste()
         // 剛在 App 挑了照片：直接進入調整照片（等版面排好才知道鍵盤多大）
         if (settings.adjustPhotoPending && settings.hasBackground) {
             settings.adjustPhotoPending = false
@@ -736,6 +739,17 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
                 return
             }
         }
+        // 中文：快速按兩下空白變成「。」（前面是字才換）
+        if ((mode == InputMode.ZHUYIN || mode == InputMode.PINYIN || mode == InputMode.HANDWRITING) && editorText == null && now - lastSpaceTime < 400) {
+            val before = currentInputConnection?.getTextBeforeCursor(2, 0)?.toString() ?: ""
+            if (before.length == 2 && before[1] == ' ' && before[0].isLetterOrDigit()) {
+                deleteOutput()
+                output("。")
+                lastSpaceTime = 0
+                clearSuggestions()
+                return
+            }
+        }
         applyAutocorrect()
         lastSpaceTime = now
         output(" ")
@@ -1077,6 +1091,13 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
             }
             return
         }
+        if (suggestionSource == SuggestionSource.PASTE) {
+            // 剛複製的東西：點一下貼上
+            pasteText?.let { output(it) }
+            pasteText = null
+            clearSuggestions()
+            return
+        }
         if (suggestionSource == SuggestionSource.GLIDE) {
             // 滑行輸入認錯了：換成點的那個字
             val choice = suggestions.getOrNull(i) ?: return
@@ -1151,9 +1172,10 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         // 中文模式：選字那排最前面放標點（和 iPhone 一樣），看起來是問句就把「？」排第一個
         suggestions = if (editorText == null && (mode == InputMode.ZHUYIN || mode == InputMode.HANDWRITING || mode == InputMode.PINYIN)) {
             val before = currentInputConnection?.getTextBeforeCursor(40, 0)?.toString() ?: ""
-            val marks = PunctuationSuggestions.after(if (before.endsWith(text)) before else before + text)
-            // 先露出兩個聯想詞，再放其餘標點，避免標點擋住所有詞
-            marks.take(1) + words.take(2) + marks.drop(1) + words.drop(2)
+            val context = if (before.endsWith(text)) before else before + text
+            val marks = PunctuationSuggestions.after(context)
+            // 先露出兩個聯想詞和表情（打「開心」推 😊），再放其餘標點，避免標點擋住所有詞
+            marks.take(1) + words.take(2) + EmojiSuggestions.after(context) + marks.drop(1) + words.drop(2)
         } else words
         suggestionSource = SuggestionSource.ASSOCIATION
         refreshTopBar()
@@ -1613,6 +1635,30 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
 
     // ===== 剪貼簿 =====
 
+    /** 剛複製了文字（3 分鐘內）：選字列先放一格「📋 貼上：開頭幾個字」，點一下就貼上 */
+    private fun offerPaste() {
+        if (editorText != null || isComposing || suggestions.isNotEmpty()) return
+        if (android.os.Build.VERSION.SDK_INT < 26) return
+        runCatching {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val desc = cm.primaryClipDescription ?: return
+            if (desc.extras?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true) return
+            if (!desc.hasMimeType("text/*")) return
+            val stamp = desc.timestamp
+            if (System.currentTimeMillis() - stamp > 3 * 60 * 1000) return
+            val prefs = getSharedPreferences("keyboard", Context.MODE_PRIVATE)
+            if (prefs.getLong("pasteOffered", 0L) == stamp) return
+            prefs.edit().putLong("pasteOffered", stamp).apply()
+            val text = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString() ?: return
+            if (text.isBlank()) return
+            val firstLine = text.trim().lineSequence().first()
+            pasteText = text
+            suggestions = listOf("📋 " + (if (firstLine.length > 12) firstLine.take(12) + "…" else firstLine))
+            suggestionSource = SuggestionSource.PASTE
+            refreshTopBar()
+        }
+    }
+
     private fun captureClipboard() {
         if (!settings.clipboardHistoryEnabled) return
         runCatching {
@@ -2062,7 +2108,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     private fun rebuildKeys() {
         if (root == null) return
         lastReturnTitle = returnTitle
-        val ctx = KeyLayouts.Context(mode, layer, shift, returnTitle, spaceTitle, nextModeTitle, settings.fullWidthSymbols, settings.zhuyinTenColumns)
+        val ctx = KeyLayouts.Context(mode, layer, shift, returnTitle, spaceTitle, nextModeTitle, settings.fullWidthSymbols,
+            settings.zhuyinLayout == "ten", settings.zhuyinLayout == "aligned")
         keyboard.setLayout(KeyLayouts.layout(ctx))
         keyboard.glideEnabled = mode == InputMode.ENGLISH && layer == KeyboardLayer.LETTERS && settings.glideTyping
         val showHandwriting = mode == InputMode.HANDWRITING && layer == KeyboardLayer.LETTERS

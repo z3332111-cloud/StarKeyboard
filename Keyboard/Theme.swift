@@ -1381,6 +1381,11 @@ final class KeyboardSettings {
         get { bool("zhuyinTenColumns", false) }
         set { d.set(newValue, forKey: "zhuyinTenColumns") }
     }
+    /// 注音排法：dachen 大千 11 欄、ten 十欄（像 Gboard）、aligned 對齊（像 iPhone 內建：ㄢ、ㄦ 同一顆）
+    var zhuyinLayout: String {
+        get { d.string(forKey: "zhuyinLayout") ?? (zhuyinTenColumns ? "ten" : "dachen") }
+        set { d.set(newValue, forKey: "zhuyinLayout"); zhuyinTenColumns = newValue == "ten" }
+    }
     /// 拼音模式輸出簡體字（馬來西亞、中國用簡體）
     var pinyinSimplified: Bool {
         get { bool("pinyinSimplified", false) }
