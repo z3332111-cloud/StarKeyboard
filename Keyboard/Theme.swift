@@ -1418,6 +1418,12 @@ final class KeyboardSettings {
         set { d.set(newValue, forKey: "candidateTextColor") }
     }
 
+    /// 貼圖貼出去的大小（StickerTools.sizes 的第幾個；預設「中」）
+    var stickerSize: Int {
+        get { min(max(d.object(forKey: "stickerSize") as? Int ?? 1, 0), StickerTools.sizes.count - 1) }
+        set { d.set(newValue, forKey: "stickerSize") }
+    }
+
     /// 選字列畫成圓角膠囊（插畫主題）；預設滿版
     var barRounded: Bool {
         get { bool("barRounded", false) }

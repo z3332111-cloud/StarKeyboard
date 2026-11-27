@@ -1,12 +1,12 @@
 import UIKit
 
-/// 表情符號、顏文字、特殊符號共用的面板（含「我的表符」和自製貼圖）
+/// 表情符號、顏文字、特殊符號共用的面板（含「我的表符」）；自製貼圖是獨立的一個（kind = .stickers）
 final class EmojiPanelView: UIView {
     enum Kind: String {
-        case emoji, kaomoji, symbols
+        case emoji, kaomoji, symbols, stickers
     }
 
-    enum AddOption { case type, clipboardText, clipboardImage }
+    enum AddOption { case type, clipboardText, clipboardImage, clipboardImageCutout }
 
     private enum TabContent {
         case recent
@@ -22,7 +22,8 @@ final class EmojiPanelView: UIView {
     }
 
     var onInsert: ((String) -> Void)?
-    var onCopyImage: ((UIImage) -> Void)?
+    /// 點了貼圖：交出貼圖的檔案，照設定的大小複製
+    var onCopySticker: ((URL) -> Void)?
     var onAdd: ((AddOption) -> Void)?
     var onBack: (() -> Void)?
     var onBackspace: (() -> Void)?
@@ -64,6 +65,9 @@ final class EmojiPanelView: UIView {
         case .symbols:
             tabs = [(title: "最近", content: TabContent.recent), (title: "我的", content: TabContent.mine)]
             categories = SymbolData.symbols
+        case .stickers:
+            tabs = [(title: "🖼 我的貼圖", content: TabContent.mine)]
+            categories = []
         }
         for cat in categories {
             tabs.append((title: cat.title, content: TabContent.list(cat.items)))
@@ -92,7 +96,7 @@ final class EmojiPanelView: UIView {
 
         buildAddMenu()
         let hasRecent = !store.recents(kind.rawValue).isEmpty
-        select(tab: hasRecent ? 0 : 2)
+        select(tab: kind == .stickers ? 0 : (hasRecent ? 0 : 2))
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -119,11 +123,16 @@ final class EmojiPanelView: UIView {
             refs = store.recents(kind.rawValue).map { .text($0) }
             grid.cellStyle = kind == .kaomoji ? .chip : .square
         case .mine:
-            if kind == .symbols {
+            switch kind {
+            case .symbols:
                 refs = [.add] + store.customSymbols.map { .custom($0) }
                 grid.cellStyle = .square
-            } else {
-                refs = [.add] + store.custom.map { .custom($0) } + store.stickers.map { .sticker($0) }
+            case .stickers:
+                refs = [.add] + store.stickers.map { .sticker($0) }
+                grid.cellStyle = .square
+            default:
+                // 貼圖搬到獨立的「我的貼圖」，這裡只放自己的表符
+                refs = [.add] + store.custom.map { .custom($0) }
                 grid.cellStyle = .chip
             }
         case .list(let items):
@@ -168,7 +177,7 @@ final class EmojiPanelView: UIView {
             onInsert?(s)
             store.pushRecent(s, kind: kind.rawValue)
         case .sticker(let r):
-            if let img = image(for: r) { onCopyImage?(img) }
+            if let url = store.stickerURL(r) { onCopySticker?(url) }
         case .add:
             addMenu.isHidden = false
         }
@@ -195,16 +204,27 @@ final class EmojiPanelView: UIView {
         addStack.axis = .vertical
         addStack.spacing = 6
         addStack.distribution = .fillEqually
-        let options: [(String, AddOption?)] = kind == .symbols ? [
-            ("⌨️  用鍵盤打新的符號（空白隔開可以加好幾個）", .type),
-            ("📋  把剪貼簿的文字加進來", .clipboardText),
-            ("取消", nil),
-        ] : [
-            ("⌨️  用鍵盤打一個新的表符", .type),
-            ("📋  把剪貼簿的文字加進來", .clipboardText),
-            ("🖼  把剪貼簿的圖片做成貼圖", .clipboardImage),
-            ("取消", nil),
-        ]
+        let options: [(String, AddOption?)]
+        switch kind {
+        case .symbols:
+            options = [
+                ("⌨️  用鍵盤打新的符號（空白隔開可以加好幾個）", .type),
+                ("📋  把剪貼簿的文字加進來", .clipboardText),
+                ("取消", nil),
+            ]
+        case .stickers:
+            options = [
+                ("🖼  貼上剛複製的圖片", .clipboardImage),
+                ("✂️  貼上並去掉純色背景（白底、黑底）", .clipboardImageCutout),
+                ("取消", nil),
+            ]
+        default:
+            options = [
+                ("⌨️  用鍵盤打一個新的表符", .type),
+                ("📋  把剪貼簿的文字加進來", .clipboardText),
+                ("取消", nil),
+            ]
+        }
         for (title, option) in options {
             let b = UIButton(type: .system)
             b.setTitle(title, for: .normal)
@@ -215,6 +235,16 @@ final class EmojiPanelView: UIView {
                 if let option = option { self?.onAdd?(option) }
             }, for: .touchUpInside)
             addStack.addArrangedSubview(b)
+        }
+        if kind == .stickers {
+            // 貼出去的大小：小是以前的大小，中、大比較清楚
+            let size = UISegmentedControl(items: StickerTools.sizes.map { "貼出去：\($0.title)" })
+            size.selectedSegmentIndex = KeyboardSettings.shared.stickerSize
+            size.addAction(UIAction { [weak size] _ in
+                guard let size = size else { return }
+                KeyboardSettings.shared.stickerSize = size.selectedSegmentIndex
+            }, for: .valueChanged)
+            addStack.insertArrangedSubview(size, at: addStack.arrangedSubviews.count - 1)
         }
         addMenu.addSubview(addStack)
         addSubview(addMenu)

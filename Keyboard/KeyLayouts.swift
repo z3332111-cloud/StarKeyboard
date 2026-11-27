@@ -28,7 +28,7 @@ enum InputMode: String, CaseIterable {
 
 enum KeyboardLayer { case letters, numbers, symbols, numpad }
 enum ShiftState { case off, on, locked }
-enum PanelKind: String { case emoji, kaomoji, symbols, clipboard, settings }
+enum PanelKind: String { case emoji, kaomoji, stickers, symbols, clipboard, settings }
 
 enum KeyAction: Equatable {
     case text(String)

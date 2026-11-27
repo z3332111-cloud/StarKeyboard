@@ -6,7 +6,7 @@ private final class CandidateScrollView: UIScrollView {
 }
 
 enum ToolbarItem: String, CaseIterable {
-    case clipboard, emoji, kaomoji, symbols, fancy, translate, handwriting, voice, settings, dismiss
+    case clipboard, emoji, kaomoji, stickers, symbols, fancy, translate, handwriting, voice, settings, dismiss
 
     /// 設定裡「上面那一排按鈕」的名字
     var title: String {
@@ -14,6 +14,7 @@ enum ToolbarItem: String, CaseIterable {
         case .clipboard: return "剪貼簿"
         case .emoji: return "表情符號"
         case .kaomoji: return "顏文字"
+        case .stickers: return "我的貼圖"
         case .symbols: return "特殊符號"
         case .fancy: return "花式字"
         case .translate: return "翻譯"
@@ -110,6 +111,7 @@ final class TopBarView: UIView {
             case .clipboard: b.setImage(Self.icon("doc.on.clipboard"), for: .normal)
             case .emoji: b.setImage(Self.icon("face.smiling"), for: .normal)
             case .kaomoji: b.setTitle("(•ᴗ•)", for: .normal)
+            case .stickers: b.setImage(Self.icon("photo.on.rectangle.angled"), for: .normal); b.accessibilityLabel = "我的貼圖"
             case .symbols: b.setTitle("※", for: .normal)
             case .fancy: b.setTitle("𝒜", for: .normal)
             case .translate: b.setImage(Self.icon("translate"), for: .normal)

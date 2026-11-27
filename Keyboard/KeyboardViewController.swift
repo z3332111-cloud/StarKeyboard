@@ -1536,6 +1536,7 @@ final class KeyboardViewController: UIInputViewController {
         case .clipboard: togglePanel(.clipboard)
         case .emoji: togglePanel(.emoji)
         case .kaomoji: togglePanel(.kaomoji)
+        case .stickers: togglePanel(.stickers)
         case .symbols: togglePanel(.symbols)
         case .voice:
             // 鍵盤裡不能跳系統的提示框（會閃退），改成畫在鍵盤上的說明卡
@@ -1579,14 +1580,14 @@ final class KeyboardViewController: UIInputViewController {
         panel = kind
         let v: UIView
         switch kind {
-        case .emoji, .kaomoji, .symbols:
-            let panelKind: EmojiPanelView.Kind = kind == .emoji ? .emoji : (kind == .kaomoji ? .kaomoji : .symbols)
+        case .emoji, .kaomoji, .symbols, .stickers:
+            let panelKind: EmojiPanelView.Kind = kind == .emoji ? .emoji : kind == .kaomoji ? .kaomoji : kind == .stickers ? .stickers : .symbols
             let p = EmojiPanelView(kind: panelKind, store: emoStore, style: style)
             p.onInsert = { [weak self] s in
                 self?.feedback()
                 self?.output(s)
             }
-            p.onCopyImage = { [weak self] img in self?.copySticker(img) }
+            p.onCopySticker = { [weak self] url in self?.copySticker(url) }
             p.onAdd = { [weak self] option in self?.addEmoticon(option) }
             p.onBack = { [weak self] in self?.closePanel() }
             p.onBackspace = { [weak self] in self?.deleteOutput() }
@@ -2006,19 +2007,43 @@ final class KeyboardViewController: UIInputViewController {
             let n = addEmoticonLines(s)
             (panelView as? EmojiPanelView)?.reload()
             toast(n > 1 ? "已加入 \(n) 個表符（一行一個）" : "已加入我的表符")
-        case .clipboardImage:
+        case .clipboardImage, .clipboardImageCutout:
             guard hasFullAccess else {
                 toast("要先開啟「允許完整取用」")
                 return
             }
-            guard let img = UIPasteboard.general.downsampledImage(maxSide: 512), let data = img.pngData() else {
-                toast("剪貼簿裡沒有圖片，先到相簿「拷貝」一張")
-                return
+            let cutout = option == .clipboardImageCutout
+            if let img = StickerTools.pasteboardImage(maxSide: StickerTools.storedSide) {
+                saveSticker(img, cutout: cutout)
+            } else if let url = StickerTools.pasteboardImageURL() {
+                // 只複製到圖片網址：鍵盤自己下載
+                toast("正在下載圖片…")
+                StickerTools.download(url, maxSide: StickerTools.storedSide) { [weak self] img in
+                    guard let self = self else { return }
+                    if let img { self.saveSticker(img, cutout: cutout) } else { self.toast("這個網址不是圖片，或下載失敗") }
+                }
+            } else {
+                toast("剪貼簿裡沒有圖片：在網頁、相簿或聊天裡長按圖片「拷貝」，再回來按")
             }
-            emoStore.addSticker(pngData: data)
-            (panelView as? EmojiPanelView)?.reload()
-            toast("已做成貼圖，點一下就能複製")
         }
+    }
+
+    /// 存成貼圖（可以先把純色背景去掉）
+    private func saveSticker(_ image: UIImage, cutout: Bool) {
+        var img = image
+        var note = "已做成貼圖，點一下就能複製"
+        if cutout {
+            if let clean = StickerTools.removeSolidBackground(image) {
+                img = clean
+                note = "已去背做成貼圖，點一下就能複製"
+            } else {
+                note = "背景不是單一顏色，沒辦法自動去背，先照原圖做成貼圖"
+            }
+        }
+        guard let data = img.pngData() else { toast("這張圖片讀不出來"); return }
+        emoStore.addSticker(pngData: data)
+        (panelView as? EmojiPanelView)?.reload()
+        toast(note)
     }
 
     /// 找剪貼簿：每個關鍵字都要出現（不分大小寫），最多 40 筆，最近的在前面
@@ -2068,12 +2093,18 @@ final class KeyboardViewController: UIInputViewController {
         refreshTopBar()
     }
 
-    private func copySticker(_ image: UIImage) {
+    private func copySticker(_ url: URL) {
         guard hasFullAccess else {
             toast("要先開啟「允許完整取用」")
             return
         }
-        UIPasteboard.general.image = image
+        // 照設定的大小重新縮一次（以前直接拿格子裡的小縮圖，貼出去會糊），用 PNG 保留透明背景
+        let side = StickerTools.sizes[settings.stickerSize].side
+        guard let png = StickerTools.pngForSending(url: url, side: side) else {
+            toast("這張貼圖讀不出來")
+            return
+        }
+        UIPasteboard.general.setItems([["public.png": png]])
         settings.lastPasteboardChange = UIPasteboard.general.changeCount
         toast("已複製貼圖！在輸入框長按「貼上」")
     }
