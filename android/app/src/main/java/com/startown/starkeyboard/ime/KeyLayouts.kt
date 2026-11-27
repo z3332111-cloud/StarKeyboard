@@ -123,12 +123,14 @@ object KeyLayouts {
             }
             KeySpec(title, KeyAction.Layer(KeyboardLayer.LETTERS), 1.3f * k, KeyKind.SPECIAL, 14f)
         }
-        return listOf(
+        return listOfNotNull(
             layerKey,
             // 123 和符號頁：這格換成大顆的數字鍵盤
             if (letters) KeySpec(c.nextModeTitle, KeyAction.NextMode, 1.1f * k, KeyKind.SPECIAL, 17f)
             else KeySpec("數字", KeyAction.Layer(KeyboardLayer.NUMPAD), 1.1f * k, KeyKind.SPECIAL, 15f),
             KeySpec("☺︎", KeyAction.Panel(PanelKind.EMOJI), 1.1f * k, KeyKind.SPECIAL, 21f),
+            // 注音：空白鍵旁邊放逗號鍵，點一下「，」，按住滑過去選「。？！、…」（和十欄排法一樣）
+            if (letters && c.mode == InputMode.ZHUYIN) KeySpec("，", KeyAction.Text("，"), 1f * k, KeyKind.NORMAL, 20f, hint = "。", popup = KeySpec.PUNCTUATION_POPUP) else null,
             KeySpec(c.spaceTitle, KeyAction.Space, 0f, KeyKind.NORMAL, 15f),
             KeySpec("↵", KeyAction.Return, 2f * k, KeyKind.ACCENT, 22f),
         )

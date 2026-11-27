@@ -1106,7 +1106,8 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
         val s = suggestions.getOrNull(i) ?: return
         output(s)
         if (suggestionSource == SuggestionSource.HANDWRITING) handwriting?.clear()
-        showAssociations(s)
+        // 打完標點就收起來
+        if (s in PunctuationSuggestions.marks) clearSuggestions() else showAssociations(s)
     }
 
     /** rawPinyin：拼音照打的字母送出（拼音打到一半按換行鍵，像三星鍵盤） */
@@ -1141,12 +1142,19 @@ class StarKeyboardService : InputMethodService(), SpellCheckerSession.SpellCheck
     }
 
     private fun showAssociations(text: String) {
-        suggestions = if (settings.associations && editorText == null && (mode == InputMode.ZHUYIN || mode == InputMode.HANDWRITING)) {
+        val words = if (settings.associations && editorText == null && (mode == InputMode.ZHUYIN || mode == InputMode.HANDWRITING)) {
             engine?.associations(text) ?: emptyList()
         } else if (settings.associations && editorText == null && mode == InputMode.PINYIN) {
             // 拼音：用繁體原文查，結果再轉簡體
             (pinyinEngine?.engine?.associations(text) ?: emptyList()).map { simplify(it) }.distinct()
         } else emptyList()
+        // 中文模式：選字那排最前面放標點（和 iPhone 一樣），看起來是問句就把「？」排第一個
+        suggestions = if (editorText == null && (mode == InputMode.ZHUYIN || mode == InputMode.HANDWRITING || mode == InputMode.PINYIN)) {
+            val before = currentInputConnection?.getTextBeforeCursor(40, 0)?.toString() ?: ""
+            val marks = PunctuationSuggestions.after(if (before.endsWith(text)) before else before + text)
+            // 先露出兩個聯想詞，再放其餘標點，避免標點擋住所有詞
+            marks.take(1) + words.take(2) + marks.drop(1) + words.drop(2)
+        } else words
         suggestionSource = SuggestionSource.ASSOCIATION
         refreshTopBar()
     }

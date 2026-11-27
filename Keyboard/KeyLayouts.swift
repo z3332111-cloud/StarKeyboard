@@ -179,6 +179,10 @@ enum KeyLayouts {
         if !c.needsGlobe {
             row.append(KeySpec(face: .symbol("face.smiling"), action: .panel(.emoji), width: 1.1 * k, kind: .special))
         }
+        if c.layer == .letters && c.mode == .zhuyin {
+            // 注音：空白鍵旁邊放逗號鍵，點一下「，」，按住滑過去選「。？！、…」（和十欄排法一樣）
+            row.append(KeySpec(face: .text("，"), action: .text("，"), width: 1.0 * k, fontSize: 20, hint: "。", popup: KeySpec.punctuationPopup))
+        }
         row.append(KeySpec(face: .text(c.spaceTitle), action: .space, width: 0, fontSize: 15))
         row.append(KeySpec(face: .symbol("return"), action: .returnKey, width: 2.0 * k, kind: .accent, fontSize: 16))
         return row
