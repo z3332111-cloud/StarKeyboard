@@ -90,17 +90,17 @@ class SQLitePhraseSource private constructor(private val db: SQLiteDatabase, pri
         abbrs = abbrMap
         syllableList = plains.toList()
         byChar = chars
-        val loaded = HashMap<String, Int>()
+        // 前後文的字串次數有 90 萬筆，不讀進記憶體，要用時才查（ContextModel 自己會暫存最近查過的）
+        var total = 0.0
+        var kinds = 0.0
         runCatching {
-            db.rawQuery("SELECT gram, n FROM ngrams", null).use { c ->
-                while (c.moveToNext()) {
-                    val gram = c.getString(0) ?: continue
-                    val n = c.getInt(1)
-                    if (gram.length >= 2 && n > 0) loaded[gram] = n
-                }
+            db.rawQuery("SELECT gram, n FROM ngrams WHERE gram IN ('#N', '#V')", null).use { c ->
+                while (c.moveToNext()) if (c.getString(0) == "#N") total = c.getDouble(1) else kinds = c.getDouble(1)
             }
         }
-        context = if (loaded.isEmpty()) ContextModel.fromPhrases(phraseSet) else ContextModel(loaded)
+        context = ContextModel({ gram ->
+            db.rawQuery("SELECT n FROM ngrams WHERE gram = ?", arrayOf(gram)).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+        }, total, kinds)
         ready = true
     }
 

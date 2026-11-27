@@ -408,60 +408,82 @@ final class ZhuyinEngine {
         }
     }
 
+    /// 前後文的分量：0.6 倍的對數機率差，單一接法最多加減 2.5（用 everyday 測試句調出來的）
+    static let contextWeight = 0.6
+    static let contextClip = 2.5
+    /// 每個位置留幾種「最後兩個字」的走法：後面的字可以回頭改前面的選擇（例如「再看一次」的「再」）
+    static let beamWidth = 6
+
     /// 斷詞，附上每一段用掉的起始音節。呼叫端要已持有 queryLock。
+    /// contextual：每個位置照「最後兩個字」留幾條走法，候選詞看接在前文後面像不像真的句子（PhraseIndex.contextBonus）；
+    /// 關掉就是只看詞頻、每個位置只留最好的一條（測試用的對照）。錯字修正少的永遠優先。
     private func segmentation(of readings: [String], contextual: Bool) -> [(start: Int, text: String, score: Double)] {
         let n = readings.count
         guard n > 0 else { return [] }
-        var best = [Double](repeating: -.infinity, count: n + 1)
-        var errors = [Int](repeating: Int.max, count: n + 1)
-        var back = [(start: Int, text: String, score: Double)](repeating: (0, "", 0), count: n + 1)
-        var tail = [String](repeating: "", count: n + 1)
-        best[0] = 0
-        errors[0] = 0
+        struct State {
+            var score: Double
+            var errors: Int
+            var start: Int
+            var fromTail: String
+            var text: String
+            var partScore: Double
+        }
+        func better(_ e: Int, _ s: Double, than old: State?) -> Bool {
+            guard let old else { return true }
+            return e < old.errors || (e == old.errors && s > old.score)
+        }
+        var states = [[String: State]](repeating: [:], count: n + 1)
+        states[0][""] = State(score: 0, errors: 0, start: 0, fromTail: "", text: "", partScore: 0)
         for i in 1...n {
+            var next: [String: State] = [:]
             for k in 1...min(Self.maxPhraseLength, i) {
                 let start = i - k
-                guard best[start] > -.infinity else { continue }
+                guard !states[start].isEmpty else { continue }
                 let pool = fuzzyPhrases(readings[start..<i]).filter { !PhoneticText.containsPhonetic($0.text) }
                 if let floor = pool.first?.corrections {
                     let options = contextual
                         ? Array(pool.prefix(6).filter { $0.corrections == floor })
                         : Array(pool.prefix(1))
-                    // 詞頻最高的那個維持原分。前後文只幫忙分很接近的同音詞，避免把本來對的句子改錯。
-                    let leaderBonus = contextual && !options.isEmpty
-                        ? index.contextBonus(tail: tail[start], phrase: options[0].text) : 0
-                    for opt in options {
-                        let raw = contextual ? index.contextBonus(tail: tail[start], phrase: opt.text) : 0
-                        let extra = min(0.55, max(0, raw - leaderBonus))
-                        let s = best[start] + opt.score + extra
-                        let count = errors[start] + opt.corrections
-                        if count < errors[i] || (count == errors[i] && s > best[i]) {
-                            errors[i] = count
-                            best[i] = s
-                            back[i] = (start, opt.text, opt.score + extra)
-                            tail[i] = String((tail[start] + opt.text).suffix(2))
+                    for (tail, prev) in states[start] {
+                        for opt in options {
+                            let extra = contextual
+                                ? Self.contextWeight * min(Self.contextClip, max(-Self.contextClip, index.contextBonus(tail: tail, phrase: opt.text)))
+                                : 0
+                            let s = prev.score + opt.score + extra
+                            let e = prev.errors + opt.corrections
+                            let key = contextual ? String((tail + opt.text).suffix(2)) : ""
+                            if better(e, s, than: next[key]) {
+                                next[key] = State(score: s, errors: e, start: start, fromTail: tail, text: opt.text, partScore: opt.score + extra)
+                            }
                         }
                     }
                 } else if k == 1 {
-                    let s = best[start] + Self.unknownPenalty
-                    let count = errors[start] + 1
-                    if count < errors[i] || (count == errors[i] && s > best[i]) {
-                        errors[i] = count
-                        best[i] = s
+                    for (tail, prev) in states[start] {
+                        let s = prev.score + Self.unknownPenalty
+                        let e = prev.errors + 1
                         // 查不到就留空，不要把注音或聲調送進文章。
-                        back[i] = (start, "", Self.unknownPenalty)
-                        tail[i] = tail[start]
+                        if better(e, s, than: next[tail]) {
+                            next[tail] = State(score: s, errors: e, start: start, fromTail: tail, text: "", partScore: Self.unknownPenalty)
+                        }
                     }
                 }
             }
+            if next.count > Self.beamWidth {
+                let kept = next.sorted { $0.value.errors != $1.value.errors ? $0.value.errors < $1.value.errors : $0.value.score > $1.value.score }
+                    .prefix(Self.beamWidth)
+                next = Dictionary(uniqueKeysWithValues: kept.map { ($0.key, $0.value) })
+            }
+            states[i] = next
         }
+        guard var key = states[n].min(by: { $0.value.errors != $1.value.errors ? $0.value.errors < $1.value.errors : $0.value.score > $1.value.score })?.key
+        else { return [] }
         var parts: [(start: Int, text: String, score: Double)] = []
         var i = n
-        while i > 0 {
-            let b = back[i]
-            parts.append((b.start, b.text, b.score))
-            if b.start >= i { break }
-            i = b.start
+        while i > 0, let st = states[i][key] {
+            parts.append((st.start, st.text, st.partScore))
+            if st.start >= i { break }
+            i = st.start
+            key = st.fromTail
         }
         return parts.reversed()
     }

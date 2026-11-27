@@ -27,46 +27,45 @@ interface PhraseSource {
     fun contextModel(): ContextModel = ContextModel.EMPTY
 }
 
-/** 字組出現次數。注音送出時用來在同音詞裡挑比較像前後文的那個。 */
-class ContextModel(private val ngrams: Map<String, Int>) {
+/**
+ * 候選詞接在前面兩個字後面，像不像真的句子：用開放語料算的字串次數（tools/train_lm.py，存在字典的 ngrams 表）。
+ * count 是查某個字串出現幾次（查 SQLite），n、v 是語料的總字數和不同的字有幾個。
+ * 和 iPhone 版 Core/Sources/KeyboardCore/PhraseIndex.swift 的 contextBonus 同一個算法。
+ */
+class ContextModel(private val count: (String) -> Int, private val n: Double, private val v: Double) {
+    private val cache = HashMap<String, Int>()
+    private val enabled = n > 0 && v > 0
+
+    private fun c(gram: String): Int = synchronized(cache) {
+        cache[gram]?.let { return it }
+        if (cache.size > 12000) cache.clear()
+        val found = runCatching { count(gram) }.getOrDefault(0)
+        cache[gram] = found
+        found
+    }
+
+    private fun unigram(x: String) = (c(x) + 0.5) / (n + 0.5 * v)
+    private fun bigram(x: String, b: String) = (c(b + x) + 3 * unigram(x)) / (c(b) + 3.0)
+    private fun trigram(x: String, a: String, b: String) =
+        if (a.isEmpty()) bigram(x, b) else (c(a + b + x) + 3 * bigram(x, b)) / (c(a + b) + 3.0)
+
+    /** 正的是加分、負的是扣分（以 10 為底的對數機率差） */
     fun bonus(tail: String, phrase: String): Double {
-        if (phrase.isEmpty() || ngrams.isEmpty()) return 0.0
-        var best = 0.0
-        if (tail.isNotEmpty()) {
-            val ts = tail.takeLast(2)
-            val ps = phrase.take(3)
-            for (a in 1..ts.length) {
-                for (b in 1..minOf(3, ps.length)) {
-                    val gram = ts.takeLast(a) + ps.take(b)
-                    val count = ngrams[gram] ?: continue
-                    if (count <= 0) continue
-                    val weight = if (gram.length >= 3) 0.62 else 0.28
-                    best = maxOf(best, weight * kotlin.math.log10(count + 1.0))
-                }
-            }
+        if (!enabled || tail.isEmpty() || phrase.isEmpty()) return 0.0
+        val t = tail.takeLast(2)
+        val a = if (t.length == 2) t.substring(0, 1) else ""
+        val b = t.takeLast(1)
+        val x = phrase.substring(0, 1)
+        var s = kotlin.math.log10(trigram(x, a, b)) - kotlin.math.log10(unigram(x))
+        if (phrase.length > 1) {
+            val y = phrase.substring(1, 2)
+            s += kotlin.math.log10(trigram(y, b, x)) - kotlin.math.log10(bigram(y, x))
         }
-        return minOf(best, 1.8)
+        return s
     }
 
     companion object {
-        val EMPTY = ContextModel(emptyMap())
-
-        fun fromPhrases(phrases: Collection<String>): ContextModel {
-            val map = HashMap<String, Int>()
-            for (phrase in phrases.toSet()) {
-                if (phrase.length < 2 || phrase.any { Bopomofo.kind(it) != null }) continue
-                if (phrase.length <= 4) map[phrase] = (map[phrase] ?: 0) + 1
-                for (i in 0 until phrase.length - 1) {
-                    val bi = phrase.substring(i, i + 2)
-                    map[bi] = (map[bi] ?: 0) + 1
-                    if (i + 2 < phrase.length) {
-                        val tri = phrase.substring(i, i + 3)
-                        map[tri] = (map[tri] ?: 0) + 1
-                    }
-                }
-            }
-            return ContextModel(map)
-        }
+        val EMPTY = ContextModel({ 0 }, 0.0, 0.0)
     }
 }
 
@@ -118,6 +117,11 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
     companion object {
         const val MAX_PHRASE = 6
         const val UNKNOWN_PENALTY = -30.0
+        /** 前後文的分量：0.6 倍的對數機率差，單一接法最多加減 2.5（用 everyday 測試句調出來的） */
+        const val CONTEXT_WEIGHT = 0.6
+        const val CONTEXT_CLIP = 2.5
+        /** 每個位置留幾種「最後兩個字」的走法 */
+        const val BEAM_WIDTH = 6
         const val USER_PHRASE_BASE = -6.0
         /** 學過的單字最多比同音字的第一名高多少（整句斷詞用） */
         const val LEARNED_SINGLE_LEAD = 0.3
@@ -314,62 +318,61 @@ class ZhuyinEngine(private val source: PhraseSource, val userModel: UserPhraseMo
         return out
     }
 
-    /** 整串注音分數最高的斷法。contextual 用前後文在同音詞裡挑。 */
+    private class BeamState(val score: Double, val errors: Int, val start: Int, val fromTail: String, val text: String, val partScore: Double)
+
+    private fun better(e: Int, s: Double, old: BeamState?) = old == null || e < old.errors || (e == old.errors && s > old.score)
+
+    /**
+     * 整串注音分數最高的斷法。contextual：每個位置照「最後兩個字」留幾條走法，候選詞看接在前文後面像不像真的句子，
+     * 後面的字可以回頭改前面的選擇（例如「再看一次」的「再」）。錯字修正少的永遠優先。和 iPhone 版一樣。
+     */
     fun bestSegments(readings: List<String>, contextual: Boolean = true): List<Scored> {
         val n = readings.size
         if (n == 0) return emptyList()
-        val best = DoubleArray(n + 1) { Double.NEGATIVE_INFINITY }
-        val errors = IntArray(n + 1) { Int.MAX_VALUE }
-        val backStart = IntArray(n + 1)
-        val backText = arrayOfNulls<String>(n + 1)
-        val backScore = DoubleArray(n + 1)
-        val tail = Array(n + 1) { "" }
         val context = if (contextual) source.contextModel() else ContextModel.EMPTY
-        best[0] = 0.0
-        errors[0] = 0
+        val states = Array(n + 1) { HashMap<String, BeamState>() }
+        states[0][""] = BeamState(0.0, 0, 0, "", "", 0.0)
         for (i in 1..n) {
+            val next = HashMap<String, BeamState>()
             for (k in 1..minOf(MAX_PHRASE, i)) {
                 val start = i - k
-                if (best[start] == Double.NEGATIVE_INFINITY) continue
+                if (states[start].isEmpty()) continue
                 val pool = fuzzyPhrases(readings.subList(start, i)).filter { commit(it.text) == it.text && it.text.isNotEmpty() }
                 if (pool.isNotEmpty()) {
                     // 整句先求猜錯字最少，再比分數：每個音都打對時不會被猜按錯鍵的詞換掉
                     val floor = pool[0].corrections
                     val options = if (contextual) pool.take(6).filter { it.corrections == floor } else pool.take(1)
-                    val leaderBonus = if (contextual) context.bonus(tail[start], options[0].text) else 0.0
-                    for (opt in options) {
-                        val raw = if (contextual) context.bonus(tail[start], opt.text) else 0.0
-                        val extra = minOf(0.55, maxOf(0.0, raw - leaderBonus))
-                        val s = best[start] + opt.score + extra
-                        val count = errors[start] + opt.corrections
-                        if (count < errors[i] || (count == errors[i] && s > best[i])) {
-                            errors[i] = count
-                            best[i] = s
-                            backStart[i] = start
-                            backText[i] = opt.text
-                            backScore[i] = opt.score + extra
-                            tail[i] = (tail[start] + opt.text).takeLast(2)
+                    for ((tail, prev) in states[start]) {
+                        for (opt in options) {
+                            val extra = if (contextual) CONTEXT_WEIGHT * context.bonus(tail, opt.text).coerceIn(-CONTEXT_CLIP, CONTEXT_CLIP) else 0.0
+                            val s = prev.score + opt.score + extra
+                            val e = prev.errors + opt.corrections
+                            val key = if (contextual) (tail + opt.text).takeLast(2) else ""
+                            if (better(e, s, next[key])) next[key] = BeamState(s, e, start, tail, opt.text, opt.score + extra)
                         }
                     }
                 } else if (k == 1) {
-                    val s = best[start] + UNKNOWN_PENALTY
-                    val count = errors[start] + 1
-                    if (count < errors[i] || (count == errors[i] && s > best[i])) {
-                        errors[i] = count
-                        best[i] = s
-                        backStart[i] = start
-                        backText[i] = ""
-                        backScore[i] = UNKNOWN_PENALTY
-                        tail[i] = tail[start]
+                    for ((tail, prev) in states[start]) {
+                        val s = prev.score + UNKNOWN_PENALTY
+                        val e = prev.errors + 1
+                        if (better(e, s, next[tail])) next[tail] = BeamState(s, e, start, tail, "", UNKNOWN_PENALTY)
                     }
                 }
             }
+            val order = compareBy<BeamState>({ it.errors }, { -it.score })
+            states[i] = if (next.size > BEAM_WIDTH) {
+                HashMap(next.entries.sortedWith(compareBy(order) { it.value }).take(BEAM_WIDTH).associate { it.key to it.value })
+            } else next
         }
+        var key = states[n].entries.minWithOrNull(compareBy({ it.value.errors }, { -it.value.score }))?.key ?: return emptyList()
         val segments = ArrayList<Scored>()
         var i = n
         while (i > 0) {
-            segments.add(Scored(backText[i] ?: "", backScore[i]))
-            i = backStart[i]
+            val st = states[i][key] ?: break
+            segments.add(Scored(st.text, st.partScore))
+            if (st.start >= i) break
+            i = st.start
+            key = st.fromTail
         }
         return segments.reversed()
     }

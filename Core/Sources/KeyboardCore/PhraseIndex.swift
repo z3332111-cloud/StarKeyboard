@@ -33,6 +33,8 @@ final class PhraseIndex {
     private var lookupCache: [String: [Int]] = [:]
     private var ngramCache: [String: Int] = [:]
     private let hasNgrams: Bool
+    /// 語料的總字數、不同的字有幾個（算單字機率用；打包時存在 ngrams 表的 #N、#V）
+    private let totals: (n: Double, v: Double)
 
     /// 單音節（沒聲調）的所有開頭，組字時用來判斷注音能不能接在一起（只有一千多筆，留在記憶體）
     let prefixes: Set<String>
@@ -42,10 +44,11 @@ final class PhraseIndex {
     // 暫存上限：超過就整個清掉重來，記憶體不會一直長
     private static let maxRows = 6000
     private static let maxLookups = 800
-    private static let maxNgrams = 4000
+    private static let maxNgrams = 12000
 
-    private init(db: SQLiteDB, prefixes: Set<String>, syllables: Set<String>, hasNgrams: Bool) {
+    private init(db: SQLiteDB, prefixes: Set<String>, syllables: Set<String>, hasNgrams: Bool, totals: (n: Double, v: Double)) {
         self.db = db
+        self.totals = totals
         self.prefixes = prefixes
         self.syllables = syllables
         self.hasNgrams = hasNgrams
@@ -63,9 +66,13 @@ final class PhraseIndex {
                 prefixes.insert(prefix)
             }
         }
-        var hasNgrams = false
-        db.run("SELECT 1 FROM ngrams LIMIT 1") { _ in hasNgrams = true }
-        return PhraseIndex(db: db, prefixes: prefixes, syllables: syllables, hasNgrams: hasNgrams)
+        var n = 0.0, v = 0.0
+        db.run("SELECT gram, n FROM ngrams WHERE gram IN ('#N', '#V')") { stmt in
+            if SQLiteDB.text(stmt, 0) == "#N" { n = SQLiteDB.double(stmt, 1) } else { v = SQLiteDB.double(stmt, 1) }
+        }
+        // 舊字典沒有總數：不用前後文（避免亂加分）
+        let hasNgrams = n > 0 && v > 0
+        return PhraseIndex(db: db, prefixes: prefixes, syllables: syllables, hasNgrams: hasNgrams, totals: (max(n, 1), max(v, 1)))
     }
 
     // MARK: 對外的查法（和以前的記憶體版本一樣）
@@ -119,25 +126,36 @@ final class PhraseIndex {
         }
     }
 
-    /// 候選詞接在已經決定的字後面時，語料裡看過的接法加分。上限避免蓋過差很多的詞頻。
-    /// 前後文用的字組出現次數來自字典詞與 Tatoeba 中文句子（CC BY 2.0）。
+    /// 候選詞接在前面兩個字後面，像不像真的句子：用開放語料算的字串次數（tools/train_lm.py），
+    /// 比較「接在前文後面」和「單獨出現」的機率，正的是加分、負的是扣分（以 10 為底的對數）。
+    /// 看候選詞的前兩個字：第一個字接在前文後面、第二個字接在「前文最後一個字＋第一個字」後面。
     func contextBonus(tail: String, phrase: String) -> Double {
-        guard !phrase.isEmpty, hasNgrams else { return 0 }
-        var best = 0.0
-        if !tail.isEmpty {
-            let ts = Array(tail.suffix(2))
-            let ps = Array(phrase.prefix(3))
-            for a in 1...ts.count {
-                for b in 1...min(3, ps.count) {
-                    let gram = String(ts.suffix(a)) + String(ps.prefix(b))
-                    let count = ngramCount(gram)
-                    guard count > 0 else { continue }
-                    let weight = gram.count >= 3 ? 0.62 : 0.28
-                    best = max(best, weight * log10(Double(count) + 1))
-                }
-            }
+        guard hasNgrams, !tail.isEmpty, let first = phrase.first else { return 0 }
+        let t = Array(tail.suffix(2))
+        let a = t.count == 2 ? String(t[0]) : ""
+        let b = String(t[t.count - 1])
+        let x = String(first)
+        var s = log10(trigram(x, a, b)) - log10(unigram(x))
+        if phrase.count > 1 {
+            let y = String(phrase[phrase.index(after: phrase.startIndex)])
+            s += log10(trigram(y, b, x)) - log10(bigram(y, x))
         }
-        return min(best, 1.8)
+        return s
+    }
+
+    // 平滑過的機率：沒看過的接法退回比較短的（三字 → 兩字 → 單字）
+
+    private func unigram(_ x: String) -> Double {
+        (Double(ngramCount(x)) + 0.5) / (totals.n + 0.5 * totals.v)
+    }
+
+    private func bigram(_ x: String, _ b: String) -> Double {
+        (Double(ngramCount(b + x)) + 3 * unigram(x)) / (Double(ngramCount(b)) + 3)
+    }
+
+    private func trigram(_ x: String, _ a: String, _ b: String) -> Double {
+        guard !a.isEmpty else { return bigram(x, b) }
+        return (Double(ngramCount(a + b + x)) + 3 * bigram(x, b)) / (Double(ngramCount(a + b)) + 3)
     }
 
     /// 記憶體快不夠時：丟掉暫存

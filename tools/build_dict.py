@@ -156,7 +156,11 @@ def main(src, dst, opencc):
     t2s = load_opencc(opencc) if opencc else {}
     db.execute("CREATE TABLE t2s(trad TEXT PRIMARY KEY, simp TEXT NOT NULL) WITHOUT ROWID")
     db.executemany("INSERT INTO t2s VALUES (?, ?)", sorted(t2s.items()))
-    ngram_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "context_ngrams.txt")
+    # 選字看前後文用的字串次數（tools/train_lm.py 從開放語料算的）；沒有就用舊的 context_ngrams.txt
+    here = os.path.dirname(os.path.abspath(__file__))
+    ngram_path = os.path.join(here, "context_lm.txt")
+    if not os.path.exists(ngram_path):
+        ngram_path = os.path.join(here, "context_ngrams.txt")
     ngrams = []
     if os.path.exists(ngram_path):
         with open(ngram_path, encoding="utf-8") as f:
@@ -192,6 +196,11 @@ def main(src, dst, opencc):
         db.executemany("INSERT OR REPLACE INTO radicals VALUES (?, ?)", rows)
         print("部首 %d 字" % len(rows))
     db.execute("CREATE TABLE ngrams(gram TEXT PRIMARY KEY, n INTEGER NOT NULL) WITHOUT ROWID")
+    # 單字的總次數、不同的字有幾個：算機率時要用（#N、#V 不會跟真的字串撞到）
+    singles = [n for g, n in ngrams if len(g) == 1]
+    if singles:
+        ngrams.append(("#N", sum(singles)))
+        ngrams.append(("#V", len(singles)))
     db.executemany("INSERT INTO ngrams VALUES (?, ?)", ngrams)
     db.commit()
     db.execute("VACUUM")
