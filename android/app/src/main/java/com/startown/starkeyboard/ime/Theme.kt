@@ -547,9 +547,34 @@ object SoundPacks {
 }
 
 /** 按鍵和候選字用的字體（App 裡附的免費字體，SIL OFL 1.1） */
-enum class KeyFont(val id: String, val title: String) {
-    SYSTEM("system", "系統"), HUNINN("huninn", "粉圓"), IANSUI("iansui", "芫荽"), WENKAI("wenkai", "文楷"),
-    GENSEN("gensen", "源泉圓體"), NAIKAI("naikai", "內海"), CUBIC("cubic", "像素");
+enum class KeyFont(val id: String, val title: String, val style: String) {
+    SYSTEM("system", "系統", "手機內建"), HUNINN("huninn", "粉圓", "圓圓的粉圓"), IANSUI("iansui", "芫荽", "溫柔楷書"),
+    WENKAI("wenkai", "文楷", "文青楷書"), GENSEN("gensen", "源泉圓體", "清爽圓體"), NAIKAI("naikai", "內海", "可愛手寫"),
+    CUBIC("cubic", "像素", "像素點陣"),
+    // 額外字體（tools/extra_fonts.tsv，wumanzoo.com 整理的開源字體）
+    POP("pop", "大波浪圓體", "少女感圓圓字"),
+    KUREWA("kurewa", "苦累蛙圓體", "軟軟的手寫圓體"),
+    NANI("nani", "何某手寫", "可愛手寫"),
+    JASON1("jason1", "清松手寫1", "清松手寫體"),
+    JASON2("jason2", "清松手寫2", "清松手寫體"),
+    JASON3("jason3", "清松手寫3", "清松手寫體"),
+    JASON4("jason4", "清松手寫4", "清松手寫體"),
+    JASON5("jason5", "清松手寫5", "清松手寫體"),
+    JASON6("jason6", "清松手寫6", "清松手寫體"),
+    YOZAI("yozai", "悠哉", "輕鬆手寫"),
+    CHENYU("chenyu", "落雁體", "秀氣細手寫"),
+    PROPER("proper", "中規中矩", "工整手寫"),
+    THENKHUNG("thenkhung", "宇文天穹", "古典有氣質"),
+    DAOIST("daoist", "道源符體", "道教符咒花紋"),
+    SWEI("swei", "四季春加糖", "彎彎可愛宋體"),
+    MANTOU("mantou", "饅頭黑體", "粗粗標題字"),
+    MAOKEN("maoken", "什錦黑", "馬克筆手繪"),
+    TSUIPITA("tsuipita", "秋茄體", "活潑手寫"),
+    BITMAP("bitmap", "精品點陣", "像素點陣"),
+    MASA("masa", "正風毛筆", "行書毛筆"),
+    BAKUDAI("bakudai", "莫大毛筆", "毛筆字"),
+    GENWAN("genwan", "源雲明體", "復古印刷明體"),
+    GLITCH("glitch", "故障明朝", "故障恐怖風");
 
     /** 放在 App 裡的字體；其他的要用時才下載（FontPacks） */
     val bundled get() = this == SYSTEM || this == HUNINN

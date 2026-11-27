@@ -482,7 +482,10 @@ struct FontGalleryView: View {
             Card(selected: selected) {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(font.title).font(.system(.headline, design: .rounded)).foregroundColor(.primary)
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(font.title).font(.system(.headline, design: .rounded)).foregroundColor(.primary)
+                            Text(font.style).font(.caption).foregroundColor(.secondary)
+                        }
                         Text("糯糯鍵盤 ㄅㄆㄇ Aa 123")
                             .font(ready ? Font(KeyFonts.font(font.rawValue, size: 24) as CTFont) : .system(size: 24))
                             .foregroundColor(ready ? .primary : .secondary)

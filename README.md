@@ -61,6 +61,7 @@ project.yml  XcodeGen 專案設定（雲端打包時產生 Xcode 專案）
 - 注音字典：小麥注音 McBopomofo，MIT 授權，打包時下載並附上授權文件。程式沒有另外內嵌一份字典；`tools/build_dict.py` 在打包時把 McBopomofo 的 `data.txt` 轉成 `zhuyin.sqlite`。鍵盤打開時整表建成記憶體索引，按鍵本身不再查資料庫。
 - 表情符號是系統字型顯示；顏文字是常見的文字組合。
 - 字體（打包時下載、只留常用字）：jf open 粉圓（justfont）、芫荽 Iansui（But Ko）、霞鶩文楷 TC（LXGW）、源泉圓體 TW（ButTaiwan）、內海字體（max32002）、俐方體11號 Cubic 11（ACh-K），都是 SIL Open Font License 1.1。
+- 額外字體（`tools/extra_fonts.tsv`，`.github/workflows/font-pack.yml` 下載、只留常用字，放在 font-pack 發佈，鍵盤要用才下載）：大波浪圓體、苦累蛙圓體、何某手寫體、獅尾四季春加糖、正風毛筆、莫大毛筆（max32002）、清松手寫體 1～6（Jason Sung）、悠哉字體（LXGW）、辰宇落雁體（Chenyu）、中規中矩體（peihe07）、宇文天穹（MoonlitOwen）、道源符體（Losketch）、饅頭黑體（mant0u0）、貓啃什錦黑 TC（Skr-ZERO）、曉聲通秋茄體（jeffreyxuan）、精品點陣體 9×9（scott0107000）、源雲明體（ButTaiwan）、瀞ノグリッチ明朝（amazusa），都是 SIL Open Font License 1.1；字體檔裡保留原作者的著作權與授權資訊。
 - 繁簡對照：OpenCC，Apache 2.0。
 - 按鍵音：叮叮、泡泡、木琴、叮鈴、啵啵是 tools/make_sounds.js 用程式合成，原創。
 - 機械鍵盤軸的錄音：[kbsim](https://github.com/tplai/kbsim)（Copyright (c) Thomas Lai，MIT 授權），用 tools/import_switch_sounds.py 轉檔、去雜音，放在 SoundPack/，發佈在 nuonuo-keyboard 的 sound-pack（鍵盤要用才下載）；授權全文附在 Keyboard/Resources/Sounds/kbsim-LICENSE.txt 和 Android 的 res/raw/kbsim_license.txt。

@@ -10,6 +10,7 @@
 - gensen：源泉圓體 TW（ButTaiwan）
 - naikai：內海字體 Lite（max32002）
 - cubic：俐方體11號（ACh-K，像素風）
+- 額外字體：tools/extra_fonts.tsv（.github/workflows/font-pack.yml 用同一支程式縮小）
 
 完整的中文字體每個 4～14 MB。鍵盤只用來顯示按鍵和候選字，所以只留字典裡最常用的字，
 少見的字手機會自動用內建字體補上。
@@ -23,13 +24,18 @@ from fontTools import subset
 KEEP_CHARS = 8000
 
 
-def charset(dict_path):
+# 縮完還超過這個大小（筆畫很多的手寫字）就只留更常用的字：iPhone 鍵盤只有 60MB 左右的記憶體可以用
+MAX_BYTES = 8_000_000
+SMALL_KEEP_CHARS = 5000
+
+
+def charset(dict_path, keep=KEEP_CHARS):
     db = sqlite3.connect(dict_path)
     best = {}
     for phrase, score in db.execute("SELECT phrase, score FROM phrases WHERE length(phrase) = 1"):
         if phrase not in best or best[phrase] < score:
             best[phrase] = score
-    common = sorted(best, key=lambda c: -best[c])[:KEEP_CHARS]
+    common = sorted(best, key=lambda c: -best[c])[:keep]
     chars = set(common)
     ranges = [
         (0x20, 0x7E),        # 英文、數字、符號
@@ -53,6 +59,7 @@ def charset(dict_path):
 def main(dict_path, out_dir, fonts):
     os.makedirs(out_dir, exist_ok=True)
     text = charset(dict_path)
+    small_text = charset(dict_path, SMALL_KEEP_CHARS)
     for item in fonts:
         name, path = item.split("=", 1)
         if not path or not os.path.exists(path):
@@ -65,11 +72,14 @@ def main(dict_path, out_dir, fonts):
         options.name_languages = ["*"]
         options.notdef_outline = True
         options.glyph_names = False
-        font = subset.load_font(path, options)
-        sub = subset.Subsetter(options)
-        sub.populate(text=text)
-        sub.subset(font)
-        subset.save_font(font, out, options)
+        for chars in (text, small_text):
+            font = subset.load_font(path, options)
+            sub = subset.Subsetter(options)
+            sub.populate(text=chars)
+            sub.subset(font)
+            subset.save_font(font, out, options)
+            if os.path.getsize(out) <= MAX_BYTES:
+                break
         print("%s：%.1f MB → %.1f MB" % (name, os.path.getsize(path) / 1e6, os.path.getsize(out) / 1e6))
 
 

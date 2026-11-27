@@ -1,0 +1,26 @@
+# 要用再下載的額外字體（全部 SIL OFL 1.1，來源：wumanzoo.com 字型整理裡繁中不缺字的開源字體）
+# id<TAB>名稱<TAB>來源：raw 網址，或 gh:作者/倉庫<TAB>Release 檔名樣式
+# 鍵盤的選單在 Keyboard/Theme.swift 的 KeyFont 和 android/.../ime/Theme.kt 的 KeyFont，新增時三個地方一起改
+pop	大波浪圓體	https://raw.githubusercontent.com/max32002/pop-gothic/master/CJK%20TC/PopGothicCjkTc-Regular.ttf	
+kurewa	苦累蛙圓體	https://raw.githubusercontent.com/max32002/kurewa-gothic/master/CJK%20TC/KurewaGothicCjkTc-Regular.ttf	
+nani	何某手寫	https://raw.githubusercontent.com/max32002/nanifont/master/ttf/NaniFont-Regular.ttf	
+jason1	清松手寫1	https://raw.githubusercontent.com/jasonhandwriting/JasonHandwriting/master/JasonHandwriting1.ttf	
+jason2	清松手寫2	https://raw.githubusercontent.com/jasonhandwriting/JasonHandwriting/master/JasonHandwriting2.ttf	
+jason3	清松手寫3	https://raw.githubusercontent.com/jasonhandwriting/JasonHandwriting/master/JasonHandwriting3.ttf	
+jason4	清松手寫4	https://raw.githubusercontent.com/jasonhandwriting/JasonHandwriting/master/JasonHandwriting4.ttf	
+jason5	清松手寫5	https://raw.githubusercontent.com/jasonhandwriting/JasonHandwriting/master/JasonHandwriting5.ttf	
+jason6	清松手寫6	https://raw.githubusercontent.com/jasonhandwriting/JasonHandwriting/master/JasonHandwriting6.ttf	
+yozai	悠哉	gh:lxgw/yozai-font	*Regular*.ttf
+chenyu	落雁體	https://raw.githubusercontent.com/Chenyu-otf/chenyuluoyan_thin/main/ChenYuluoyan-2.0-Thin.ttf	
+proper	中規中矩	https://raw.githubusercontent.com/peihe07/ProperScript/main/ProperScript-Regular.ttf	
+thenkhung	宇文天穹	https://raw.githubusercontent.com/MoonlitOwen/ThenKhung/main/fonts/ttf/UoqMunThenKhung-Regular.ttf	
+daoist	道源符體	gh:Losketch/daoist-sigi-source	*
+swei	四季春加糖	https://raw.githubusercontent.com/max32002/swei-spring/main/CJK%20TC/SweiSpringSugarCJKtc-Regular.ttf	
+mantou	饅頭黑體	https://raw.githubusercontent.com/mant0u0/MantouSans/main/Font/MantouSans-Regular.ttf	
+maoken	什錦黑	https://raw.githubusercontent.com/Skr-ZERO/MaokenAssortedSans-TC/main/MaokenAssortedSans-TC.ttf	
+tsuipita	秋茄體	https://raw.githubusercontent.com/jeffreyxuan/toneoz-font-tsuipita/main/fonts/ttf/ToneOZ-Tsuipita-TC.ttf	
+bitmap	精品點陣	https://raw.githubusercontent.com/scott0107000/BoutiqueBitmap9x9/main/BoutiqueBitmap9x9_1.93.ttf	
+masa	正風毛筆	https://raw.githubusercontent.com/max32002/masafont/master/tw/MasaFont-Regular.ttf	
+bakudai	莫大毛筆	https://raw.githubusercontent.com/max32002/bakudaifont/master/tw/Bakudai-Regular.ttf	
+genwan	源雲明體	https://raw.githubusercontent.com/ButTaiwan/genwan-font/master/otf/TW/GenWanMin2TW-R.otf	
+glitch	故障明朝	https://raw.githubusercontent.com/amazusa/ToronoGlitch/master/%E7%80%9E%E3%83%8E%E3%82%B0%E3%83%AA%E3%83%83%E3%83%81%E6%98%8E%E6%9C%9D/%E7%80%9E%E3%83%8E%E3%82%B0%E3%83%AA%E3%83%83%E3%83%81%E6%98%8E%E6%9C%9DH1.otf	

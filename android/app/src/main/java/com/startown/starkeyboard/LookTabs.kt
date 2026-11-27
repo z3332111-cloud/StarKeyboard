@@ -264,7 +264,7 @@ class LookTabs(private val activity: Activity, private val col: LinearLayout, pr
             val ready = font == KeyFont.SYSTEM || FontPacks.isReady(activity, id)
             val selected = ks.fontId == id
             val c = card(selected)
-            header(c, name, if (font == null) "我匯入的字體" else "", when {
+            header(c, name, font?.style ?: "我匯入的字體", when {
                 id in downloading -> "下載中…"
                 selected -> "✓ 使用中"
                 !ready -> "⬇ 下載"

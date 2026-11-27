@@ -1,0 +1,88 @@
+name: 更新額外字體包
+
+# 額外的「要用再下載」字體（tools/extra_fonts.tsv，全部 SIL OFL 1.1）：下載、縮成常用字，放到 font-pack 發佈。
+# 跟 iOS 打包分開，平常打包不用每次重做這二十幾款字體。改了字體清單會自動跑，也可以手動執行。
+on:
+  push:
+    branches: [main]
+    paths:
+      - tools/extra_fonts.tsv
+      - tools/build_fonts.py
+      - .github/workflows/font-pack.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: font-pack
+  cancel-in-progress: true
+
+jobs:
+  fonts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 準備字典（決定要留哪些常用字）
+        run: |
+          git clone --depth 1 https://github.com/openvanilla/McBopomofo.git "$RUNNER_TEMP/McBopomofo"
+          make -C "$RUNNER_TEMP/McBopomofo/Source/Data" data.txt
+          for f in TSCharacters TSPhrases; do curl -sSfL -o "$RUNNER_TEMP/$f.txt" "https://raw.githubusercontent.com/BYVoid/OpenCC/master/data/dictionary/$f.txt"; done
+          python3 tools/build_dict.py "$RUNNER_TEMP/McBopomofo/Source/Data/data.txt" "$RUNNER_TEMP/zhuyin.sqlite" "$RUNNER_TEMP/TSCharacters.txt" "$RUNNER_TEMP/TSPhrases.txt"
+
+      - name: 下載字體並縮小
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q fonttools
+          mkdir -p "$RUNNER_TEMP/src" ExtraFontPack
+          args=()
+          while IFS=$'\t' read -r id title src pattern; do
+            case "$id" in \#*|"") continue;; esac
+            out="$RUNNER_TEMP/src/$id"
+            if [[ "$src" == gh:* ]]; then
+              # 只放在 Release 的字體：抓最新版裡第一個符合的字體檔
+              mkdir -p "$out.d"
+              gh release download -R "${src#gh:}" --pattern "$pattern" -D "$out.d" --clobber || { echo "::warning::$title 下載失敗，先跳過"; continue; }
+              for z in "$out.d"/*.zip; do [ -f "$z" ] && unzip -q -o "$z" -d "$out.d"; done
+              file=$(find "$out.d" \( -iname "*.ttf" -o -iname "*.otf" \) | grep -viE "mono|bold|light|thin|medium|heavy" | head -1)
+              [ -n "$file" ] || file=$(find "$out.d" \( -iname "*.ttf" -o -iname "*.otf" \) | head -1)
+              [ -n "$file" ] || { echo "::warning::$title 找不到字體檔，先跳過"; continue; }
+              cp "$file" "$out"
+            else
+              python3 tools/download_font.py "$out.ttf" "$src" || { echo "::warning::$title 下載失敗，先跳過"; continue; }
+              mv "$out.ttf" "$out"
+            fi
+            echo "$id（$title）：$(du -h "$out" | cut -f1)"
+            args+=("$id=$out")
+          done < tools/extra_fonts.tsv
+          "$RUNNER_TEMP/venv/bin/python" tools/build_fonts.py "$RUNNER_TEMP/zhuyin.sqlite" ExtraFontPack "${args[@]}"
+          ls -la ExtraFontPack
+          n=$(ls ExtraFontPack/*.ttf | wc -l)
+          echo "做好 $n 款"
+          [ "$n" -gt 0 ]
+
+      - name: 放到 font-pack 發佈
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view font-pack >/dev/null 2>&1 || gh release create font-pack --title "糯糯鍵盤 字體包" --notes "鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。" --prerelease --latest=false
+          gh release upload font-pack ExtraFontPack/*.ttf --clobber
+
+      # 鍵盤從公開的 nuonuo-keyboard 下載字體
+      - name: 也放到公開的 nuonuo-keyboard
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: z3332111-cloud/nuonuo-keyboard
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          target_commitish: main
+          tag_name: font-pack
+          name: 糯糯鍵盤 字體包
+          body: 鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。
+          files: ExtraFontPack/*.ttf
+          prerelease: true
+          make_latest: "false"
+          overwrite_files: true

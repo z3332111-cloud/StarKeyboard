@@ -813,6 +813,8 @@ enum SoundPacks {
 /// 按鍵和候選字用的字體（App 裡附的免費字體，SIL OFL 1.1）
 enum KeyFont: String, CaseIterable {
     case system, huninn, iansui, wenkai, gensen, naikai, cubic
+    // 額外字體（tools/extra_fonts.tsv，wumanzoo.com 整理的開源字體）
+    case pop, kurewa, nani, jason1, jason2, jason3, jason4, jason5, jason6, yozai, chenyu, proper, thenkhung, daoist, swei, mantou, maoken, tsuipita, bitmap, masa, bakudai, genwan, glitch
 
     var title: String {
         switch self {
@@ -823,6 +825,65 @@ enum KeyFont: String, CaseIterable {
         case .gensen: return "源泉圓體"
         case .naikai: return "內海"
         case .cubic: return "像素"
+        case .pop: return "大波浪圓體"
+        case .kurewa: return "苦累蛙圓體"
+        case .nani: return "何某手寫"
+        case .jason1: return "清松手寫1"
+        case .jason2: return "清松手寫2"
+        case .jason3: return "清松手寫3"
+        case .jason4: return "清松手寫4"
+        case .jason5: return "清松手寫5"
+        case .jason6: return "清松手寫6"
+        case .yozai: return "悠哉"
+        case .chenyu: return "落雁體"
+        case .proper: return "中規中矩"
+        case .thenkhung: return "宇文天穹"
+        case .daoist: return "道源符體"
+        case .swei: return "四季春加糖"
+        case .mantou: return "饅頭黑體"
+        case .maoken: return "什錦黑"
+        case .tsuipita: return "秋茄體"
+        case .bitmap: return "精品點陣"
+        case .masa: return "正風毛筆"
+        case .bakudai: return "莫大毛筆"
+        case .genwan: return "源雲明體"
+        case .glitch: return "故障明朝"
+        }
+    }
+
+    /// 風格（字體分頁的小字說明）
+    var style: String {
+        switch self {
+        case .system: return "手機內建"
+        case .huninn: return "圓圓的粉圓"
+        case .iansui: return "溫柔楷書"
+        case .wenkai: return "文青楷書"
+        case .gensen: return "清爽圓體"
+        case .naikai: return "可愛手寫"
+        case .cubic: return "像素點陣"
+        case .pop: return "少女感圓圓字"
+        case .kurewa: return "軟軟的手寫圓體"
+        case .nani: return "可愛手寫"
+        case .jason1: return "清松手寫體"
+        case .jason2: return "清松手寫體"
+        case .jason3: return "清松手寫體"
+        case .jason4: return "清松手寫體"
+        case .jason5: return "清松手寫體"
+        case .jason6: return "清松手寫體"
+        case .yozai: return "輕鬆手寫"
+        case .chenyu: return "秀氣細手寫"
+        case .proper: return "工整手寫"
+        case .thenkhung: return "古典有氣質"
+        case .daoist: return "道教符咒花紋"
+        case .swei: return "彎彎可愛宋體"
+        case .mantou: return "粗粗標題字"
+        case .maoken: return "馬克筆手繪"
+        case .tsuipita: return "活潑手寫"
+        case .bitmap: return "像素點陣"
+        case .masa: return "行書毛筆"
+        case .bakudai: return "毛筆字"
+        case .genwan: return "復古印刷明體"
+        case .glitch: return "故障恐怖風"
         }
     }
 
