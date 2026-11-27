@@ -1,0 +1,58 @@
+name: 訓練選字用的字串統計
+
+# 手動執行：下載開放授權的中文句子，算「哪些字常接在一起」，結果存回同一個分支的 tools/context_lm.txt。
+on:
+  workflow_dispatch:
+    inputs:
+      wiki_mb:
+        description: "維基百科要下載前面幾 MB（壓縮後）"
+        default: "80"
+
+permissions:
+  contents: write
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安裝 OpenCC（簡體轉台灣繁體）
+        run: pip install opencc
+      - name: 下載 Common Voice 台灣華語句子（CC0）
+        run: |
+          git clone -q --depth 1 --filter=blob:none --sparse https://github.com/common-voice/common-voice.git "$RUNNER_TEMP/cv"
+          git -C "$RUNNER_TEMP/cv" sparse-checkout set server/data/zh-TW
+          cat "$RUNNER_TEMP"/cv/server/data/zh-TW/*.txt > "$RUNNER_TEMP/cv.txt"
+          wc -l "$RUNNER_TEMP/cv.txt"
+      - name: 下載 Tatoeba 中文句子（CC BY 2.0 FR）
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/cmn.tsv.bz2" https://downloads.tatoeba.org/exports/per_language/cmn/cmn_sentences.tsv.bz2
+          bunzip2 -c "$RUNNER_TEMP/cmn.tsv.bz2" | cut -f3 > "$RUNNER_TEMP/tatoeba.txt"
+          wc -l "$RUNNER_TEMP/tatoeba.txt"
+      - name: 下載維基百科中文版前面一段（CC BY-SA 4.0）
+        run: |
+          bytes=$(( ${{ github.event.inputs.wiki_mb || 80 }} * 1024 * 1024 ))
+          curl -sSfL -r 0-$((bytes - 1)) -o "$RUNNER_TEMP/zhwiki.xml.bz2" \
+            https://dumps.wikimedia.org/zhwiki/latest/zhwiki-latest-pages-articles-multistream.xml.bz2 || true
+          ls -la "$RUNNER_TEMP/zhwiki.xml.bz2"
+          python3 tools/wiki_text.py "$RUNNER_TEMP/zhwiki.xml.bz2" "$RUNNER_TEMP/wiki.txt"
+          wc -l "$RUNNER_TEMP/wiki.txt"
+      - name: 算字串出現次數
+        run: |
+          python3 tools/train_lm.py tools/context_lm.txt \
+            --exclude Core/Tests/KeyboardCoreTests/Fixtures/everyday.txt \
+            --weight 20 "$RUNNER_TEMP/cv.txt" "$RUNNER_TEMP/tatoeba.txt" \
+            --weight 1 "$RUNNER_TEMP/wiki.txt"
+          ls -la tools/context_lm.txt
+          head -30 tools/context_lm.txt
+      - name: 存回分支
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/context_lm.txt
+          git commit -m "更新選字用的字串統計（tools/context_lm.txt）" || exit 0
+          git push origin HEAD:${{ github.ref_name }}
