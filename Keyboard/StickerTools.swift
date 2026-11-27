@@ -140,4 +140,35 @@ enum StickerTools {
     static func pngForSending(url: URL, side: CGFloat) -> Data? {
         autoreleasepool { UIImage.downsampled(url: url, maxSide: side)?.pngData() }
     }
+
+    /// 貼出去用的 GIF（保留透明）。Discord 在 iPhone 會把貼上的 PNG 壓成 JPG、透明背景變白，GIF 會原樣上傳。
+    /// GIF 只能「全透明或不透明」：半透明的邊緣過半就留、不到一半就變透明。
+    static func gifForSending(url: URL, side: CGFloat) -> Data? {
+        autoreleasepool {
+            guard let cg = UIImage.downsampled(url: url, maxSide: side)?.cgImage else { return nil }
+            let w = cg.width, h = cg.height
+            guard w > 0, h > 0,
+                  let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+                  let raw = ctx.data else { return nil }
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+            let px = raw.bindMemory(to: UInt8.self, capacity: w * h * 4)
+            for i in 0..<(w * h) {
+                let a = Int(px[i * 4 + 3])
+                if a < 128 {
+                    px[i * 4] = 0; px[i * 4 + 1] = 0; px[i * 4 + 2] = 0; px[i * 4 + 3] = 0
+                } else if a < 255 {
+                    for c in 0..<3 { px[i * 4 + c] = UInt8(min(255, Int(px[i * 4 + c]) * 255 / a)) }
+                    px[i * 4 + 3] = 255
+                }
+            }
+            guard let flat = ctx.makeImage() else { return nil }
+            let out = NSMutableData()
+            guard let dest = CGImageDestinationCreateWithData(out as CFMutableData, "com.compuserve.gif" as CFString, 1, nil) else { return nil }
+            CGImageDestinationAddImage(dest, flat, nil)
+            guard CGImageDestinationFinalize(dest) else { return nil }
+            return out as Data
+        }
+    }
 }

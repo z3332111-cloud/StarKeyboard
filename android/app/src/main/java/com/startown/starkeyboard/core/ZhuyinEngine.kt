@@ -87,8 +87,6 @@ class MemoryPhraseSource(private val rows: List<Triple<String, String, Double>>)
             .groupBy { it.text }.map { (k, v) -> Scored(k, v.maxOf { it.score }) }
             .sortedByDescending { it.score }.take(limit).map { it.text }
 
-    private val context = ContextModel.fromPhrases(rows.map { it.second })
-    override fun contextModel() = context
 }
 
 /** 注音選字：整串用動態規劃找分數最高的斷詞，也會猜打錯的字 */

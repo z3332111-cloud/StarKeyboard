@@ -245,6 +245,14 @@ final class EmojiPanelView: UIView {
                 KeyboardSettings.shared.stickerSize = size.selectedSegmentIndex
             }, for: .valueChanged)
             addStack.insertArrangedSubview(size, at: addStack.arrangedSubviews.count - 1)
+            // Discord 會把貼上的 PNG 壓成白底，選 GIF 就能保留透明背景
+            let format = UISegmentedControl(items: ["PNG（一般）", "GIF（DC 透明背景）"])
+            format.selectedSegmentIndex = KeyboardSettings.shared.stickerGif ? 1 : 0
+            format.addAction(UIAction { [weak format] _ in
+                guard let format = format else { return }
+                KeyboardSettings.shared.stickerGif = format.selectedSegmentIndex == 1
+            }, for: .valueChanged)
+            addStack.insertArrangedSubview(format, at: addStack.arrangedSubviews.count - 1)
         }
         addMenu.addSubview(addStack)
         addSubview(addMenu)

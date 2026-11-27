@@ -2160,11 +2160,16 @@ final class KeyboardViewController: UIInputViewController {
         }
         // 照設定的大小重新縮一次（以前直接拿格子裡的小縮圖，貼出去會糊），用 PNG 保留透明背景
         let side = StickerTools.sizes[settings.stickerSize].side
-        guard let png = StickerTools.pngForSending(url: url, side: side) else {
-            toast("這張貼圖讀不出來")
-            return
+        // Discord 用：複製成 GIF（只放 GIF，App 才不會挑到 PNG 又壓成白底 JPG）；GIF 做不出來就照常用 PNG
+        if settings.stickerGif, let gif = StickerTools.gifForSending(url: url, side: side) {
+            UIPasteboard.general.setItems([["com.compuserve.gif": gif]])
+        } else {
+            guard let png = StickerTools.pngForSending(url: url, side: side) else {
+                toast("這張貼圖讀不出來")
+                return
+            }
+            UIPasteboard.general.setItems([["public.png": png]])
         }
-        UIPasteboard.general.setItems([["public.png": png]])
         settings.lastPasteboardChange = UIPasteboard.general.changeCount
         toast("已複製貼圖！在輸入框長按「貼上」")
     }

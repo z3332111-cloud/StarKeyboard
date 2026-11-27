@@ -1432,6 +1432,12 @@ final class KeyboardSettings {
         set { d.set(newValue, forKey: "stickerSize") }
     }
 
+    /// 貼圖複製成 GIF：Discord 在 iPhone 會把貼上的 PNG 重新壓成 JPG，透明背景變白；GIF 它會原樣上傳
+    var stickerGif: Bool {
+        get { bool("stickerGif", false) }
+        set { d.set(newValue, forKey: "stickerGif") }
+    }
+
     /// 選字列畫成圓角膠囊（插畫主題）；預設滿版
     var barRounded: Bool {
         get { bool("barRounded", false) }
