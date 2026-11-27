@@ -945,18 +945,21 @@ enum SpaceArt {
         if let c = cache, c.0 == v { return c.1 }
         var result: UIImage?
         if FileManager.default.fileExists(atPath: gif.path), let src = CGImageSourceCreateWithURL(gif as CFURL, nil) {
-            let count = min(CGImageSourceGetCount(src), 80)
+            // 每格都要放在記憶體裡：最多 48 格、128 像素（以前 80 格 160 像素，要 8MB）
+            let total0 = CGImageSourceGetCount(src)
+            let step = max(1, Int((Double(total0) / 48).rounded(.up)))
+            let count = total0
             var frames: [UIImage] = []
             var total = 0.0
-            let opts = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: 160,
+            let opts = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: 128,
                         kCGImageSourceCreateThumbnailWithTransform: true] as CFDictionary
-            for i in 0..<count {
+            for i in stride(from: 0, to: count, by: step) {
                 guard let cg = CGImageSourceCreateThumbnailAtIndex(src, i, opts) else { continue }
                 frames.append(UIImage(cgImage: cg))
                 let props = CGImageSourceCopyPropertiesAtIndex(src, i, nil) as? [CFString: Any]
                 let g = props?[kCGImagePropertyGIFDictionary] as? [CFString: Any]
                 let d = (g?[kCGImagePropertyGIFUnclampedDelayTime] as? Double) ?? (g?[kCGImagePropertyGIFDelayTime] as? Double) ?? 0.1
-                total += d < 0.02 ? 0.1 : d
+                total += (d < 0.02 ? 0.1 : d) * Double(step)
             }
             result = frames.count > 1 ? UIImage.animatedImage(with: frames, duration: total) : frames.first
         } else if FileManager.default.fileExists(atPath: png.path) {

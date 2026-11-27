@@ -25,6 +25,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
     var onStopLayoutDiagnostics: (() -> Void)?
     var onAddShortcut: (() -> Void)?
     var onResetLearning: (() -> Void)?
+    var onCopyCrashReport: (() -> Void)?
     var onBack: (() -> Void)?
     /// 「邊看邊調大小」：關掉設定，選字列換成滑桿
     var onLiveSize: (() -> Void)?
@@ -413,6 +414,8 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             ("📒 看看記住了哪些字", { [weak self] in self?.onShowLearning?() }),
             ("清除選字學習紀錄", { [weak self] in self?.onResetLearning?() }),
         ]))
+        add(buttonRow([("📋 複製當掉紀錄（給開發的人）", { [weak self] in self?.onCopyCrashReport?() })]))
+        add(note("鍵盤突然跳回原本的鍵盤時，按這個再貼給開發的人。只記鍵盤做了什麼和用了多少記憶體，不記你打的字。"))
         if !hasFullAccess {
             add(note("⚠️ 還沒開啟「允許完整取用」：剪貼簿、聲音、震動、貼圖、背景圖片都需要它。\n設定 › 一般 › 鍵盤 › 鍵盤 › 糯糯鍵盤 › 允許完整取用"))
         }

@@ -318,6 +318,8 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        if CrashTrail.start() { crashedLastTime = true }
+        CrashTrail.mark("主題 \(settings.themeID)、照片 \(settings.hasBackground ? "有" : "無")、空白鍵 \(settings.spaceStyle)")
         layoutDiagnostics.record("viewWillAppear.beforeUpdates", force: true)
         loadGlideWords()
         prepareKeySound()
@@ -440,8 +442,18 @@ final class KeyboardViewController: UIInputViewController {
         settingsChanged()
     }
 
+    /// 上次鍵盤沒有正常收起來（多半是被 iOS 關掉）：打開後提醒可以到 ⚙ 複製當掉紀錄
+    private var crashedLastTime = false
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        CrashTrail.mark("顯示好了")
+        if crashedLastTime {
+            crashedLastTime = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                self?.toast("鍵盤剛剛好像當掉了。可以到 ⚙「其他」按「複製當掉紀錄」貼給開發的人")
+            }
+        }
         if let message = foxFellBack {
             foxFellBack = nil
             toast(message)
@@ -459,6 +471,7 @@ final class KeyboardViewController: UIInputViewController {
     /// iOS 說記憶體快不夠了：先把可以重新讀的東西丟掉，免得鍵盤被系統強制關掉（閃退）
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
+        CrashTrail.mark("記憶體不夠警告（面板：\(panel?.rawValue ?? "無")）")
         engine?.trimCaches()
         pinyinEngineStore?.engine.trimCaches()
         glide = nil   // 滑行輸入的字表，下次打開鍵盤再讀
@@ -467,6 +480,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        CrashTrail.finish()
         settings.foxLaunches = 0
         layoutDiagnostics.record("viewWillDisappear", force: true)
         clipboardTimer?.invalidate()
@@ -719,8 +733,15 @@ final class KeyboardViewController: UIInputViewController {
 
     // MARK: - 按鍵
 
+    private var keysSinceMark = 0
+
     private func handle(_ spec: KeySpec) {
         lastKeyTime = CACurrentMediaTime()
+        keysSinceMark += 1
+        if keysSinceMark >= 30 {
+            keysSinceMark = 0
+            CrashTrail.mark("打字中")
+        }
         if quick != nil {
             quick = nil
             refreshTopBar()
@@ -1574,6 +1595,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func openPanel(_ kind: PanelKind) {
+        CrashTrail.mark("打開面板 \(kind.rawValue)")
         commitAll()
         finishHangul()
         closePanel()
@@ -1693,6 +1715,14 @@ final class KeyboardViewController: UIInputViewController {
                 } else {
                     self.toast("已記住 \(s.count) 個字詞\n最近：\(s.recent.joined(separator: "、"))")
                 }
+            }
+            p.onCopyCrashReport = { [weak self] in
+                guard let self = self else { return }
+                guard self.hasFullAccess else { self.toast("要先開啟「允許完整取用」才能複製"); return }
+                guard let report = CrashTrail.lastReport else { self.toast("還沒有當掉紀錄"); return }
+                UIPasteboard.general.string = "糯糯鍵盤 v\(ReleaseChecker.currentVersion) iPhone 當掉紀錄\n" + report
+                self.settings.lastPasteboardChange = UIPasteboard.general.changeCount
+                self.toast("已複製當掉紀錄，貼給開發的人")
             }
             p.onResetLearning = { [weak self] in
                 self?.engine?.resetLearning()
