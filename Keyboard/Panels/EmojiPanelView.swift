@@ -12,6 +12,10 @@ final class EmojiPanelView: UIView {
         case recent
         case mine
         case list([String])
+        /// 貼圖的一個分類
+        case folder(String)
+        /// 最後一個分頁「📁 分類」：點了打開分類選單，不是真的分頁
+        case folderMenu
     }
 
     private enum ItemRef {
@@ -27,6 +31,9 @@ final class EmojiPanelView: UIView {
     var onAdd: ((AddOption) -> Void)?
     var onBack: (() -> Void)?
     var onBackspace: (() -> Void)?
+    /// 新增貼圖分類（nil）或重新命名（舊名字）：交給鍵盤開打字框
+    var onEditFolder: ((String?) -> Void)?
+    var onMessage: ((String) -> Void)?
     var style: KeyboardStyle {
         didSet {
             grid.style = style
@@ -45,6 +52,10 @@ final class EmojiPanelView: UIView {
     private var imageCache: [UUID: UIImage] = [:]
     private let addMenu = UIView()
     private let addStack = UIStackView()
+    /// 臨時的選單（貼圖分類、把貼圖移到哪個分類）
+    private let sheet = UIView()
+    private let sheetScroll = UIScrollView()
+    private let sheetStack = UIStackView()
 
     init(kind: Kind, store: EmoticonStore, style: KeyboardStyle) {
         self.kind = kind
@@ -66,7 +77,7 @@ final class EmojiPanelView: UIView {
             tabs = [(title: "最近", content: TabContent.recent), (title: "我的", content: TabContent.mine)]
             categories = SymbolData.symbols
         case .stickers:
-            tabs = [(title: "🖼 我的貼圖", content: TabContent.mine)]
+            tabs = []
             categories = []
         }
         for cat in categories {
@@ -75,8 +86,8 @@ final class EmojiPanelView: UIView {
 
         addSubview(grid)
         addSubview(bar)
-        bar.setTabs(tabs.map { $0.title })
-        bar.onTab = { [weak self] i in self?.select(tab: i) }
+        if kind == .stickers { stickerTabs() } else { bar.setTabs(tabs.map { $0.title }) }
+        bar.onTab = { [weak self] i in self?.tabTapped(i) }
         bar.onBack = { [weak self] in self?.onBack?() }
         bar.onBackspace = { [weak self] in self?.onBackspace?() }
 
@@ -90,11 +101,15 @@ final class EmojiPanelView: UIView {
         }
         grid.onDelete = { [weak self] i in self?.delete(i) }
         grid.onLongPress = { [weak self] _ in
-            guard let self = self, case .mine = self.tabs[self.current].content else { return }
-            self.grid.isEditingItems.toggle()
+            guard let self = self else { return }
+            switch self.tabs[self.current].content {
+            case .mine, .folder: self.grid.isEditingItems.toggle()
+            default: return
+            }
         }
 
         buildAddMenu()
+        buildSheet()
         let hasRecent = !store.recents(kind.rawValue).isEmpty
         select(tab: kind == .stickers ? 0 : (hasRecent ? 0 : 2))
     }
@@ -108,10 +123,143 @@ final class EmojiPanelView: UIView {
         bar.frame = CGRect(x: 0, y: bounds.height - barH, width: bounds.width, height: barH)
         addMenu.frame = bounds
         addStack.frame = CGRect(x: 24, y: 10, width: bounds.width - 48, height: bounds.height - 20)
+        sheet.frame = bounds
+        sheetScroll.frame = CGRect(x: 24, y: 8, width: bounds.width - 48, height: bounds.height - 16)
+        layoutSheet()
     }
 
     func reload() {
+        if kind == .stickers { stickerTabs() }
+        select(tab: min(current, tabs.count - 1))
+    }
+
+    // MARK: 貼圖分類
+
+    /// 現在看的貼圖分類（「全部」是 nil）；新增的貼圖放進這裡
+    var currentFolder: String? {
+        guard current < tabs.count, case .folder(let name) = tabs[current].content else { return nil }
+        return name
+    }
+
+    /// 貼圖的分頁：全部、每個分類、最後是「📁 分類」
+    private func stickerTabs() {
+        tabs = [(title: "🖼 全部", content: TabContent.mine)]
+            + store.stickerFolders.map { (title: $0, content: TabContent.folder($0)) }
+            + [(title: "📁 分類", content: TabContent.folderMenu)]
+        bar.setTabs(tabs.map { $0.title })
+    }
+
+    /// 打開某個分類（剛新增或改名之後）
+    func selectFolder(_ name: String) {
+        stickerTabs()
+        let i = tabs.firstIndex { if case .folder(let n) = $0.content { return n == name } else { return false } } ?? 0
+        select(tab: i)
+    }
+
+    private func tabTapped(_ i: Int) {
+        guard i < tabs.count else { return }
+        if case .folderMenu = tabs[i].content {
+            bar.selectedTab = current
+            showFolderMenu()
+            return
+        }
+        select(tab: i)
+    }
+
+    private func showFolderMenu() {
+        var options: [(String, (() -> Void)?)] = [("＋ 新增分類", { [weak self] in self?.onEditFolder?(nil) })]
+        if let name = currentFolder {
+            options.append(("✏️ 重新命名「\(name)」", { [weak self] in self?.onEditFolder?(name) }))
+            options.append(("🗑 移除「\(name)」（貼圖會留在「全部」）", { [weak self] in
+                guard let self = self else { return }
+                self.store.removeStickerFolder(name)
+                self.stickerTabs()
+                self.select(tab: 0)
+                self.onMessage?("已移除分類「\(name)」，貼圖都還在「全部」")
+            }))
+        } else if !store.stickerFolders.isEmpty {
+            options.append(("想改名或移除：先點下面那個分類，再按「📁 分類」", nil))
+        }
+        options.append(("要把貼圖放進分類：按住貼圖，再點一下那張", nil))
+        options.append(("取消", nil))
+        showSheet(options)
+    }
+
+    /// 整理模式點了貼圖：刪掉，或移到某個分類
+    private func stickerActions(_ ref: StickerRef) {
+        var options: [(String, (() -> Void)?)] = []
+        for name in store.stickerFolders where name != ref.category {
+            options.append(("📁 移到「\(name)」", { [weak self] in self?.move(ref, to: name) }))
+        }
+        if ref.category != nil {
+            options.append(("📤 移出分類（只留在「全部」）", { [weak self] in self?.move(ref, to: nil) }))
+        }
+        if store.stickerFolders.isEmpty {
+            options.append(("還沒有分類：先按下面的「📁 分類」新增", nil))
+        }
+        options.append(("🗑 刪除這張貼圖", { [weak self] in
+            guard let self = self else { return }
+            self.store.removeSticker(ref)
+            self.imageCache[ref.id] = nil
+            self.reloadKeepingEdit()
+        }))
+        options.append(("取消", nil))
+        showSheet(options)
+    }
+
+    private func move(_ ref: StickerRef, to folder: String?) {
+        store.moveSticker(ref.id, to: folder)
+        reloadKeepingEdit()
+        onMessage?(folder.map { "已移到「\($0)」" } ?? "已移出分類")
+    }
+
+    private func reloadKeepingEdit() {
+        let editing = grid.isEditingItems
         select(tab: current)
+        grid.isEditingItems = editing
+    }
+
+    private func buildSheet() {
+        sheet.isHidden = true
+        sheetStack.axis = .vertical
+        sheetStack.spacing = 6
+        sheetScroll.addSubview(sheetStack)
+        sheet.addSubview(sheetScroll)
+        addSubview(sheet)
+    }
+
+    private func layoutSheet() {
+        let w = sheetScroll.bounds.width
+        let h = CGFloat(sheetStack.arrangedSubviews.count) * 46
+        sheetStack.frame = CGRect(x: 0, y: 0, width: w, height: max(0, h - 6))
+        sheetScroll.contentSize = CGSize(width: w, height: h)
+    }
+
+    /// 一排一排的按鈕；沒有動作的是說明文字或「取消」，點了就關掉
+    private func showSheet(_ options: [(String, (() -> Void)?)]) {
+        sheetStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        let t = style.theme
+        sheet.backgroundColor = t.backgroundTop.withAlphaComponent(0.95)
+        for (title, action) in options {
+            let b = UIButton(type: .system)
+            b.setTitle(title, for: .normal)
+            b.titleLabel?.font = .rounded(action == nil ? 14 : 16, action == nil ? .regular : .semibold)
+            b.titleLabel?.adjustsFontSizeToFitWidth = true
+            b.titleLabel?.minimumScaleFactor = 0.7
+            b.layer.cornerRadius = 12
+            b.backgroundColor = action == nil ? .clear : t.key
+            b.setTitleColor(t.keyText.withAlphaComponent(action == nil ? 0.75 : 1), for: .normal)
+            b.heightAnchor.constraint(equalToConstant: 40).isActive = true
+            b.addAction(UIAction { [weak self] _ in
+                self?.sheet.isHidden = true
+                action?()
+            }, for: .touchUpInside)
+            sheetStack.addArrangedSubview(b)
+        }
+        sheet.isHidden = false
+        bringSubviewToFront(sheet)
+        sheetScroll.contentOffset = .zero
+        setNeedsLayout()
     }
 
     private func select(tab i: Int) {
@@ -138,6 +286,11 @@ final class EmojiPanelView: UIView {
         case .list(let items):
             refs = items.map { .text($0) }
             grid.cellStyle = kind == .kaomoji ? .chip : .square
+        case .folder(let name):
+            refs = [.add] + store.stickers.filter { $0.category == name }.map { .sticker($0) }
+            grid.cellStyle = .square
+        case .folderMenu:
+            refs = []
         }
         var items: [ChipGridView.Item] = []
         var kept: [ItemRef] = []
@@ -188,8 +341,9 @@ final class EmojiPanelView: UIView {
         switch refs[i] {
         case .custom(let s): if kind == .symbols { store.removeSymbol(s) } else { store.removeCustom(s) }
         case .sticker(let r):
-            store.removeSticker(r)
-            imageCache[r.id] = nil
+            // 貼圖：問要刪掉還是移到分類
+            stickerActions(r)
+            return
         default: return
         }
         let editing = grid.isEditingItems

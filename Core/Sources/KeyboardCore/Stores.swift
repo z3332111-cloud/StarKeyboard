@@ -192,6 +192,8 @@ final class ClipboardStore {
 struct StickerRef: Codable, Equatable {
     var id: UUID
     var file: String
+    /// 放在哪個分類（nil＝沒分類，只在「全部」）
+    var category: String? = nil
 }
 
 final class EmoticonStore {
@@ -201,6 +203,20 @@ final class EmoticonStore {
         var recents: [String: [String]]
         /// 「※ 符號」裡自己加的符號（舊版存檔沒有這一項）
         var symbols: [String]?
+        /// 貼圖的分類（舊版存檔沒有這一項）
+        var stickerFolders: [String]?
+    }
+
+    /// 貼圖分類的名字不行時的原因
+    enum FolderError: LocalizedError {
+        case empty, tooLong, duplicate
+        var errorDescription: String? {
+            switch self {
+            case .empty: return "先打分類的名字"
+            case .tooLong: return "分類名字最多 20 個字"
+            case .duplicate: return "已經有這個分類了"
+            }
+        }
     }
 
     static let defaultCustom = ["(๑•̀ㅂ•́)و✧", "ʕ•ᴥ•ʔ", "✿♡✿", "(｡･ω･｡)ﾉ♡"]
@@ -256,11 +272,61 @@ final class EmoticonStore {
         save()
     }
 
+    // MARK: 貼圖分類
+
+    var stickerFolders: [String] { contents.stickerFolders ?? [] }
+
+    private func folderName(_ raw: String, except old: String? = nil) throws -> String {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { throw FolderError.empty }
+        guard name.count <= 20 else { throw FolderError.tooLong }
+        guard name == old || !stickerFolders.contains(name) else { throw FolderError.duplicate }
+        return name
+    }
+
+    /// 新增分類，回傳整理過的名字
     @discardableResult
-    func addSticker(pngData: Data) -> StickerRef? {
+    func addStickerFolder(_ raw: String) throws -> String {
+        let name = try folderName(raw)
+        contents.stickerFolders = stickerFolders + [name]
+        save()
+        return name
+    }
+
+    @discardableResult
+    func renameStickerFolder(_ old: String, to raw: String) throws -> String {
+        let name = try folderName(raw, except: old)
+        contents.stickerFolders = stickerFolders.map { $0 == old ? name : $0 }
+        for i in contents.stickers.indices where contents.stickers[i].category == old {
+            contents.stickers[i].category = name
+        }
+        save()
+        return name
+    }
+
+    /// 移除分類：裡面的貼圖不會刪掉，回到「全部」
+    func removeStickerFolder(_ name: String) {
+        contents.stickerFolders = stickerFolders.filter { $0 != name }
+        for i in contents.stickers.indices where contents.stickers[i].category == name {
+            contents.stickers[i].category = nil
+        }
+        save()
+    }
+
+    /// 把貼圖移到某個分類（nil＝不分類）
+    func moveSticker(_ id: UUID, to folder: String?) {
+        guard folder == nil || stickerFolders.contains(folder!) else { return }
+        guard let i = contents.stickers.firstIndex(where: { $0.id == id }) else { return }
+        contents.stickers[i].category = folder
+        save()
+    }
+
+    @discardableResult
+    func addSticker(pngData: Data, folder: String? = nil) -> StickerRef? {
         guard let dir = stickerDirectory else { return nil }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let ref = StickerRef(id: UUID(), file: UUID().uuidString + ".png")
+        let inFolder = folder.flatMap { stickerFolders.contains($0) ? $0 : nil }
+        let ref = StickerRef(id: UUID(), file: UUID().uuidString + ".png", category: inFolder)
         do {
             try pngData.write(to: dir.appendingPathComponent(ref.file))
         } catch {

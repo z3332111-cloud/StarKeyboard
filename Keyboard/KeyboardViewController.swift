@@ -24,6 +24,10 @@ final class KeyboardViewController: UIInputViewController {
     /// 上面那條編輯框的用途：新增表符，或是先打中文再翻譯
     private enum EditorPurpose { case emoticon, symbol, clipboardSearch, translate, fancy, shortcutPhrase, shortcutCode, clipboardCategory, clipboardItem }
     private var renamingCategory: String?
+    /// 打字框在幫「貼圖」取分類名字（不是剪貼簿）
+    private var namingStickerFolder = false
+    /// 新增貼圖時正在看的分類：新的貼圖放進去
+    private var stickerFolderForAdd: String?
     private var editingClipID: UUID?
     /// 編輯框裡的游標位置（第幾個字後面）；nil = 永遠在最後面
     private var editorCursor: Int?
@@ -257,8 +261,9 @@ final class KeyboardViewController: UIInputViewController {
             guard let self = self else { return }
             // 改剪貼簿的 endEditor 自己會打開剪貼簿
             let wasClip = self.editorPurpose == .clipboardItem
+            let wasSticker = self.namingStickerFolder
             self.endEditor()
-            if !wasClip { self.openPanel(.clipboard) }
+            if wasSticker { self.openPanel(.stickers) } else if !wasClip { self.openPanel(.clipboard) }
         }
         // 改剪貼簿：點文字就把游標移過去（按住空白鍵滑也可以）
         folderNameBox.onTapIndex = { [weak self] i in
@@ -1632,7 +1637,19 @@ final class KeyboardViewController: UIInputViewController {
                 self?.output(s)
             }
             p.onCopySticker = { [weak self] url in self?.copySticker(url) }
-            p.onAdd = { [weak self] option in self?.addEmoticon(option) }
+            p.onAdd = { [weak self, weak p] option in
+                self?.stickerFolderForAdd = p?.currentFolder
+                self?.addEmoticon(option)
+            }
+            p.onMessage = { [weak self] text in self?.toast(text) }
+            p.onEditFolder = { [weak self] name in
+                guard let self = self else { return }
+                self.renamingCategory = name
+                self.beginEditor(.clipboardCategory)
+                self.namingStickerFolder = true
+                self.editorText = name ?? ""
+                self.refreshTopBar()
+            }
             p.onBack = { [weak self] in self?.closePanel() }
             p.onBackspace = { [weak self] in self?.deleteOutput() }
             v = p
@@ -1666,6 +1683,7 @@ final class KeyboardViewController: UIInputViewController {
                 guard let self = self else { return }
                 self.renamingCategory = name
                 self.beginEditor(.clipboardCategory)
+                self.namingStickerFolder = false
                 self.editorText = name ?? ""
                 self.refreshTopBar()
             }
@@ -1890,6 +1908,14 @@ final class KeyboardViewController: UIInputViewController {
         guard let text = editorText else { return }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         switch editorPurpose {
+        case .clipboardCategory where namingStickerFolder:
+            do {
+                let isNew = renamingCategory == nil
+                let name = try renamingCategory.map { try emoStore.renameStickerFolder($0, to: trimmed) } ?? emoStore.addStickerFolder(trimmed)
+                endEditor(); openPanel(.stickers)
+                (panelView as? EmojiPanelView)?.selectFolder(name)
+                toast(isNew ? "已新增分類「\(name)」：按住貼圖再點一下，就能放進來" : "已改名為「\(name)」")
+            } catch { toast(error.localizedDescription) }
         case .clipboardCategory:
             do {
                 if let old = renamingCategory { try clipStore.renameCategory(old, to: trimmed) }
@@ -2037,6 +2063,7 @@ final class KeyboardViewController: UIInputViewController {
         pinyinBuffer = ""
         candidates = []
         editingClipID = nil
+        namingStickerFolder = false
         editorText = nil
         editorCursor = nil
         editorReturnPanel = nil
@@ -2106,7 +2133,7 @@ final class KeyboardViewController: UIInputViewController {
             }
         }
         guard let data = img.pngData() else { toast("這張圖片讀不出來"); return }
-        emoStore.addSticker(pngData: data)
+        emoStore.addSticker(pngData: data, folder: stickerFolderForAdd)
         (panelView as? EmojiPanelView)?.reload()
         toast(note)
     }
