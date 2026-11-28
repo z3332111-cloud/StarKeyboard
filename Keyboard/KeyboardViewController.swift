@@ -176,7 +176,11 @@ final class KeyboardViewController: UIInputViewController {
         view.isOpaque = false
     }
 
+    /// 現在還活著的鍵盤畫面有幾個（應該是 1；一直變多就是舊的沒放掉，記憶體會越用越多）
+    private static var alive = 0
+
     deinit {
+        Self.alive -= 1
         for id in soundIDs.values { AudioServicesDisposeSystemSoundID(id) }
     }
 
@@ -217,6 +221,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        Self.alive += 1
         guardFoxLaunch()
         // 讓 iOS 照我們自己設的高度（不然「鍵盤高度」滑桿會被系統的預設高度蓋掉）
         (view as? UIInputView)?.allowsSelfSizing = true
@@ -319,7 +324,7 @@ final class KeyboardViewController: UIInputViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         if CrashTrail.start() { crashedLastTime = true }
-        CrashTrail.mark("主題 \(settings.themeID)、照片 \(settings.hasBackground ? "有" : "無")、空白鍵 \(settings.spaceStyle)")
+        CrashTrail.mark("主題 \(settings.themeID)、照片 \(settings.hasBackground ? "有" : "無")、空白鍵 \(settings.spaceStyle)、畫面 \(Self.alive) 個、字體 \(settings.fontID)")
         layoutDiagnostics.record("viewWillAppear.beforeUpdates", force: true)
         loadGlideWords()
         prepareKeySound()

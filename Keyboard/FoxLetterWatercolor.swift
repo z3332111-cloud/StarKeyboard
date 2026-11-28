@@ -29,7 +29,10 @@ enum FoxLetterWatercolor {
         }
         // 讀圖的暫存馬上放掉，不要等到這一輪結束才一起放
         let image: UIImage? = autoreleasepool {
-            let plain = UIImage.downsampled(url: url, maxSide: 768)
+            // 一張圖一顆鍵的主題：一般鍵螢幕上只有 110 像素左右，讀 320 就夠清楚（以前 768，一款十幾張要 30MB）；
+            // 空白鍵、換行鍵是長條圖，照長邊算要大一點才不會糊
+            let royalCap = royalTheme(name) != nil && !name.hasSuffix("-space") && !name.hasSuffix("-enter")
+            let plain = UIImage.downsampled(url: url, maxSide: royalCap ? 320 : 768)
             // 背景紙不加質感；按鍵圖照選的質感算一次
             guard name != "background-watercolor-v2", finish != .flat, let cg = plain?.cgImage,
                   let done = ArtFinish.apply(cg, finish: finish) else { return plain }
