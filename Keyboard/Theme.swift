@@ -814,7 +814,7 @@ enum SoundPacks {
 enum KeyFont: String, CaseIterable {
     case system, huninn, iansui, wenkai, gensen, naikai, cubic
     // 額外字體（tools/extra_fonts.tsv，wumanzoo.com 整理的開源字體）
-    case pop, kurewa, nani, jason1, jason2, jason3, jason4, jason5, jason6, yozai, chenyu, proper, thenkhung, daoist, swei, mantou, maoken, tsuipita, bitmap, masa, bakudai, genwan, glitch
+    case pop, kurewa, nani, jason1, jason2, jason3, jason4, jason5, jason6, yozai, chenyu, proper, thenkhung, daoist, swei, mantou, maoken, tsuipita, bitmap, masa, bakudai, genwan, glitch, swei0, glow, xiangcui, chilldin
 
     var title: String {
         switch self {
@@ -848,6 +848,10 @@ enum KeyFont: String, CaseIterable {
         case .bakudai: return "莫大毛筆"
         case .genwan: return "源雲明體"
         case .glitch: return "故障明朝"
+        case .swei0: return "四季春"
+        case .glow: return "未來熒黑"
+        case .xiangcui: return "香萃刻宋"
+        case .chilldin: return "寒蟬德黑"
         }
     }
 
@@ -884,6 +888,10 @@ enum KeyFont: String, CaseIterable {
         case .bakudai: return "毛筆字"
         case .genwan: return "復古印刷明體"
         case .glitch: return "故障恐怖風"
+        case .swei0: return "優雅宋體"
+        case .glow: return "現代黑體"
+        case .xiangcui: return "刻印宋體"
+        case .chilldin: return "工業風黑體"
         }
     }
 

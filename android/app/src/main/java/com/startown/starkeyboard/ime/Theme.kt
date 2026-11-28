@@ -574,7 +574,11 @@ enum class KeyFont(val id: String, val title: String, val style: String) {
     MASA("masa", "正風毛筆", "行書毛筆"),
     BAKUDAI("bakudai", "莫大毛筆", "毛筆字"),
     GENWAN("genwan", "源雲明體", "復古印刷明體"),
-    GLITCH("glitch", "故障明朝", "故障恐怖風");
+    GLITCH("glitch", "故障明朝", "故障恐怖風"),
+    SWEI0("swei0", "四季春", "優雅宋體"),
+    GLOW("glow", "未來熒黑", "現代黑體"),
+    XIANGCUI("xiangcui", "香萃刻宋", "刻印宋體"),
+    CHILLDIN("chilldin", "寒蟬德黑", "工業風黑體");
 
     /** 放在 App 裡的字體；其他的要用時才下載（FontPacks） */
     val bundled get() = this == SYSTEM || this == HUNINN
