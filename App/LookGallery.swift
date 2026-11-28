@@ -64,6 +64,40 @@ final class LookStore: ObservableObject {
         commit()
     }
 
+    /// 備用字體：選的字體裡沒有的字用這個補
+    func chooseFallback(_ font: KeyFont) {
+        guard font.bundled || FontPacks.isReady(font.rawValue) else {
+            download(font.rawValue, title: font.title, with: FontPacks.download) { [weak self] in
+                self?.settings.fontFallbackID = font.rawValue
+                self?.commit()
+            }
+            return
+        }
+        settings.fontFallbackID = font.rawValue
+        commit()
+    }
+
+    /// 下載過、不喜歡的字體移除（正在用的不能移除）
+    func removeFont(_ font: KeyFont) {
+        guard !font.bundled else { return }
+        guard settings.fontID != font.rawValue, settings.fontFallbackID != font.rawValue else {
+            message = "「\(font.title)」正在使用，先換別的字體再移除"
+            return
+        }
+        FontPacks.remove(font.rawValue)
+        revision += 1
+    }
+
+    /// 下載過、不喜歡的主題移除（正在用的不能移除）
+    func removeTheme(_ id: String) {
+        guard settings.themeID != id else {
+            message = "這個主題正在使用，先換別的主題再移除"
+            return
+        }
+        ThemePacks.remove(id)
+        revision += 1
+    }
+
     // 聲音
 
     func chooseSound(_ sound: KeySound) {
@@ -210,6 +244,22 @@ private struct CurrentPreview: View {
     }
 }
 
+/// 「移除」小按鈕：下載過、不喜歡的主題和字體刪掉，要用再下載
+private struct RemoveButton: View {
+    var action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Label("移除", systemImage: "trash")
+                .font(.caption.bold())
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color(UIColor.secondarySystemBackground)))
+        }
+        .buttonStyle(.plain)
+        .foregroundColor(.red)
+    }
+}
+
 private struct Card<Content: View>: View {
     var selected: Bool
     @ViewBuilder var content: Content
@@ -309,7 +359,19 @@ struct ThemeGalleryView: View {
     private func card(_ item: Item) -> some View {
         let selected = store.settings.themeID == item.id
         let needsDownload = !ThemePacks.isReady(item.id)
-        return Button {
+        let removable = !needsDownload && !selected && !ThemePacks.files(item.id).isEmpty && !store.downloading.contains(item.id)
+        return ZStack(alignment: .topTrailing) {
+            themeButton(item, selected: selected, needsDownload: needsDownload)
+            if removable {
+                RemoveButton { store.removeTheme(item.id) }
+                    .padding(.trailing, 30)
+                    .padding(.top, 14)
+            }
+        }
+    }
+
+    private func themeButton(_ item: Item, selected: Bool, needsDownload: Bool) -> some View {
+        Button {
             store.chooseTheme(item.id)
         } label: {
             Card(selected: selected) {
@@ -459,6 +521,7 @@ struct FontGalleryView: View {
             ScrollView {
                 LazyVStack(spacing: 12) {
                     CurrentPreview()
+                    fallbackCard
                     ForEach(KeyFont.allCases, id: \.rawValue) { card($0) }
                     Text("自己買的字體：在「首頁」按「匯入我的字體」，再到鍵盤的 ⚙ 貼上。")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -473,10 +536,52 @@ struct FontGalleryView: View {
         .syncsWithKeyboard(store)
     }
 
+    /// 備用字體：選的字體缺字時用哪一款補
+    private var fallbackCard: some View {
+        let current = KeyFont(rawValue: store.settings.fontFallbackID) ?? .system
+        return Card(selected: false) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("備用字體").font(.system(.headline, design: .rounded))
+                    Spacer()
+                    Menu {
+                        ForEach(KeyFont.allCases, id: \.rawValue) { f in
+                            Button {
+                                store.chooseFallback(f)
+                            } label: {
+                                if f == current { Label(f.title, systemImage: "checkmark") } else { Text(f.title) }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(current == .system ? "手機內建" : current.title)
+                            Image(systemName: "chevron.up.chevron.down").font(.caption)
+                        }
+                        .font(.subheadline.bold())
+                    }
+                }
+                Text("選的字體裡沒有的字，用這款補上（例如落雁體缺的字）。沒下載的選了會先下載。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private func card(_ font: KeyFont) -> some View {
         let ready = font.bundled || FontPacks.isReady(font.rawValue)
         let selected = store.settings.fontID == font.rawValue
-        return Button {
+        let inUse = selected || store.settings.fontFallbackID == font.rawValue
+        return ZStack(alignment: .trailing) {
+            fontButton(font, ready: ready, selected: selected)
+            // 下載過、沒在用的可以移除
+            if ready && !font.bundled && !inUse && !store.downloading.contains(font.rawValue) {
+                RemoveButton { store.removeFont(font) }
+                    .padding(.trailing, 30)
+            }
+        }
+    }
+
+    private func fontButton(_ font: KeyFont, ready: Bool, selected: Bool) -> some View {
+        Button {
             store.chooseFont(font)
         } label: {
             Card(selected: selected) {

@@ -6,7 +6,7 @@ import UIKit
 enum AppPick {
     /// 會傳的設定（UserDefaults 的名字）
     static let keys = [
-        "themeID", "fontID", "keyShape", "keyFinish", "artFinish", "keyMotion", "keyEffect",
+        "themeID", "fontID", "fontFallbackID", "keyShape", "keyFinish", "artFinish", "keyMotion", "keyEffect",
         "keySound", "keySoundStyle", "keyTextColor",
         "customHue", "customSaturation", "customHue2", "customSaturation2", "customDark",
     ]

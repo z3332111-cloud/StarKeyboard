@@ -681,6 +681,7 @@ enum KeyMotion: String, CaseIterable {
 /// 按下按鍵時冒出來的小圖案
 enum KeyEffect: String, CaseIterable {
     case none, stars, hearts, sparkles, flowers, bubbles
+    case notes, balloons, snow, sakura, butterflies, paws, confetti
 
     var title: String {
         switch self {
@@ -690,6 +691,13 @@ enum KeyEffect: String, CaseIterable {
         case .sparkles: return "閃亮"
         case .flowers: return "花花"
         case .bubbles: return "泡泡"
+        case .notes: return "音符"
+        case .balloons: return "氣球"
+        case .snow: return "雪花"
+        case .sakura: return "櫻花"
+        case .butterflies: return "蝴蝶"
+        case .paws: return "貓掌"
+        case .confetti: return "彩帶"
         }
     }
 
@@ -701,6 +709,13 @@ enum KeyEffect: String, CaseIterable {
         case .sparkles: return ["✧", "✦", "⋆"]
         case .flowers: return ["✿", "❀", "❁"]
         case .bubbles: return ["○", "◦", "°"]
+        case .notes: return ["♪", "♫", "♬", "♩"]
+        case .balloons: return ["🎈"]
+        case .snow: return ["❄\u{FE0E}", "❅", "❆"]
+        case .sakura: return ["🌸"]
+        case .butterflies: return ["🦋"]
+        case .paws: return ["🐾"]
+        case .confetti: return ["🎉", "🎊", "✨"]
         }
     }
 }
@@ -948,38 +963,16 @@ enum FontPacks {
 enum KeyFonts {
     private static var names: [String: String] = [:]
 
-    /// 選的字體；系統字體或讀不到時用圓體
+    /// 選的字體；系統字體或讀不到時用圓體。
+    /// 有選「備用字體」時，第一個字體沒有的字用備用字體補（不然會跳成手機內建的字，落差很大）
     static func font(_ id: String, size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
-        guard id != KeyFont.system.rawValue, !id.isEmpty, let name = postScriptName(id),
-              let f = UIFont(name: name, size: size * visualScale(name)) else {
+        guard id != KeyFont.system.rawValue, !id.isEmpty, let name = postScriptName(id), let f = UIFont(name: name, size: size) else {
             return .rounded(size, weight)
         }
-        return f
-    }
-
-    private static var scales: [String: CGFloat] = [:]
-
-    /// 有些字體（細的手寫字）字畫得比格子小很多，同樣的字級看起來特別小：
-    /// 量「國」「ㄅ」實際畫出來的高度，跟系統字比，小的就放大（最多 1.5 倍），每款字體看起來差不多大
-    private static func visualScale(_ name: String) -> CGFloat {
-        if let s = scales[name] { return s }
-        func inkHeight(_ font: CTFont, _ text: String) -> CGFloat? {
-            var chars = Array(text.utf16)
-            var glyphs = [CGGlyph](repeating: 0, count: chars.count)
-            guard CTFontGetGlyphsForCharacters(font, &chars, &glyphs, chars.count), glyphs[0] != 0 else { return nil }
-            var rect = CGRect.zero
-            _ = CTFontGetBoundingRectsForGlyphs(font, .horizontal, glyphs, &rect, 1)
-            return rect.height > 1 ? rect.height : nil
-        }
-        let mine = CTFontCreateWithName(name as CFString, 100, nil)
-        let reference = CTFontCreateWithName("PingFangTC-Regular" as CFString, 100, nil)
-        var ratios: [CGFloat] = []
-        for text in ["國", "ㄅ", "ㄤ"] {
-            if let a = inkHeight(mine, text), let b = inkHeight(reference, text) { ratios.append(b / a) }
-        }
-        let scale = ratios.isEmpty ? 1 : min(1.5, max(1, ratios.reduce(0, +) / CGFloat(ratios.count)))
-        scales[name] = scale
-        return scale
+        let fallback = UserDefaults.standard.string(forKey: "fontFallbackID") ?? KeyFont.system.rawValue
+        guard fallback != KeyFont.system.rawValue, fallback != id, let fallbackName = postScriptName(fallback) else { return f }
+        let descriptor = f.fontDescriptor.addingAttributes([.cascadeList: [UIFontDescriptor(name: fallbackName, size: size)]])
+        return UIFont(descriptor: descriptor, size: size)
     }
 
     /// 第一次用時把字體檔註冊給系統，記住它的名字
@@ -1519,6 +1512,12 @@ final class KeyboardSettings {
     var candidateTextColor: Int {
         get { d.object(forKey: "candidateTextColor") as? Int ?? -1 }
         set { d.set(newValue, forKey: "candidateTextColor") }
+    }
+
+    /// 備用字體：選的字體裡沒有的字用這個補（system＝手機內建的字）
+    var fontFallbackID: String {
+        get { d.string(forKey: "fontFallbackID") ?? KeyFont.system.rawValue }
+        set { d.set(newValue, forKey: "fontFallbackID") }
     }
 
     /// 貼圖貼出去的大小（StickerTools.sizes 的第幾個；預設「中」）

@@ -100,6 +100,16 @@ class LookTabs(private val activity: Activity, private val col: LinearLayout, pr
 
     private fun toast(s: String) = Toast.makeText(activity, s, Toast.LENGTH_SHORT).show()
 
+    /** 卡片下面的「🗑 移除」：下載過、不喜歡的刪掉，要用再下載 */
+    private fun removeLink(parent: LinearLayout, onRemove: () -> Unit) {
+        parent.addView(TextView(activity).apply {
+            text = "🗑 移除"; textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#C0392B"))
+            setPadding(0, px(8f), px(12f), 0)
+            setOnClickListener { onRemove() }
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+    }
+
     // MARK: 預覽（和鍵盤同一套程式畫）
 
     private val fullLayout: KeyboardLayout
@@ -162,6 +172,13 @@ class LookTabs(private val activity: Activity, private val col: LinearLayout, pr
             else -> ""
         })
         preview(c, ks.style(id), true, 58f)
+        if (ready && !selected && ThemePacks.files(id).isNotEmpty() && id !in downloading) {
+            removeLink(c) {
+                ThemePacks.remove(activity, id)
+                toast("已移除「$name」，要用再下載")
+                refresh()
+            }
+        }
         c.setOnClickListener { chooseTheme(id, name) }
         addCard(c)
     }
@@ -259,6 +276,7 @@ class LookTabs(private val activity: Activity, private val col: LinearLayout, pr
 
     fun fonts() {
         current()
+        fallbackCard()
         val all = KeyFont.values().map { Triple(it.id, it.title, it) } + UserFonts.all(activity).map { Triple(it.id, it.name, null) }
         for ((id, name, font) in all) {
             val ready = font == KeyFont.SYSTEM || FontPacks.isReady(activity, id)
@@ -276,10 +294,53 @@ class LookTabs(private val activity: Activity, private val col: LinearLayout, pr
                 typeface = if (ready) KeyFonts.get(activity, id) ?: Typeface.DEFAULT else Typeface.DEFAULT
                 setPadding(0, px(6f), 0, 0)
             })
+            if (font != null && !font.bundled && ready && !selected && ks.fontFallbackId != id && id !in downloading) {
+                removeLink(c) {
+                    FontPacks.remove(activity, id)
+                    toast("已移除「$name」，要用再下載")
+                    refresh()
+                }
+            }
             c.setOnClickListener { if (font != null) chooseFont(font) else { ks.fontId = id; refresh() } }
             addCard(c)
         }
         note("自己買的字體：在「首頁」按「匯入我的字體」，匯入後會出現在這裡。")
+    }
+
+    /** 備用字體：選的字體裡沒有的字用這款補 */
+    private fun fallbackCard() {
+        val current = KeyFont.values().firstOrNull { it.id == ks.fontFallbackId } ?: KeyFont.SYSTEM
+        val c = card(false)
+        header(c, "備用字體", "選的字體裡沒有的字，用這款補上（Android 10 以上）",
+            if (current == KeyFont.SYSTEM) "手機內建 ▾" else "${current.title} ▾")
+        c.setOnClickListener {
+            val fonts = KeyFont.values()
+            android.app.AlertDialog.Builder(activity)
+                .setTitle("備用字體")
+                .setSingleChoiceItems(fonts.map { if (it == KeyFont.SYSTEM) "手機內建" else it.title }.toTypedArray(), fonts.indexOf(current)) { d, i ->
+                    d.dismiss()
+                    chooseFallback(fonts[i])
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+        addCard(c)
+    }
+
+    private fun chooseFallback(font: KeyFont) {
+        if (font != KeyFont.SYSTEM && !font.bundled && !FontPacks.isReady(activity, font.id)) {
+            downloading.add(font.id)
+            refresh()
+            FontPacks.download(activity, font.id) { ok ->
+                downloading.remove(font.id)
+                if (ok) { ks.fontFallbackId = font.id; KeyFonts.forget(font.id) } else toast("「${font.title}」下載失敗，檢查一下網路再試")
+                refresh()
+            }
+            return
+        }
+        ks.fontFallbackId = font.id
+        KeyFonts.forget(font.id)
+        refresh()
     }
 
     private fun chooseFont(font: KeyFont) {

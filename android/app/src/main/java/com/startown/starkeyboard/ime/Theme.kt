@@ -477,7 +477,14 @@ enum class KeyEffect(val id: String, val title: String, val glyphs: List<String>
     HEARTS("hearts", "愛心", listOf("♥︎", "♡", "❤︎")),
     SPARKLES("sparkles", "閃亮", listOf("✧", "✦", "⋆")),
     FLOWERS("flowers", "花花", listOf("✿", "❀", "❁")),
-    BUBBLES("bubbles", "泡泡", listOf("○", "◦", "°"));
+    BUBBLES("bubbles", "泡泡", listOf("○", "◦", "°")),
+    NOTES("notes", "音符", listOf("♪", "♫", "♬", "♩")),
+    BALLOONS("balloons", "氣球", listOf("🎈")),
+    SNOW("snow", "雪花", listOf("❄\uFE0E", "❅", "❆")),
+    SAKURA("sakura", "櫻花", listOf("🌸")),
+    BUTTERFLIES("butterflies", "蝴蝶", listOf("🦋")),
+    PAWS("paws", "貓掌", listOf("🐾")),
+    CONFETTI("confetti", "彩帶", listOf("🎉", "🎊", "✨"));
 
     companion object {
         fun from(id: String) = values().firstOrNull { it.id == id } ?: NONE
@@ -625,8 +632,15 @@ object FontPacks {
 object KeyFonts {
     private val cache = HashMap<String, Typeface?>()
 
-    /** 系統字體或讀不到時回傳 null（用內建字體） */
-    fun get(context: Context, id: String): Typeface? = if (id == KeyFont.SYSTEM.id) null else cache.getOrPut(id) {
+    /** 系統字體或讀不到時回傳 null（用內建字體）。有選「備用字體」時，缺的字用備用字體補（Android 10 以上） */
+    fun get(context: Context, id: String): Typeface? {
+        if (id == KeyFont.SYSTEM.id) return null
+        val fallback = context.getSharedPreferences("keyboard", Context.MODE_PRIVATE).getString("fontFallbackId", KeyFont.SYSTEM.id) ?: KeyFont.SYSTEM.id
+        if (fallback == KeyFont.SYSTEM.id || fallback == id || android.os.Build.VERSION.SDK_INT < 29) return single(context, id)
+        return cache.getOrPut("$id|$fallback") { withFallback(context, id, fallback) ?: single(context, id) }
+    }
+
+    private fun single(context: Context, id: String): Typeface? = cache.getOrPut(id) {
         if (id.startsWith("user:")) UserFonts.file(context, id).takeIf { it.exists() }?.let { f ->
             runCatching { Typeface.Builder(f).build() }.getOrNull()
         }
@@ -634,30 +648,24 @@ object KeyFonts {
             ?: runCatching { Typeface.createFromAsset(context.assets, "fonts/$id.ttf") }.getOrNull()
     }
 
-    fun forget(id: String) { cache.remove(id); scales.remove(id) }
+    @android.annotation.TargetApi(29)
+    private fun family(context: Context, id: String): android.graphics.fonts.FontFamily? = runCatching {
+        val font = when {
+            id.startsWith("user:") -> UserFonts.file(context, id).takeIf { it.exists() }?.let { android.graphics.fonts.Font.Builder(it).build() }
+            FontPacks.file(context, id).exists() -> android.graphics.fonts.Font.Builder(FontPacks.file(context, id)).build()
+            else -> android.graphics.fonts.Font.Builder(context.assets, "fonts/$id.ttf").build()
+        } ?: return@runCatching null
+        android.graphics.fonts.FontFamily.Builder(font).build()
+    }.getOrNull()
 
-    private val scales = HashMap<String, Float>()
+    @android.annotation.TargetApi(29)
+    private fun withFallback(context: Context, id: String, fallback: String): Typeface? = runCatching {
+        val main = family(context, id) ?: return@runCatching null
+        val extra = family(context, fallback) ?: return@runCatching null
+        Typeface.CustomFallbackBuilder(main).addCustomFallback(extra).setSystemFallback("sans-serif").build()
+    }.getOrNull()
 
-    /** 有些字體（細的手寫字）字畫得比格子小很多：量「國」「ㄅ」實際的高度跟系統字比，小的就放大（最多 1.5 倍） */
-    fun scale(context: Context, id: String): Float = scales[id] ?: run {
-        val tf = get(context, id)
-        val result = if (tf == null) 1f else {
-            val p = android.graphics.Paint().apply { textSize = 100f }
-            fun ink(t: Typeface, s: String): Float {
-                p.typeface = t
-                val r = android.graphics.Rect()
-                p.getTextBounds(s, 0, s.length, r)
-                return r.height().toFloat()
-            }
-            val ratios = listOf("國", "ㄅ", "ㄤ").mapNotNull { s ->
-                val mine = ink(tf, s); val ref = ink(Typeface.DEFAULT, s)
-                if (mine > 1f && ref > 1f) ref / mine else null
-            }
-            if (ratios.isEmpty()) 1f else ratios.average().toFloat().coerceIn(1f, 1.5f)
-        }
-        scales[id] = result
-        result
-    }
+    fun forget(id: String) { cache.keys.removeAll { it == id || it.startsWith("$id|") || it.endsWith("|$id") } }
 }
 
 /** 空白鍵上的小圖：自己的圖片（PNG，去背後是透明底）或 GIF 動圖 */
@@ -1050,6 +1058,10 @@ class KeyboardSettings(context: Context) {
     var fontId: String
         get() = p.getString("fontId", KeyFont.SYSTEM.id) ?: KeyFont.SYSTEM.id
         set(v) = p.edit().putString("fontId", v).apply()
+    /** 備用字體：選的字體裡沒有的字用這個補（system＝手機內建） */
+    var fontFallbackId: String
+        get() = p.getString("fontFallbackId", KeyFont.SYSTEM.id) ?: KeyFont.SYSTEM.id
+        set(v) = p.edit().putString("fontFallbackId", v).apply()
 
     val style get() = style(null)
 

@@ -438,6 +438,12 @@ final class KeyboardViewController: UIInputViewController {
                 waiting = true
             }
         }
+        // 備用字體：鍵盤裡還沒有就自己下載一份（好了才用得到）
+        let fallback = settings.fontFallbackID
+        if fallback != KeyFont.system.rawValue, let f = KeyFont(rawValue: fallback), !f.bundled,
+           !FontPacks.isReady(fallback), hasFullAccess {
+            FontPacks.download(fallback) { [weak self] ok in if ok { self?.settingsChanged() } }
+        }
         settingsChanged()
         if !waiting { toast("已換成 App 裡選的樣子") }
     }

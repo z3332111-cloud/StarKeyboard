@@ -488,7 +488,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         val rect = FoxLetter.labelRect(frame, compact, dp).also { it.intersect(k.frame) }
         textPaint.typeface = KeyFonts.get(context, style.fontId) ?: Typeface.DEFAULT_BOLD
         // 插畫裡放字的框比較小：上限跟著整顆按鍵，「字的大小」才調得動
-        var size = minOf(k.spec.fontSize * dp * style.fontScale * KeyFonts.scale(context, style.fontId), maxOf(rect.height(), k.frame.height() * 0.75f))
+        var size = minOf(k.spec.fontSize * dp * style.fontScale, maxOf(rect.height(), k.frame.height() * 0.75f))
         textPaint.textSize = size
         val w = textPaint.measureText(k.spec.label)
         val maxW = if (k.frame.width() <= k.frame.height() * 1.35f) maxOf(rect.width(), k.frame.width() - 2 * dp) else rect.width()
@@ -556,7 +556,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         if (drawSpaceArt(canvas, k)) return
         textPaint.typeface = KeyFonts.get(context, style.fontId) ?: Typeface.DEFAULT_BOLD
         textPaint.color = style.keyInk(if (action == KeyAction.Space) look.spaceInk else look.ink)
-        var size = minOf(k.spec.fontSize * dp * style.fontScale * KeyFonts.scale(context, style.fontId), frame.height() * 0.55f)
+        var size = minOf(k.spec.fontSize * dp * style.fontScale, frame.height() * 0.55f)
         // 123 放在圖案旁邊（神燈）時字小一點，才不會壓到圖
         if (action is KeyAction.Layer && anchor.x != 0.5f) size = minOf(size, frame.width() * 0.19f)
         textPaint.textSize = size
@@ -613,7 +613,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         if (drawSpaceArt(canvas, k)) return
         textPaint.typeface = KeyFonts.get(context, style.fontId) ?: Typeface.DEFAULT_BOLD
         textPaint.color = style.keyInk(color)
-        var size = minOf(k.spec.fontSize * dp * style.fontScale * KeyFonts.scale(context, style.fontId), maxOf(rect.height(), k.frame.height() * 0.75f))
+        var size = minOf(k.spec.fontSize * dp * style.fontScale, maxOf(rect.height(), k.frame.height() * 0.75f))
         textPaint.textSize = size
         val w = textPaint.measureText(k.spec.label)
         val maxW = if (k.frame.width() <= k.frame.height() * 1.35f) maxOf(rect.width(), k.frame.width() - 2 * dp) else rect.width()
@@ -750,7 +750,7 @@ class KeyboardView(context: Context, style: KeyboardStyle) : View(context) {
         textPaint.color = color
         textPaint.typeface = KeyFonts.get(context, style.fontId)
             ?: if (k.spec.kind == KeyKind.NORMAL) Typeface.DEFAULT else Typeface.DEFAULT_BOLD
-        var size = k.spec.fontSize * dp * style.fontScale * KeyFonts.scale(context, style.fontId)
+        var size = k.spec.fontSize * dp * style.fontScale
         if (style.shape.isSoftShape) {
             // 上限跟著整顆按鍵，不跟著造型裡放字的框：造型不拉長之後框變小，字會被卡住，「字的大小」就調不動
             size = minOf(size, k.frame.height() * 0.75f)
