@@ -634,7 +634,30 @@ object KeyFonts {
             ?: runCatching { Typeface.createFromAsset(context.assets, "fonts/$id.ttf") }.getOrNull()
     }
 
-    fun forget(id: String) { cache.remove(id) }
+    fun forget(id: String) { cache.remove(id); scales.remove(id) }
+
+    private val scales = HashMap<String, Float>()
+
+    /** 有些字體（細的手寫字）字畫得比格子小很多：量「國」「ㄅ」實際的高度跟系統字比，小的就放大（最多 1.5 倍） */
+    fun scale(context: Context, id: String): Float = scales[id] ?: run {
+        val tf = get(context, id)
+        val result = if (tf == null) 1f else {
+            val p = android.graphics.Paint().apply { textSize = 100f }
+            fun ink(t: Typeface, s: String): Float {
+                p.typeface = t
+                val r = android.graphics.Rect()
+                p.getTextBounds(s, 0, s.length, r)
+                return r.height().toFloat()
+            }
+            val ratios = listOf("國", "ㄅ", "ㄤ").mapNotNull { s ->
+                val mine = ink(tf, s); val ref = ink(Typeface.DEFAULT, s)
+                if (mine > 1f && ref > 1f) ref / mine else null
+            }
+            if (ratios.isEmpty()) 1f else ratios.average().toFloat().coerceIn(1f, 1.5f)
+        }
+        scales[id] = result
+        result
+    }
 }
 
 /** 空白鍵上的小圖：自己的圖片（PNG，去背後是透明底）或 GIF 動圖 */

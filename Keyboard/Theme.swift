@@ -950,10 +950,36 @@ enum KeyFonts {
 
     /// 選的字體；系統字體或讀不到時用圓體
     static func font(_ id: String, size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
-        guard id != KeyFont.system.rawValue, !id.isEmpty, let name = postScriptName(id), let f = UIFont(name: name, size: size) else {
+        guard id != KeyFont.system.rawValue, !id.isEmpty, let name = postScriptName(id),
+              let f = UIFont(name: name, size: size * visualScale(name)) else {
             return .rounded(size, weight)
         }
         return f
+    }
+
+    private static var scales: [String: CGFloat] = [:]
+
+    /// 有些字體（細的手寫字）字畫得比格子小很多，同樣的字級看起來特別小：
+    /// 量「國」「ㄅ」實際畫出來的高度，跟系統字比，小的就放大（最多 1.5 倍），每款字體看起來差不多大
+    private static func visualScale(_ name: String) -> CGFloat {
+        if let s = scales[name] { return s }
+        func inkHeight(_ font: CTFont, _ text: String) -> CGFloat? {
+            var chars = Array(text.utf16)
+            var glyphs = [CGGlyph](repeating: 0, count: chars.count)
+            guard CTFontGetGlyphsForCharacters(font, &chars, &glyphs, chars.count), glyphs[0] != 0 else { return nil }
+            var rect = CGRect.zero
+            _ = CTFontGetBoundingRectsForGlyphs(font, .horizontal, glyphs, &rect, 1)
+            return rect.height > 1 ? rect.height : nil
+        }
+        let mine = CTFontCreateWithName(name as CFString, 100, nil)
+        let reference = CTFontCreateWithName("PingFangTC-Regular" as CFString, 100, nil)
+        var ratios: [CGFloat] = []
+        for text in ["國", "ㄅ", "ㄤ"] {
+            if let a = inkHeight(mine, text), let b = inkHeight(reference, text) { ratios.append(b / a) }
+        }
+        let scale = ratios.isEmpty ? 1 : min(1.5, max(1, ratios.reduce(0, +) / CGFloat(ratios.count)))
+        scales[name] = scale
+        return scale
     }
 
     /// 第一次用時把字體檔註冊給系統，記住它的名字

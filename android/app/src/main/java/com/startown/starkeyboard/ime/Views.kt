@@ -324,6 +324,7 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
                     row.addView(Tap(context, s, candidateFontSp, if (first) style.candidatePillText else t.keyText, true) { onCandidate?.invoke(i) }.apply {
                         setPadding(dpi(11f), 0, dpi(11f), 0)
                         val base = KeyFonts.get(context, style.fontId) ?: android.graphics.Typeface.DEFAULT
+                        textSize = candidateFontSp * KeyFonts.scale(context, style.fontId)
                         typeface = android.graphics.Typeface.create(base, android.graphics.Typeface.BOLD)
                         if (first) {
                             background = roundRect(style.candidatePillFill, dp(999f))
