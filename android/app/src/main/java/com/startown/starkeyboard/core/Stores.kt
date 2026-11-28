@@ -279,7 +279,8 @@ data class ReleaseInfo(val build: Int, val title: String, val notes: String, val
 
 object ReleaseChecker {
     const val API = "https://api.github.com/repos/z3332111-cloud/nuonuo-keyboard/releases?per_page=30"
-    const val PAGE = "https://github.com/z3332111-cloud/nuonuo-keyboard/releases"
+    /** 給人看的下載頁：安裝網站（不是 GitHub 的網頁） */
+    const val PAGE = "https://z3332111-cloud.github.io/nuonuo-keyboard/#install"
 
     fun buildNumber(tag: String): Int? = if (tag.startsWith("android-")) tag.removePrefix("android-").toIntOrNull() else null
 
@@ -298,7 +299,7 @@ object ReleaseChecker {
                     if (asset.optString("name").endsWith(".apk")) apk = asset.optString("browser_download_url")
                 }
             }
-            best = ReleaseInfo(build, o.optString("name", "糯糯鍵盤 Android 更新"), o.optString("body"), apk, o.optString("html_url", PAGE))
+            best = ReleaseInfo(build, o.optString("name", "糯糯鍵盤 Android 更新"), o.optString("body"), apk, PAGE)
         }
         return best
     }
