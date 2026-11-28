@@ -56,6 +56,7 @@ class LookTabs(private val activity: Activity, private val col: LinearLayout, pr
     companion object {
         /** 正在下載的主題、字體、聲音（換分頁也記得） */
         private val downloading = HashSet<String>()
+        private val previews = HashMap<String, android.graphics.Bitmap>()
         private var pool: SoundPool? = null
     }
 
@@ -288,12 +289,15 @@ class LookTabs(private val activity: Activity, private val col: LinearLayout, pr
                 !ready -> "⬇ 下載"
                 else -> ""
             })
-            c.addView(TextView(activity).apply {
+            val sample = TextView(activity).apply {
                 text = "糯糯鍵盤 ㄅㄆㄇ Aa 123"; textSize = 24f; maxLines = 1
                 setTextColor(if (ready) ink else soft)
                 typeface = if (ready) KeyFonts.get(activity, id) ?: Typeface.DEFAULT else Typeface.DEFAULT
                 setPadding(0, px(6f), 0, 0)
-            })
+            }
+            c.addView(sample)
+            // 還沒下載：先看雲端做好的預覽小圖
+            if (!ready && font != null) previewInto(c, sample, font.id)
             if (font != null && !font.bundled && ready && !selected && ks.fontFallbackId != id && id !in downloading) {
                 removeLink(c) {
                     FontPacks.remove(activity, id)
@@ -305,6 +309,33 @@ class LookTabs(private val activity: Activity, private val col: LinearLayout, pr
             addCard(c)
         }
         note("自己買的字體：在「首頁」按「匯入我的字體」，匯入後會出現在這裡。")
+    }
+
+    /** 字體預覽小圖：下載一次就記著（切分頁不用再下載） */
+    private fun previewInto(card: LinearLayout, sample: TextView, id: String) {
+        fun show(bmp: android.graphics.Bitmap) {
+            val image = android.widget.ImageView(activity).apply {
+                setImageBitmap(bmp)
+                adjustViewBounds = true
+                scaleType = android.widget.ImageView.ScaleType.FIT_START
+                setColorFilter(ink, android.graphics.PorterDuff.Mode.SRC_IN)
+                setPadding(0, px(8f), 0, 0)
+            }
+            val i = card.indexOfChild(sample)
+            if (i < 0) return
+            card.removeView(sample)
+            card.addView(image, i, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, px(34f)))
+        }
+        previews[id]?.let { show(it); return }
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        Thread {
+            val bmp = runCatching {
+                val conn = java.net.URL(FontPacks.preview(id)).openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 10000; conn.readTimeout = 15000; conn.instanceFollowRedirects = true
+                if (conn.responseCode != 200) null else conn.inputStream.use { android.graphics.BitmapFactory.decodeStream(it) }
+            }.getOrNull() ?: return@Thread
+            main.post { previews[id] = bmp; show(bmp) }
+        }.start()
     }
 
     /** 備用字體：選的字體裡沒有的字用這款補 */

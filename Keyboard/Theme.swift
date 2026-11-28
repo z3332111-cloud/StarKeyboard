@@ -920,6 +920,11 @@ enum FontPacks {
         URL(string: "https://github.com/z3332111-cloud/nuonuo-keyboard/releases/download/font-pack/\(id).ttf")!
     }
 
+    /// 預覽小圖（tools/font_preview.py 做的，黑字透明底）：還沒下載的字體先看這張
+    static func preview(_ id: String) -> URL {
+        URL(string: "https://github.com/z3332111-cloud/nuonuo-keyboard/releases/download/font-pack/\(id)-preview.png")!
+    }
+
     private static var dir: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let d = base.appendingPathComponent("FontPack", isDirectory: true)

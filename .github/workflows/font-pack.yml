@@ -8,6 +8,7 @@ on:
     paths:
       - tools/extra_fonts.tsv
       - tools/build_fonts.py
+      - tools/font_preview.py
       - .github/workflows/font-pack.yml
   workflow_dispatch:
 
@@ -65,12 +66,28 @@ jobs:
           echo "做好 $n 款"
           [ "$n" -gt 0 ]
 
+      - name: 做預覽小圖（App 裡沒下載的字體先看圖）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          "$RUNNER_TEMP/venv/bin/pip" install -q pillow
+          # 原本的字體（粉圓、芫荽…）是 iOS 打包時做的，從發佈拿回來一起做預覽
+          mkdir -p "$RUNNER_TEMP/base"
+          for id in huninn iansui wenkai gensen naikai cubic; do
+            gh release download font-pack -R "${{ github.repository }}" --pattern "$id.ttf" -D "$RUNNER_TEMP/base" --clobber || echo "::warning::$id 拿不到，先不做預覽"
+          done
+          # 字體裡沒有的字（有的手寫字沒有注音）用粉圓補，跟鍵盤上看到的一樣
+          FALLBACK="$RUNNER_TEMP/base/huninn.ttf"
+          [ -f "$FALLBACK" ] || FALLBACK=$(ls ExtraFontPack/*.ttf | head -1)
+          "$RUNNER_TEMP/venv/bin/python" tools/font_preview.py ExtraFontPack "$FALLBACK" ExtraFontPack/*.ttf "$RUNNER_TEMP"/base/*.ttf
+          ls -la ExtraFontPack/*.png | head -40
+
       - name: 放到 font-pack 發佈
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view font-pack >/dev/null 2>&1 || gh release create font-pack --title "糯糯鍵盤 字體包" --notes "鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。" --prerelease --latest=false
-          gh release upload font-pack ExtraFontPack/*.ttf --clobber
+          gh release upload font-pack ExtraFontPack/*.ttf ExtraFontPack/*.png --clobber
 
       # 鍵盤從公開的 nuonuo-keyboard 下載字體
       - name: 也放到公開的 nuonuo-keyboard
@@ -82,7 +99,9 @@ jobs:
           tag_name: font-pack
           name: 糯糯鍵盤 字體包
           body: 鍵盤裡按「下載」才會用到的字體（都是 SIL OFL 1.1 免費字體，已縮成常用字）。不用手動下載。
-          files: ExtraFontPack/*.ttf
+          files: |
+            ExtraFontPack/*.ttf
+            ExtraFontPack/*.png
           prerelease: true
           make_latest: "false"
           overwrite_files: true

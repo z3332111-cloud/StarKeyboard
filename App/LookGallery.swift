@@ -591,12 +591,26 @@ struct FontGalleryView: View {
                             Text(font.title).font(.system(.headline, design: .rounded)).foregroundColor(.primary)
                             Text(font.style).font(.caption).foregroundColor(.secondary)
                         }
-                        Text("糯糯鍵盤 ㄅㄆㄇ Aa 123")
-                            .font(ready ? Font(KeyFonts.font(font.rawValue, size: 24) as CTFont) : .system(size: 24))
-                            .foregroundColor(ready ? .primary : .secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                            .id("\(font.rawValue)-\(ready)-\(store.revision)")
+                        if ready {
+                            Text("糯糯鍵盤 ㄅㄆㄇ Aa 123")
+                                .font(Font(KeyFonts.font(font.rawValue, size: 24) as CTFont))
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                                .id("\(font.rawValue)-\(ready)-\(store.revision)")
+                        } else {
+                            // 還沒下載：先看雲端做好的預覽小圖（黑字透明底，照深淺色模式染色）
+                            AsyncImage(url: FontPacks.preview(font.rawValue)) { phase in
+                                if let image = phase.image {
+                                    image.renderingMode(.template).resizable().scaledToFit()
+                                        .frame(maxWidth: .infinity, maxHeight: 30, alignment: .leading)
+                                        .foregroundColor(.primary)
+                                } else {
+                                    Text("糯糯鍵盤 ㄅㄆㄇ Aa 123").font(.system(size: 24)).foregroundColor(.secondary)
+                                        .lineLimit(1).minimumScaleFactor(0.6)
+                                }
+                            }
+                        }
                     }
                     Spacer()
                     if store.downloading.contains(font.rawValue) {
