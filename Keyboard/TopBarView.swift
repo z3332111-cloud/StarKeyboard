@@ -324,6 +324,8 @@ final class TopBarView: UIView {
                 b.frame = CGRect(x: x, y: 0, width: bw, height: ch)
                 x += bw
             }
+            // 第一個候選字（按空白會送出的）字下面畫底線
+            underline(b, on: i == 0, textWidth: ceil(textW))
         }
         candidateScroll.contentSize = CGSize(width: x + 6, height: candidateScroll.bounds.height)
 
@@ -334,6 +336,24 @@ final class TopBarView: UIView {
         editorExtra.frame = CGRect(x: w - 208, y: 0, width: 72, height: h)
         editorCancel.frame = CGRect(x: w - 136, y: 0, width: 64, height: h)
         editorSave.frame = CGRect(x: w - 70, y: 0, width: 64, height: h)
+    }
+
+    private func underline(_ b: UIButton, on: Bool, textWidth: CGFloat) {
+        let name = "candidateUnderline"
+        var line = b.layer.sublayers?.first { $0.name == name }
+        guard on else { line?.isHidden = true; return }
+        if line == nil {
+            let l = CALayer()
+            l.name = name
+            b.layer.addSublayer(l)
+            line = l
+        }
+        let font = b.titleLabel?.font ?? UIFont.systemFont(ofSize: candidateFontSize)
+        let y = min(b.bounds.height - 3, b.bounds.height / 2 + font.lineHeight / 2 - 1)
+        line?.frame = CGRect(x: (b.bounds.width - textWidth) / 2, y: y, width: textWidth, height: 2)
+        line?.backgroundColor = (b.titleColor(for: .normal) ?? style.theme.keyText).cgColor
+        line?.cornerRadius = 1
+        line?.isHidden = false
     }
 
     @objc private func dragBarHeight(_ gesture: UIPanGestureRecognizer) {

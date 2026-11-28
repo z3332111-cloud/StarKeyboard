@@ -24,7 +24,7 @@ final class SizeAdjustBar: UIView {
         super.init(frame: .zero)
         items = [
             Item(title: "高度", range: 0.8...1.3, get: { settings.heightScale }, set: { settings.heightScale = $0 }),
-            Item(title: "字", range: 0.8...1.4, get: { settings.fontScale }, set: { settings.fontScale = $0 }),
+            Item(title: "字", range: 0.8...1.8, get: { settings.fontScale }, set: { settings.fontScale = $0 }),
             Item(title: "間距", range: 0.3...1.6, get: { settings.gapScale }, set: { settings.gapScale = $0 }),
             Item(title: "造型", range: 0.9...1.6, get: { settings.shapeScale }, set: { settings.shapeScale = $0 }),
         ]

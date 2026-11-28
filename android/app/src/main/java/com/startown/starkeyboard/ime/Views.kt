@@ -179,7 +179,7 @@ class SizeAdjustBar(context: Context, private val style: KeyboardStyle, private 
     private class Item(val title: String, val lo: Float, val hi: Float, val get: () -> Float, val set: (Float) -> Unit)
     private val items = listOf(
         Item("高度", 0.8f, 1.3f, { settings.heightScale }) { settings.heightScale = it },
-        Item("字", 0.8f, 1.4f, { settings.fontScale }) { settings.fontScale = it },
+        Item("字", 0.8f, 1.8f, { settings.fontScale }) { settings.fontScale = it },
         Item("間距", 0.3f, 1.6f, { settings.gapScale }) { settings.gapScale = it },
         Item("造型", 0.9f, 1.6f, { settings.shapeScale }) { settings.shapeScale = it },
     )
@@ -327,6 +327,8 @@ class TopBar(context: Context, style: KeyboardStyle) : FrameLayout(context) {
                         textSize = candidateFontSp * KeyFonts.scale(context, style.fontId)
                         typeface = android.graphics.Typeface.create(base, android.graphics.Typeface.BOLD)
                         if (first) {
+                            // 第一個候選字（按空白會送出的）加底線
+                            paintFlags = paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
                             background = roundRect(style.candidatePillFill, dp(999f))
                             elevation = dp(2f)
                         }

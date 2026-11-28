@@ -1443,7 +1443,7 @@ final class KeyboardSettings {
         get { CGFloat(double("heightScale", 1)) }
         set { d.set(Double(newValue), forKey: "heightScale") }
     }
-    /// 按鍵字的大小倍率（0.8～1.4）
+    /// 按鍵字的大小倍率（0.8～1.8）
     var fontScale: CGFloat {
         get { CGFloat(double("fontScale", 1)) }
         set { d.set(Double(newValue), forKey: "fontScale") }

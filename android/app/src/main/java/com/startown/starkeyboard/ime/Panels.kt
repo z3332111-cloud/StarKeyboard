@@ -897,7 +897,7 @@ class SettingsPanel(
 
         header("大小（邊拖邊看）")
         slider("鍵盤高度", settings.heightScale, 0.8f, 1.3f) { settings.heightScale = it }
-        slider("字的大小", settings.fontScale, 0.8f, 1.4f) { settings.fontScale = it }
+        slider("字的大小", settings.fontScale, 0.8f, 1.8f) { settings.fontScale = it }
         slider("按鍵間距", settings.gapScale, 0.3f, 1.6f) { settings.gapScale = it }
         note("間距越小，按鍵越大、越好按。")
         slider("造型大小", settings.shapeScale, 0.9f, 1.6f) { settings.shapeScale = it }

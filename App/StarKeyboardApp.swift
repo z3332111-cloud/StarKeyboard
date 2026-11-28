@@ -114,7 +114,7 @@ struct ContentView: View {
                     Text("先點下面「試打看看」的框，叫出糯糯鍵盤，再拖滑桿，鍵盤會馬上跟著變。（要打開「允許完整取用」）")
                         .font(.footnote).foregroundStyle(.secondary)
                     lookSlider("鍵盤高度", value: $look.heightScale, range: 0.8...1.3)
-                    lookSlider("字的大小", value: $look.fontScale, range: 0.8...1.4)
+                    lookSlider("字的大小", value: $look.fontScale, range: 0.8...1.8)
                     lookSlider("按鍵間距", value: $look.gapScale, range: 0.3...1.6)
                     lookSlider("造型大小", value: $look.shapeScale, range: 0.9...1.6)
                     lookSlider("按鍵透明度", value: $look.keyAlpha, range: 0...1)

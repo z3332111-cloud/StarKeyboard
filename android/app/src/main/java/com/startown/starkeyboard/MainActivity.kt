@@ -217,7 +217,7 @@ class MainActivity : Activity() {
         val ks = KeyboardSettings(this)
         val sliders = listOf(
             lookSlider("鍵盤高度", ks.heightScale, 0.8f, 1.3f) { ks.heightScale = it },
-            lookSlider("字的大小", ks.fontScale, 0.8f, 1.4f) { ks.fontScale = it },
+            lookSlider("字的大小", ks.fontScale, 0.8f, 1.8f) { ks.fontScale = it },
             lookSlider("按鍵間距", ks.gapScale, 0.3f, 1.6f) { ks.gapScale = it },
             lookSlider("造型大小", ks.shapeScale, 0.9f, 1.6f) { ks.shapeScale = it },
             lookSlider("按鍵透明度", ks.keyAlpha, 0f, 1f) { ks.keyAlpha = it },

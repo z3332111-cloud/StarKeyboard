@@ -241,7 +241,7 @@ final class SettingsPanelView: UIView, UIScrollViewDelegate {
             self?.settings.heightScale = CGFloat(v)
             self?.onChange?()
         })
-        add(sliderRow("字的大小", value: Float(settings.fontScale), range: 0.8...1.4) { [weak self] v in
+        add(sliderRow("字的大小", value: Float(settings.fontScale), range: 0.8...1.8) { [weak self] v in
             self?.settings.fontScale = CGFloat(v)
             self?.onChange?()
         })
